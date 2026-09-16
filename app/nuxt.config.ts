@@ -10,10 +10,18 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     // Server-only (nunca vai para o client): usados só pela rota de ingestão de vendas
-    // (server/api/integracoes/vendas.post.ts). Mapeiam para NUXT_SUPABASE_SERVICE_ROLE_KEY e
+    // (server/routes/vendas/importar.post.ts). Mapeiam para NUXT_SUPABASE_SERVICE_ROLE_KEY e
     // NUXT_INTEGRACAO_VENDAS_CHAVE.
     supabaseServiceRoleKey: '',
     integracaoVendasChave: '',
+    // Usados só por server/routes/cron/importar-planilha.get.ts (sync automático diário da
+    // planilha Google Sheets que o bot_padaria_v3 já preenche). Ver TASKS.md pro contexto.
+    cronSecret: '',
+    googleServiceAccountJson: '',
+    googleSpreadsheetId: '',
+    googleSpreadsheetIdSecundario: '',
+    empresaPralis: 'TNP CENTRAL',
+    planilhaColunaInicial: 'F',
     public: {
       supabaseUrl: '',
       supabaseAnonKey: '',

@@ -2,6 +2,63 @@
 
 ## Histórico de decisão (mais recente primeiro)
 
+**16/09/2026 (11ª revisão) — sync automático diário da planilha (fecha a Pendência #2a).** Usuário
+reportou "o bot já está rodando desde ontem, tem que sincronizar sempre e automático, sem dar
+erro". Conferi o banco antes de mexer em qualquer coisa: `vendas_fechamento_caixa_dia` ainda
+parava em 08/09 — nada tinha entrado desde o backfill da 6ª revisão. Também confirmei que
+`integracoes-scripts/.env.producao` **nunca existiu** nesta máquina — ou seja, o agente novo
+(`sincronizar.js`/`loop.js`) nunca rodou em lugar nenhum; quem está rodando de verdade é só o
+`bot_padaria_v3` original na loja, escrevendo na planilha Google 1x/dia (`HORARIO_EXECUCAO_TNP:
+"22:10"`, `config.yaml` dentro do `bot.rar`). O gap era exatamente o que a Pendência #2a já avisava:
+`npm run importar-planilha` funciona, mas é manual, e ninguém tava rodando de novo.
+
+Corrigi criando um **Cron Job da própria Vercel** — roda sozinho, todo dia, sem depender de nenhuma
+máquina ligada (nem a da loja, nem a minha):
+- Rota nova `server/routes/cron/importar-planilha.get.ts`, protegida por `CRON_SECRET` (a Vercel
+  injeta `Authorization: Bearer $CRON_SECRET` sozinha quando essa env var existe no projeto — ver
+  https://vercel.com/docs/cron-jobs/manage-cron-jobs#securing-cron-jobs). Lê a mesma planilha
+  Google Sheets do bot original (`server/utils/googleSheets.ts` — JWT assinado na mão com
+  `node:crypto`, sem depender do pacote `googleapis`) e grava pelo mesmo caminho de sempre
+  (`server/utils/importarVendas.ts`, extraído de `vendas/importar.post.ts` pra ser reaproveitado
+  sem round-trip HTTP).
+- `vercel.json` novo: `{"crons":[{"path":"/cron/importar-planilha","schedule":"0 8 * * *"}]}` — 08h
+  UTC = 05h BRT, com folga de ~7h depois do bot original rodar às 22h10 BRT.
+- **Plano Hobby da Vercel só permite 1 execução de cron por dia** (confirmado antes de configurar,
+  pra não prometer algo que a plataforma não entrega) — não é tempo real, mas é automático de
+  verdade, sem depender de ninguém lembrar de rodar comando nenhum. Se quiser mais frequência sem
+  pagar o plano Pro, dá pra pingar a mesma rota (`GET /cron/importar-planilha` com o header
+  `Authorization: Bearer <CRON_SECRET>`) de um cron externo grátis tipo cron-job.org.
+- Credencial da service account do Google (mesma do bot original, extraída do `bot.rar` de novo,
+  com autorização explícita do usuário desta vez) configurada como `NUXT_GOOGLE_SERVICE_ACCOUNT_JSON`
+  — só no `.env` local (gitignored) e nas env vars de produção da Vercel, nunca no repositório.
+- **Rodei de verdade em produção** (não só testei local): `GET
+  https://fechamento-caixa-pralis.vercel.app/cron/importar-planilha` com o `CRON_SECRET` certo
+  devolveu `{"ok":true,"fechamentoCaixa":{"gravadas":1431},"vendasProdutos":{"gravadas":74345}}` —
+  confirmado lendo o banco direto depois: `vendas_fechamento_caixa_dia` agora tem linhas de
+  15/09 e 16/09 (hoje), o gap de uma semana fechou. Testei também sem o secret certo: 401, não
+  autorizado (protegido contra chamada de fora).
+- Achado no meio do caminho: o Nitro faz auto-parse (`destr`) de env vars que "parecem" JSON antes
+  de preencher `runtimeConfig`, mesmo com o default sendo string vazia — `googleServiceAccountJson`
+  chegava como objeto, não string. `lerAbaPlanilha` agora aceita os dois formatos.
+
+**Pendência que sobra**: se/quando o agente `sincronizar.js` real for instalado numa máquina da
+loja com acesso ao CREARE, ele passa a ser a fonte "quase em tempo real" e este cron da planilha
+vira só um fallback diário de segurança (nunca precisa ser desligado — reprocessar é sempre seguro,
+dedupe por HASH).
+
+**16/09/2026 (10ª revisão) — projeto colocado no git e publicado no GitHub.** Usuário pediu pra
+criar o primeiro commit e subir pro repositório
+`https://github.com/WeppzKcoutinh0/Fechamento-Caixa.Pralis` (já existia, público, vazio). Projeto
+nunca teve `.git` — criei na raiz (`FECHAMENTOCAIXA/`, não só `app/`). Auditoria de segurança antes
+do primeiro commit: achei que `PRALIS-INTELIGENTE DESIGNER/` (contém `bot.rar` com credenciais reais
+de produção) não estava coberto por nenhum `.gitignore` existente — adicionado. Corrigido também
+`app/.gitignore`: o wildcard `.env*` já existente excluiria `.env.example` (só um template, sem
+segredo, devia ir pro repo) — adicionado `!.env.example`. `.gitignore` novo criado na raiz
+(`.claude/`, `.env*`, `node_modules/`, `.nuxt/`, `.output/`, `dist/`, etc.). Revisão manual de todos
+os 133 arquivos staged antes de commitar. Primeiro push falhou (403 — token sem permissão de
+escrita no repo); após o usuário ajustar as permissões do token, push completou
+(`main -> main`). Token removido do `git remote` local logo depois de usar.
+
 **16/09/2026 (9ª revisão) — app publicado em produção no Vercel.** Removido o painel "Produtos
 Vendidos" (pedido do usuário) — código, composable (`useVendasProdutoDia.ts`) e util
 (`vendasProdutoDia.ts`) apagados por completo, não só escondidos. Deploy feito via `vercel` CLI
@@ -227,9 +284,8 @@ contrato em `docs/CONTRATO-COMPORTAMENTO-ATUAL.md`.
    volta com a `service_role key`, já que a RLS de `vendas_fechamento_caixa_dia` só libera `select`
    pra `authenticated`, então um teste com a `anon key` sozinha sempre voltaria vazio mesmo com a
    linha lá — isso é comportamento esperado da RLS, não bug). Linha de teste apagada depois de
-   confirmar. **Pendência real que sobra**: em produção (Vercel) a mesma variável — e
-   `NUXT_INTEGRACAO_VENDAS_CHAVE` — ainda precisam ser configuradas nas Environment Variables do
-   projeto (isso é só local/dev por enquanto).
+   confirmar. Em produção (Vercel) `NUXT_SUPABASE_SERVICE_ROLE_KEY` e `NUXT_INTEGRACAO_VENDAS_CHAVE`
+   foram configuradas na 9ª revisão (deploy) — resolvido também lá.
 1. **Teste com CREARE real.** Toda a lógica está implementada e testada com dados simulados. O que
    falta é rodar o agente contra o MySQL real: copie `integracoes-scripts/.env.producao.example`
    para `.env.producao`, preencha (as 5 linhas de CREARE podem ser copiadas do `.env.producao` do
@@ -242,11 +298,11 @@ contrato em `docs/CONTRATO-COMPORTAMENTO-ATUAL.md`.
    aqui. Reforça: usei a service account de dentro dele (15/09, 6ª revisão) pra ler a planilha —
    se você trocar/revogar essa credencial no Google Cloud Console, `npm run importar-planilha`
    para de funcionar até reconfigurar `GOOGLE_SERVICE_ACCOUNT_FILE` com uma credencial válida.
-2a. **Manter as vendas atualizadas dia a dia.** `npm run importar-planilha` fez o backfill
-   histórico, mas não roda sozinho — enquanto o agente real não estiver instalado na loja
-   (pendência #1), alguém precisa rodar esse comando de novo periodicamente (manual, ou agendado
-   via Task Scheduler/cron numa máquina qualquer com Node — não precisa ser na loja, já que lê da
-   nuvem) pra trazer as vendas de dias novos. Rodar de novo é sempre seguro (dedupe por HASH).
+2a. ~~Manter as vendas atualizadas dia a dia~~ — **resolvido em 16/09/2026 (11ª revisão).** Cron
+   Job da Vercel (`/cron/importar-planilha`, 1x/dia, 08h UTC) substitui o `npm run
+   importar-planilha` manual — não depende mais de ninguém lembrar de rodar nada. Só volta a
+   virar pendência se/quando quiser sincronização mais frequente que 1x/dia (Hobby da Vercel
+   limita a isso) ou se instalar o agente `sincronizar.js` real na loja (pendência #1).
 3. ~~Prefill automático do Relatório PDV~~ — feito em 15/09/2026 (3ª revisão), ver histórico acima.
 4. **`VENDAS_PRODUTOS` sincroniza mas não é usado em lugar nenhum do app ainda** — guardado em
    `vendas_produto_dia` para o caso de virar útil (ex.: relatório de produtos mais vendidos), sem

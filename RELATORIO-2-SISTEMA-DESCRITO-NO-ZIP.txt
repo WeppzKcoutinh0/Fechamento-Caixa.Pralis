@@ -1,0 +1,312 @@
+RELATÓRIO 2 — SISTEMA DE CAIXA DESCRITO NO ARQUIVO ZIP
+Data da análise: 10/09/2026
+Arquivo analisado: PACOTE-IA-CAIXA-2026-09-09.zip
+
+======================================================================
+1. AVISO IMPORTANTE SOBRE O CONTEÚDO DO ZIP
+======================================================================
+
+O ZIP não contém o sistema completo pronto para abrir e executar.
+
+Ele contém 146 arquivos:
+
+- 139 documentos Markdown;
+- 5 documentos HTML;
+- 1 patch Git;
+- 1 lista de commits.
+
+O material explica regras, decisões, arquitetura, testes, pendências, histórico
+e estado de desenvolvimento do módulo Caixa Pralis. Existe um patch envolvendo
+40 arquivos, mas o repositório completo não foi incluído.
+
+Por isso, este relatório explica o sistema descrito e as evidências entregues.
+Não foi possível instalar ou executar o Pralis completo usando somente o ZIP.
+
+======================================================================
+2. O QUE É O CAIXA PRALIS
+======================================================================
+
+O Caixa Pralis é um módulo de um ERP para uma rede de padarias. Diferentemente
+de um formulário isolado, ele faz parte de uma plataforma com:
+
+- frontend Nuxt 4, Vue e Vuetify;
+- API Fastify;
+- banco PostgreSQL;
+- Drizzle para acesso ao banco;
+- contratos e regras compartilhadas com Zod;
+- integração com o PDV CREARE;
+- testes Vitest, Testcontainers e E2E;
+- publicação por Coolify;
+- empresas, usuários, cargos, contas e permissões.
+
+O objetivo não é apenas produzir um relatório. O módulo controla o caminho do
+dinheiro desde a abertura do caixa até a entrega e conferência no cofre.
+
+======================================================================
+3. OS DOIS CIRCUITOS FINANCEIROS
+======================================================================
+
+O Pralis separa duas naturezas que não podem ser misturadas.
+
+Dinheiro físico:
+
+Cofre -> fundo lacrado -> Caixa/PDV -> vendas em dinheiro e saídas físicas ->
+sangria/retorno -> Cofre -> conferência -> fechamento.
+
+Recebíveis e banco:
+
+Cartão, Pix, voucher ou cliente -> recebível -> taxa e prazo -> liquidação ->
+banco -> conciliação.
+
+Cartão, Pix, voucher e crediário representam vendas, mas não são tratados como
+dinheiro físico disponível na gaveta.
+
+======================================================================
+4. ABERTURA DO CAIXA
+======================================================================
+
+O sistema descrito permite:
+
+- abrir um caixa por empresa, PDV, operador e turno;
+- receber fundo de troco do cofre;
+- usar um lacre para identificar o fundo;
+- abrir sem lacre e começar zerado, recebendo o fundo depois;
+- escolher opcionalmente uma maquininha cadastrada;
+- impedir estados conflitantes de caixa no mesmo PDV;
+- associar a operação a usuários e contas reais.
+
+Quando o fundo chega por uma transferência pendente, informar o lacre na
+abertura confirma o recebimento. A operação precisa ser concluída por inteiro;
+não existe meia abertura ou meia confirmação.
+
+======================================================================
+5. VENDAS E INTEGRAÇÃO COM O PDV
+======================================================================
+
+O Pralis recebe vendas integradas do CREARE.
+
+As regras mais recentes informam que:
+
+- a mesma venda não pode ser gravada duas vezes;
+- a identificação combina empresa e identificador externo;
+- chamadas concorrentes são controladas;
+- venda sem roteamento financeiro não é descartada;
+- o sistema não inventa uma conta para completar dados ausentes;
+- uma venda inconsistente vira pendência para conciliação;
+- divergência entre venda e pagamentos possui tolerância zero.
+
+======================================================================
+6. LANÇAMENTOS
+======================================================================
+
+O sistema trabalha com:
+
+- despesas;
+- mercadorias;
+- retiradas;
+- entradas;
+- transferências.
+
+O formulário documentado inclui:
+
+- valor original;
+- juros em reais ou percentual;
+- valor total calculado;
+- data do lançamento;
+- data e número do documento fiscal;
+- credor tipado como fornecedor, colaborador ou sócio/gestor;
+- pagamento e data de pagamento;
+- vencimento;
+- fotos/anexos;
+- conta de origem;
+- recorrência.
+
+O servidor recalcula valores e pode recusar a escrita quando a conta não possui
+saldo suficiente. Lançamentos recorrentes podem criar ocorrências futuras e a
+série pode ser cancelada sem apagar fatos passados ou já pagos.
+
+A discriminação de mercadorias e despesas foi especificada com quantidade,
+produto, grupo, valores, descontos e conferência entre o total da nota e os
+itens. Entretanto, o backlog mais recente ainda aponta trabalho em
+discriminação, portanto essa parte não deve ser considerada totalmente pronta.
+
+======================================================================
+7. CONTAS E SALDOS
+======================================================================
+
+Cada conta pode possuir:
+
+- empresa;
+- fundo/saldo inicial;
+- usuários autorizados;
+- entradas e saídas;
+- saldo derivado dos movimentos;
+- valor disponível;
+- valor pendente ou em trânsito.
+
+O Pralis bloqueia novas saídas que comprometam mais dinheiro do que existe na
+conta. O bloqueio ocorre dentro da transação do banco, com trava da linha, para
+que duas operações simultâneas não gastem o mesmo saldo.
+
+Saldos históricos negativos devem ser preservados. Correções futuras não podem
+reescrever o passado silenciosamente.
+
+======================================================================
+8. TRANSFERÊNCIAS E LACRES
+======================================================================
+
+O sistema descrito permite transferências com:
+
+- conta de origem;
+- uma ou várias contas candidatas de destino;
+- valor;
+- lacre;
+- prazo para confirmação;
+- estado agendado, pendente, recebido ou divergente;
+- pessoa que criou, entregou e confirmou;
+- notificações de atraso ou problema.
+
+Quando existem vários destinos candidatos, não ocorre rateio. O primeiro
+destino elegível que confirmar recebe o valor inteiro. O lacre é rompido e não
+pode ser reutilizado.
+
+O valor sai do disponível da origem quando o dinheiro entra em trânsito. Ele só
+entra no destino depois da confirmação.
+
+======================================================================
+9. SANGRIA, RETORNO E ENTREGA AO COFRE
+======================================================================
+
+As regras mais recentes definem um único caminho:
+
+Caixa aberto -> operador registra sangria/retorno dentro do Caixa -> dinheiro é
+entregue ao cofre -> outra pessoa confere -> fechamento é liberado.
+
+Regras importantes:
+
+- entrega parcial é permitida, limitada ao saldo físico;
+- cada movimento possui seu próprio lacre opcional;
+- a entrega já reduz o saldo físico do caixa;
+- ela nasce pendente até o cofre conferir;
+- quem entregou não pode conferir a própria entrega;
+- sem conferente elegível, a entrega não deve ser criada;
+- uma entrega pendente bloqueia o fechamento comum;
+- o caminho antigo “Programar entrega ao cofre” foi removido na Fatia 3.
+
+======================================================================
+10. CONFERÊNCIA E DIVERGÊNCIA
+======================================================================
+
+O cofre informa o valor realmente contado.
+
+Se D for o valor declarado e C o valor contado:
+
+- D maior que C: o cofre recebe C e a diferença vira quebra negativa;
+- C igual a zero: todo o valor declarado vira quebra;
+- C igual a D: a entrega é confirmada normalmente;
+- C maior que D: exige consentimento explícito e não cria quebra positiva.
+
+Uma divergência possui estado terminal próprio. O dinheiro que já saiu não pode
+voltar ao caixa simplesmente marcando a transferência como cancelada.
+
+======================================================================
+11. FECHAMENTO E QUEBRA DE CAIXA
+======================================================================
+
+O fechamento documentado possui:
+
+- transação no banco;
+- trava contra dois fechamentos simultâneos;
+- verificação de entregas pendentes;
+- retorno final ao cofre;
+- observação obrigatória quando existe déficit;
+- tabela própria para quebras;
+- responsável pela quebra;
+- notificação para a tesouraria;
+- marcação de ocorrência verificada ou não verificada;
+- preservação do histórico.
+
+O retorno final e o fechamento formam um ato único no servidor. Se uma parte
+falhar, nenhuma deve ficar gravada pela metade.
+
+======================================================================
+12. USUÁRIOS, PERMISSÕES E AUDITORIA
+======================================================================
+
+O sistema diferencia funções como:
+
+- Caixa;
+- Gerência;
+- Financeiro/Tesouraria;
+- Administrador;
+- Contabilidade;
+- Auditoria.
+
+As decisões financeiras são verificadas no servidor e associadas à empresa. O
+sistema registra origem, destino, valor, responsável, estado e datas. Algumas
+ações exigem outra pessoa, especialmente a conferência do dinheiro entregue.
+
+======================================================================
+13. TESTES E ESTADO DA ENTREGA
+======================================================================
+
+O handoff mais recente, de 10/09/2026, informa no HEAD b9c7d19:
+
+- 844 testes de integração aprovados e um skip intencional;
+- 553 testes de frontend aprovados;
+- 242 testes unitários aprovados;
+- E2E do Caixa com 5 de 5 casos;
+- suíte E2E completa com 33 aprovados e um skip;
+- lint, check e lint de dependências verdes;
+- validação visual em 1440, 1024, 768 e 390 pixels.
+
+Porém, esse estado está documentado como local:
+
+- sem push;
+- sem PR;
+- sem merge;
+- sem deploy;
+- sem migration 0034 aplicada em produção.
+
+O ZIP não contém o repositório completo desse HEAD, então os resultados não
+puderam ser reproduzidos nesta análise.
+
+======================================================================
+14. PENDÊNCIAS E LIMITAÇÕES DO PRALIS
+======================================================================
+
+- issue #172: a API fornece saldo, mas a tabela de Contas mostra “-”;
+- discriminação de despesas/mercadorias ainda aparece no backlog;
+- empresa selecionada ainda precisa ser persistida;
+- ambiente de desenvolvimento repetível continua pendente;
+- ciclo completo de liquidação e conciliação de recebíveis não terminou;
+- linhas antigas agendadas podem distorcer alguns relatórios;
+- certos históricos podem exigir um terceiro usuário vinculado ao cofre;
+- migrations e backfills ainda exigem autorização separada;
+- auditoria humana, CT-00 a CT-19 e piloto controlado ainda são necessários.
+
+======================================================================
+15. INCONSISTÊNCIAS DOCUMENTAIS DO ZIP
+======================================================================
+
+Documentos de 09/09 ainda dizem que a Fatia 3 estava pendente no HEAD 1cfc474.
+O leia-me e o handoff de 10/09 dizem que ela foi concluída no HEAD b9c7d19.
+A lista de commits incluída ainda termina no HEAD antigo e mostra 18 commits,
+enquanto o handoff mais novo informa 26 commits à frente.
+
+Para este relatório foi considerada a informação mais recente:
+
+Fatia 3 concluída localmente e tecnicamente liberada para push/PR, mas ainda não
+publicada nem aplicada em produção.
+
+======================================================================
+16. VEREDITO
+======================================================================
+
+O Caixa Pralis é um sistema operacional e financeiro muito mais amplo do que um
+formulário de fechamento. Ele foi desenhado para controlar dinheiro real entre
+caixa, contas, usuários e cofre, com regras no servidor, banco e auditoria.
+
+Mesmo assim, o pacote não prova uma versão final em produção. Parte importante
+da #101 está somente numa branch local e ainda existem pendências de contas,
+discriminação, liquidação, conciliação e validação operacional.

@@ -1,0 +1,17 @@
+node_modules
+.nuxt
+.output
+dist
+.env
+.env.local
+*.log
+
+.vercel
+.env*
+# .env* acima pegaria .env.example também (é só um modelo sem segredo nenhum, deve ir pro repo).
+!.env.example
+
+# Material de referência com credenciais REAIS de produção (CREARE/MySQL, service account do
+# Google) dentro do .rar/.zip — nunca deve ir pro controle de versão. Ver TASKS.md e
+# integracoes-scripts/README.md pro aviso completo sobre esses arquivos.
+PRALIS-INTELIGENTE DESIGNER/

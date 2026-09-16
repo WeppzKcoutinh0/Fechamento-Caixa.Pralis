@@ -1,0 +1,429 @@
+RELATÓRIO 3 — DIFERENÇAS E O QUE O SISTEMA ATUAL NÃO TEM
+Data da análise: 10/09/2026
+Comparação: FECHAMENTOCAIXA atual × Caixa Pralis descrito no ZIP
+
+======================================================================
+1. CONCLUSÃO PRINCIPAL
+======================================================================
+
+Os dois projetos não são somente duas versões visuais do mesmo caixa.
+
+O sistema atual é um formulário local para digitação e cálculo manual.
+O sistema do ZIP é um módulo de ERP que tenta controlar a operação completa do
+dinheiro, desde a abertura até a conferência no cofre.
+
+Em resumo:
+
+SISTEMA ATUAL = preencher, calcular, guardar localmente e visualizar.
+SISTEMA DO ZIP = operar, autorizar, integrar, movimentar, conferir e auditar.
+
+======================================================================
+2. O QUE O ATUAL NÃO TEM E O DO ZIP TEM
+======================================================================
+
+2.1 Backend e banco de dados
+
+Atual:
+- tudo funciona dentro do navegador;
+- dados ficam em localStorage.
+
+ZIP/Pralis:
+- API Fastify;
+- banco PostgreSQL;
+- Drizzle;
+- migrations;
+- transações;
+- persistência central.
+
+O que falta no atual:
+- servidor;
+- banco central;
+- backup;
+- sincronização;
+- recuperação de dados;
+- segurança para vários usuários simultâneos.
+
+2.2 Autenticação real
+
+Atual:
+- pede um e-mail por uma janela de texto;
+- não confirma identidade nem senha.
+
+ZIP/Pralis:
+- usuários e perfis;
+- sessões e autenticação;
+- vínculo entre usuário, empresa e função.
+
+O que falta no atual:
+- login real;
+- senha/sessão;
+- identificação confiável de quem fez cada operação.
+
+2.3 Empresas, lojas, PDVs e turnos reais
+
+Atual:
+- quatro caixas fixos;
+- dois turnos fixos;
+- sem empresa e sem cadastro de PDV.
+
+ZIP/Pralis:
+- multiempresa;
+- PDVs cadastrados;
+- contas vinculadas ao PDV;
+- turno aberto por operador;
+- regras contra conflito de caixa aberto.
+
+O que falta no atual:
+- cadastro administrável;
+- separação de dados por empresa;
+- ciclo verdadeiro de abertura e fechamento do turno.
+
+2.4 Permissões por função
+
+Atual:
+- qualquer pessoa pode criar, editar e excluir.
+
+ZIP/Pralis:
+- Caixa registra o turno;
+- Gerência supervisiona/aprova exceções;
+- Financeiro/Tesouraria confere liquidações e divergências;
+- Admin configura;
+- Auditoria consulta sem alterar.
+
+O que falta no atual:
+- autorização por função;
+- bloqueio de ações sensíveis;
+- segunda pessoa para conferência.
+
+2.5 Abertura de caixa e fundo de troco
+
+Atual:
+- entrada/troco é digitado manualmente dentro do fechamento.
+
+ZIP/Pralis:
+- abertura formal do caixa;
+- fundo vindo de uma conta cofre;
+- transferência identificada por lacre;
+- confirmação do recebimento na abertura;
+- possibilidade de abrir zerado e receber depois.
+
+O que falta no atual:
+- origem real do fundo;
+- confirmação;
+- controle do dinheiro em trânsito;
+- vínculo entre fundo, cofre, caixa e responsável.
+
+2.6 Integração com vendas
+
+Atual:
+- valores do PDV são digitados manualmente.
+
+ZIP/Pralis:
+- recebe vendas do CREARE;
+- impede duplicidade;
+- controla concorrência;
+- preserva venda sem roteamento;
+- cria pendência de conciliação.
+
+O que falta no atual:
+- importação automática;
+- identificador externo;
+- idempotência;
+- conferência entre venda e pagamentos.
+
+2.7 Separação entre dinheiro físico e recebíveis
+
+Atual:
+- dinheiro, cartões, Pix, voucher e crediário entram no mesmo conjunto de
+  cálculos do formulário.
+
+ZIP/Pralis:
+- dinheiro físico fica no caixa;
+- cartão, Pix, voucher e crediário viram recebíveis;
+- saldo disponível depende da liquidação;
+- banco e conciliação são circuitos separados.
+
+O que falta no atual:
+- contas de recebível;
+- taxas e prazos;
+- liquidação;
+- conciliação bancária;
+- distinção entre vendido, a receber e disponível.
+
+2.8 Contagem física
+
+Atual:
+- não há um campo claro para dinheiro realmente contado;
+- sobra/falta é calculada sem confronto físico completo.
+
+ZIP/Pralis:
+- trata dinheiro físico como circuito próprio;
+- cofre informa o valor contado na entrega;
+- divergência usa declarado versus contado.
+
+O que falta no atual:
+- dinheiro esperado;
+- dinheiro contado;
+- diferença auditável;
+- responsável e justificativa da quebra.
+
+2.9 Sangria e retorno ao cofre
+
+Atual:
+- são linhas digitadas e totalizadas;
+- não movimentam uma conta real;
+- não exigem confirmação.
+
+ZIP/Pralis:
+- sangria reduz o saldo físico;
+- entrega parcial respeita o saldo;
+- movimento fica pendente até conferência;
+- fechamento é bloqueado enquanto o dinheiro está em trânsito;
+- retorno final e fechamento são atômicos.
+
+O que falta no atual:
+- conta de origem e destino;
+- saldo autoritativo;
+- limite no servidor;
+- estado pendente;
+- confirmação pelo cofre;
+- bloqueio do fechamento.
+
+2.10 Lacres
+
+Atual:
+- lacre é somente um campo numérico;
+- pode ser repetido livremente.
+
+ZIP/Pralis:
+- lacre identifica o movimento;
+- confirmação verifica o lacre;
+- lacre é rompido;
+- reutilização é impedida.
+
+O que falta no atual:
+- cadastro/controle de lacres;
+- unicidade;
+- estado utilizado/rompido;
+- trilha do lacre.
+
+2.11 Conferência por outra pessoa
+
+Atual:
+- a mesma pessoa pode preencher e considerar o caixa fechado.
+
+ZIP/Pralis:
+- quem entrega não pode conferir a própria entrega;
+- somente pessoa elegível na conta de destino pode confirmar;
+- empresa e permissão são verificadas.
+
+O que falta no atual:
+- segregação de funções;
+- confirmação independente;
+- identificação do entregador e conferente.
+
+2.12 Divergências e quebras
+
+Atual:
+- só mostra visualmente falta ou sobra;
+- não exige justificativa;
+- não cria processo de resolução.
+
+ZIP/Pralis:
+- quebra fica em tabela própria;
+- falta exige observação;
+- tesouraria recebe notificação;
+- ocorrência pode ser verificada;
+- divergência no cofre tem estado terminal;
+- dinheiro já entregue não reaparece no caixa.
+
+O que falta no atual:
+- registro permanente da quebra;
+- responsável;
+- motivo;
+- notificação;
+- verificação;
+- fluxo de resolução.
+
+2.13 Saldo insuficiente e concorrência
+
+Atual:
+- não existe conta real nem bloqueio no servidor;
+- duas pessoas não podem operar com garantia de consistência.
+
+ZIP/Pralis:
+- trava a conta no banco;
+- relê o saldo dentro da transação;
+- recusa a operação sem gravar nada;
+- impede que duas saídas gastem o mesmo valor disponível.
+
+O que falta no atual:
+- saldo central;
+- transações;
+- locks;
+- resposta estruturada de saldo insuficiente.
+
+2.14 Lançamentos mais completos
+
+Atual:
+- possui despesas, mercadorias e retiradas básicas.
+
+ZIP/Pralis:
+- conta de origem;
+- credor tipado;
+- juros em real ou percentual;
+- valor total calculado no servidor;
+- recorrência;
+- cancelamento seguro da série;
+- validação entre lançamento e discriminação;
+- permissões por função.
+
+O que falta no atual:
+- juros;
+- recorrência;
+- contas;
+- cadastros de credores;
+- validação autoritativa;
+- regras no servidor.
+
+2.15 Histórico e auditoria
+
+Atual:
+- pode editar ou excluir sem deixar rastro;
+- data de criação pode ser substituída durante edição;
+- não guarda valores anteriores.
+
+ZIP/Pralis:
+- registra autores, datas, estados, contas e responsáveis;
+- fatos históricos não devem ser reescritos silenciosamente;
+- alterações financeiras seguem regras e permissões.
+
+O que falta no atual:
+- trilha de auditoria;
+- motivo da alteração;
+- histórico antes/depois;
+- proteção contra exclusão de fato financeiro.
+
+2.16 Testes e segurança de qualidade
+
+Atual:
+- nenhum teste automatizado;
+- possui erros críticos de recálculo e fórmula.
+
+ZIP/Pralis:
+- testes unitários;
+- testes de frontend;
+- testes de integração com banco;
+- testes E2E;
+- lint e verificação de dependências;
+- validação visual em quatro larguras.
+
+O que falta no atual:
+- testes das fórmulas;
+- teste de edição;
+- teste de persistência;
+- teste responsivo automatizado/manual registrado;
+- processo de aprovação da entrega.
+
+======================================================================
+3. TABELA RESUMIDA
+======================================================================
+
+CAPACIDADE                         ATUAL                 ZIP/PRALIS
+-----------------------------------------------------------------------
+Formulário de fechamento           Sim                   Sim
+Uso sem servidor                   Sim                   Não
+Banco de dados                     Não                   Sim
+Login real                         Não                   Sim
+Multiempresa                       Não                   Sim
+Perfis e permissões                Não                   Sim
+Abertura formal do caixa           Não                   Sim
+Integração com PDV                 Não                   Sim
+Idempotência de vendas             Não                   Sim
+Dinheiro em trânsito               Não                   Sim
+Controle de lacre                  Somente texto         Regra completa
+Conferência por outra pessoa       Não                   Sim
+Entrega ao cofre                   Linha manual          Fluxo auditado
+Bloqueio por pendência             Não                   Sim
+Quebra com justificativa           Não                   Sim
+Notificação à tesouraria           Não                   Sim
+Saldo insuficiente no servidor     Não                   Sim
+Recorrência                        Não                   Sim
+Auditoria                          Não                   Sim
+Testes automatizados               Não                   Sim
+Áudio de observação                Sim, incompleto       Não destacado
+
+======================================================================
+4. O QUE O ATUAL TEM DE PARTICULAR
+======================================================================
+
+O sistema atual também possui diferenças próprias, não apenas ausências:
+
+- abre diretamente no navegador;
+- é mais simples de demonstrar;
+- oferece um formulário guiado e compacto;
+- junta PDV, maquininha e crediário numa sequência;
+- possui gravação de áudio;
+- possui discriminação manual com dois tipos de desconto;
+- pode servir como protótipo visual ou ferramenta temporária.
+
+Essas vantagens são de simplicidade. Elas não substituem banco, auditoria,
+permissões e regras financeiras no servidor.
+
+======================================================================
+5. DIFERENÇAS DE MATURIDADE
+======================================================================
+
+Atual:
+
+- protótipo de arquivo único;
+- fácil de abrir;
+- difícil de manter e testar;
+- não preparado para vários usuários;
+- cálculos atualmente não confiáveis;
+- risco de perda de dados na edição e no navegador.
+
+ZIP/Pralis:
+
+- arquitetura de ERP;
+- regras distribuídas entre frontend, API, domínio e banco;
+- controles de concorrência e auditoria;
+- ampla suíte de testes documentada;
+- maior complexidade de implantação e manutenção;
+- algumas entregas ainda locais ou pendentes.
+
+======================================================================
+6. ORDEM RECOMENDADA PARA APROXIMAR O ATUAL DO PRALIS
+======================================================================
+
+1. Corrigir o ciclo infinito do recálculo.
+2. Corrigir a dupla contagem da sangria.
+3. Definir oficialmente a fórmula do fechamento.
+4. Adicionar dinheiro esperado e dinheiro contado.
+5. Corrigir edição, fotos, áudio e relatório.
+6. Separar cálculos em funções puras e criar testes.
+7. Criar banco, API e autenticação, caso o sistema seja usado de verdade.
+8. Criar empresas, PDVs, contas, usuários e permissões.
+9. Implantar abertura, fundo, sangria, retorno e conferência.
+10. Criar auditoria e tratamento de quebra.
+11. Integrar vendas e impedir duplicidade.
+12. Separar recebíveis, liquidação e conciliação do dinheiro físico.
+
+Não é recomendado copiar a fórmula do ZIP diretamente. Antes, é necessário
+confirmar quais regras operacionais realmente serão usadas no seu sistema.
+
+======================================================================
+7. VEREDITO FINAL
+======================================================================
+
+O atual tem uma boa base visual, mas faltam praticamente todas as garantias
+necessárias para transformar um formulário local em um sistema financeiro
+operacional.
+
+O maior diferencial do Pralis não é a quantidade de campos. É a existência de
+um fluxo confiável: cada valor tem origem, destino, responsável, estado,
+permissão, confirmação e histórico.
+
+O Pralis também não está totalmente concluído ou publicado. O próprio ZIP diz
+que parte da #101 ainda está somente em branch local e que conciliação,
+discriminação e outras pendências continuam abertas.

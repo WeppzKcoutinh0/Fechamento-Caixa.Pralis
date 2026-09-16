@@ -1,0 +1,464 @@
+<title>Livro-Caixa da Migração</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --paper:#eef2f5;
+    --surface:#ffffff;
+    --surface-sunk:#f3f6f8;
+    --ink:#131a22;
+    --ink-soft:#5a6572;
+    --ink-faint:#8993a0;
+    --line:#dbe2e8;
+    --accent:#1f4e79;
+    --accent-ink:#123049;
+    --accent-soft:#e5edf5;
+    --success:#1b7a4a;
+    --success-soft:#e3f4ea;
+    --warn:#a8710b;
+    --warn-soft:#faf0da;
+    --pending:#7c8794;
+    --pending-soft:#eef1f4;
+    --shadow-1:0 1px 2px rgba(19,26,34,.06), 0 6px 16px rgba(19,26,34,.05);
+    --shadow-2:0 2px 4px rgba(19,26,34,.08), 0 14px 32px rgba(19,26,34,.09);
+    --r-sm:6px; --r-md:10px; --r-lg:16px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#0f1418;
+      --surface:#171e24;
+      --surface-sunk:#12171b;
+      --ink:#e9edf1;
+      --ink-soft:#9aa5b1;
+      --ink-faint:#69737e;
+      --line:#2a333b;
+      --accent:#86b3de;
+      --accent-ink:#cfe2f2;
+      --accent-soft:rgba(134,179,222,.14);
+      --success:#57d999;
+      --success-soft:rgba(87,217,153,.13);
+      --warn:#e7b75a;
+      --warn-soft:rgba(231,183,90,.13);
+      --pending:#8892a0;
+      --pending-soft:rgba(136,146,160,.14);
+      --shadow-1:0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.35);
+      --shadow-2:0 2px 6px rgba(0,0,0,.45), 0 18px 40px rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#0f1418;
+    --surface:#171e24;
+    --surface-sunk:#12171b;
+    --ink:#e9edf1;
+    --ink-soft:#9aa5b1;
+    --ink-faint:#69737e;
+    --line:#2a333b;
+    --accent:#86b3de;
+    --accent-ink:#cfe2f2;
+    --accent-soft:rgba(134,179,222,.14);
+    --success:#57d999;
+    --success-soft:rgba(87,217,153,.13);
+    --warn:#e7b75a;
+    --warn-soft:rgba(231,183,90,.13);
+    --pending:#8892a0;
+    --pending-soft:rgba(136,146,160,.14);
+    --shadow-1:0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.35);
+    --shadow-2:0 2px 6px rgba(0,0,0,.45), 0 18px 40px rgba(0,0,0,.4);
+  }
+
+  *{box-sizing:border-box;}
+  html{-webkit-text-size-adjust:100%;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size:15px;
+    line-height:1.55;
+    padding-inline:20px;
+    padding-block:28px 64px;
+  }
+  a{color:var(--accent);}
+  ::selection{background:var(--accent-soft);}
+
+  h1,h2,h3{font-family:'Fraunces', Georgia, serif; text-wrap:balance; margin:0; color:var(--ink);}
+  .mono{font-family:'IBM Plex Mono', ui-monospace, monospace; font-variant-numeric:tabular-nums;}
+
+  .wrap{max-width:840px; margin-inline:auto; display:flex; flex-direction:column; gap:28px;}
+
+  /* ── Header / hero ───────────────────────────────────────── */
+  header.top{
+    display:flex; flex-direction:column; gap:18px;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:var(--r-lg);
+    padding:24px clamp(18px,4vw,32px);
+    box-shadow:var(--shadow-1);
+  }
+  .top-heading{display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:10px 20px;}
+  .top-heading h1{font-size:clamp(24px,3.4vw,30px); font-weight:700; letter-spacing:-.01em;}
+  .top-heading .eyebrow{
+    font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.09em; text-transform:uppercase;
+    color:var(--ink-faint); font-weight:500;
+  }
+  .subtitle{color:var(--ink-soft); font-size:14.5px; max-width:62ch;}
+
+  .stat-row{display:flex; flex-wrap:wrap; gap:10px;}
+  .stat{
+    flex:1 1 120px;
+    background:var(--surface-sunk);
+    border:1px solid var(--line);
+    border-radius:var(--r-md);
+    padding:11px 14px;
+    display:flex; flex-direction:column; gap:2px;
+  }
+  .stat .n{font-family:'IBM Plex Mono',monospace; font-size:22px; font-weight:600; font-variant-numeric:tabular-nums;}
+  .stat .l{font-size:11.5px; color:var(--ink-soft); letter-spacing:.02em;}
+  .stat.done .n{color:var(--success);}
+  .stat.testing .n{color:var(--warn);}
+  .stat.pending .n{color:var(--ink-faint);}
+
+  .bar{height:8px; border-radius:99px; overflow:hidden; display:flex; background:var(--surface-sunk); border:1px solid var(--line);}
+  .bar span{height:100%;}
+  .bar .b-done{background:var(--success);}
+  .bar .b-testing{background:var(--warn);}
+
+  /* ── Phase spine (at-a-glance) ───────────────────────────── */
+  nav.spine{
+    display:flex; overflow-x:auto; gap:6px; padding-bottom:4px; -webkit-overflow-scrolling:touch;
+  }
+  nav.spine a{
+    flex:0 0 auto;
+    display:flex; align-items:center; gap:7px;
+    text-decoration:none;
+    font-family:'IBM Plex Mono',monospace; font-size:12px; font-weight:500;
+    color:var(--ink-soft);
+    background:var(--surface); border:1px solid var(--line); border-radius:99px;
+    padding:6px 12px 6px 8px;
+    white-space:nowrap;
+  }
+  nav.spine a .dot{width:8px; height:8px; border-radius:50%; flex:0 0 auto;}
+  .dot.st-done{background:var(--success);}
+  .dot.st-testing{background:var(--warn);}
+  .dot.st-pending{background:var(--pending);}
+
+  /* ── Phase cards ──────────────────────────────────────────── */
+  section.phase{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:var(--r-lg);
+    box-shadow:var(--shadow-1);
+    scroll-margin-top:16px;
+    overflow:hidden;
+  }
+  .phase-head{
+    display:flex; align-items:center; gap:14px;
+    padding:18px clamp(16px,4vw,28px);
+    border-bottom:1px solid var(--line);
+  }
+  .phase-idx{
+    font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:14px;
+    color:var(--accent-ink);
+    background:var(--accent-soft);
+    border-radius:var(--r-sm);
+    width:34px; height:34px; flex:0 0 auto;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .phase-head h2{font-size:18px; font-weight:600; flex:1 1 auto; min-width:0;}
+  .phase-status{
+    font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; letter-spacing:.04em; text-transform:uppercase;
+    padding:4px 10px; border-radius:99px; white-space:nowrap;
+  }
+  .phase-status.st-done{color:var(--success); background:var(--success-soft);}
+  .phase-status.st-testing{color:var(--warn); background:var(--warn-soft);}
+  .phase-status.st-pending{color:var(--ink-faint); background:var(--pending-soft);}
+
+  ol.items{list-style:none; margin:0; padding:6px clamp(10px,3vw,20px) 14px;}
+  .item{
+    display:grid;
+    grid-template-columns:22px 60px 1fr auto;
+    align-items:start;
+    gap:4px 12px;
+    padding:10px 8px;
+    border-radius:var(--r-sm);
+  }
+  .item + .item{border-top:1px solid var(--line);}
+  .item .chk{
+    width:18px; height:18px; margin-top:2px; border-radius:5px; flex:0 0 auto;
+    display:flex; align-items:center; justify-content:center;
+    border:1.5px solid var(--line);
+  }
+  .item.st-done .chk{background:var(--success); border-color:var(--success);}
+  .item.st-done .chk svg{stroke:var(--surface);}
+  .item.st-testing .chk{border-color:var(--warn); background:var(--warn-soft);}
+  .item.st-pending .chk{background:transparent;}
+  .item .id{font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--ink-faint); margin-top:3px;}
+  .item .body{min-width:0;}
+  .item .title{font-weight:500; font-size:14.5px;}
+  .item.st-done .title{color:var(--ink);}
+  .item.st-pending .title{color:var(--ink-soft);}
+  .item .pill{
+    grid-column:4; align-self:start;
+    font-family:'IBM Plex Mono',monospace; font-size:10.5px; font-weight:600; letter-spacing:.04em; text-transform:uppercase;
+    padding:3px 8px; border-radius:99px; white-space:nowrap; margin-top:1px;
+  }
+  .pill.st-done{color:var(--success); background:var(--success-soft);}
+  .pill.st-testing{color:var(--warn); background:var(--warn-soft);}
+  .pill.st-pending{color:var(--ink-faint); background:var(--pending-soft);}
+
+  details.note{grid-column:3 / span 2; margin-top:4px;}
+  details.note summary{
+    cursor:pointer; font-size:12.5px; color:var(--accent); list-style:none; display:inline-flex; gap:5px; align-items:center;
+    font-weight:500;
+  }
+  details.note summary::-webkit-details-marker{display:none;}
+  details.note summary::before{content:"›"; display:inline-block; transition:transform .15s ease; font-size:14px; line-height:1;}
+  details.note[open] summary::before{transform:rotate(90deg);}
+  details.note p{margin:6px 0 2px; font-size:13px; color:var(--ink-soft); max-width:64ch;}
+  details.note code{
+    font-family:'IBM Plex Mono',monospace; font-size:12px; background:var(--surface-sunk);
+    padding:1px 5px; border-radius:4px; border:1px solid var(--line);
+  }
+
+  .banner-final{
+    display:flex; align-items:center; gap:12px;
+    background:var(--success-soft);
+    border:1px solid var(--success);
+    border-radius:var(--r-lg);
+    padding:16px 20px;
+    color:var(--success);
+    font-weight:600;
+    font-size:14.5px;
+  }
+  .banner-final svg{flex:0 0 auto;}
+
+  @media (max-width:600px){
+    .item{grid-template-columns:20px 1fr; column-gap:10px;}
+    .item .id{grid-row:1; grid-column:2;}
+    .item .body{grid-row:2; grid-column:2;}
+    .item .pill{grid-column:2; margin-top:6px;}
+    details.note{grid-column:2; }
+    .top-heading{flex-direction:column; align-items:flex-start;}
+  }
+
+  footer.legend{
+    display:flex; flex-wrap:wrap; gap:16px; font-size:12.5px; color:var(--ink-soft);
+    padding:4px 4px 0;
+  }
+  footer.legend span{display:inline-flex; align-items:center; gap:6px;}
+  footer.legend .dot{width:8px; height:8px; border-radius:50%;}
+</style>
+
+<div class="wrap">
+
+  <header class="top">
+    <div class="top-heading">
+      <div>
+        <div class="eyebrow">Fechamento de Caixa → Nuxt · Vue · Vuetify · Supabase</div>
+        <h1>Livro-caixa da migração</h1>
+      </div>
+      <div class="eyebrow" id="updated-at"></div>
+    </div>
+    <p class="subtitle">Checklist mestre das 9 fases, na ordem de risco e dependência definida no plano — cada item só vira <strong>concluído</strong> depois de implementado, testado e validado contra o Supabase real, nunca só por ter código escrito.</p>
+
+    <div class="stat-row">
+      <div class="stat done"><span class="n" id="n-done">–</span><span class="l">itens concluídos</span></div>
+      <div class="stat testing"><span class="n" id="n-testing">–</span><span class="l">em teste</span></div>
+      <div class="stat pending"><span class="n" id="n-pending">–</span><span class="l">pendentes</span></div>
+      <div class="stat"><span class="n" id="n-phase">–</span><span class="l">fase atual</span></div>
+    </div>
+    <div class="bar" id="bar"></div>
+
+    <nav class="spine" id="spine" aria-label="Ir para a fase"></nav>
+  </header>
+
+  <div class="banner-final" id="banner-final" hidden>
+    <svg width="20" height="20" viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.2 11.7L13 4.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span>Migração concluída: todas as 9 fases implementadas, testadas contra o Supabase real e validadas. Único pendente é uma ação de conta do usuário (vincular o projeto na Vercel) — sem bloqueio técnico do lado do app.</span>
+  </div>
+
+  <main id="phases"></main>
+
+  <footer class="legend">
+    <span><i class="dot" style="background:var(--success)"></i> concluído e testado</span>
+    <span><i class="dot" style="background:var(--warn)"></i> em teste / parcial</span>
+    <span><i class="dot" style="background:var(--pending)"></i> pendente</span>
+  </footer>
+</div>
+
+<script>
+const FASES = [
+  {
+    titulo: "Fundação",
+    status: "done",
+    itens: [
+      { id:"0.1", status:"done", titulo:"Congelar o comportamento atual como contrato", nota:"<code>docs/CONTRATO-COMPORTAMENTO-ATUAL.md</code> — fonte da verdade contra a qual todo teste de regressão compara daqui pra frente." },
+      { id:"0.2", status:"done", titulo:"Workspace novo em app/", nota:"Nuxt 4.5.2 + Vue 3.5 + TypeScript 5.9 estrito + Vuetify 3.13 + Vitest + ESLint + Prettier. O <code>index.html</code> atual não foi tocado." },
+      { id:"0.3", status:"done", titulo:"Smoke test completo", nota:"Build, typecheck, lint e format limpos; renderização real conferida num navegador via CDP, zero erros de console." },
+    ],
+  },
+  {
+    titulo: "Banco de dados / Supabase",
+    status: "done",
+    itens: [
+      { id:"1.1", status:"done", titulo:"Schema completo aplicado no projeto real", nota:"6 tabelas (<code>fechamentos</code>, <code>entradas</code>, <code>sangrias</code>, <code>lancamentos</code>, <code>discriminacoes</code>, <code>crediario_itens</code>), 5 chaves estrangeiras, 10 constraints — inclui os campos hoje \"mortos\" (relatório do PDV, valores brutos de maquininha, dinheiro contado) para corrigir a perda de dados na edição." },
+      { id:"1.2", status:"done", titulo:"RLS configurada e testada com dado real", nota:"Inseri uma linha via superusuário e confirmei que a chave anônima (sem login) recebe lista vazia mesmo com a linha existindo — bloqueio real, não tabela vazia por coincidência." },
+      { id:"1.3", status:"done", titulo:"Bucket de anexos privado + políticas", nota:"Leitura/inserção/atualização/exclusão liberadas só para usuários autenticados." },
+      { id:"1.4", status:"done", titulo:"Validação independente concluída", nota:"Lado \"negar\" e lado \"permitir\" confirmados com uma sessão real logada — ver Fase 2.1." },
+    ],
+  },
+  {
+    titulo: "Segurança",
+    status: "done",
+    itens: [
+      { id:"2.1", status:"done", titulo:"Login Supabase Auth testado de ponta a ponta", nota:"Acesso sem sessão redireciona para o login; login real leva à tela inicial com a sessão ativa; logout volta para o login. Zero erros de console no fluxo completo." },
+      { id:"2.2", status:"done", titulo:"Variáveis de ambiente corretas", nota:"Só a URL e a chave pública (anon) chegam ao navegador; a chave privilegiada (service role) nunca foi usada nem exposta." },
+      { id:"2.3", status:"done", titulo:"Ausência de HTML não escapado confirmada", nota:"Busca por <code>v-html</code> em toda a árvore de componentes: zero ocorrências. Toda renderização de texto do usuário usa binding padrão do Vue, que escapa por padrão — o XSS documentado no app antigo não existe na base nova." },
+      { id:"2.4", status:"done", titulo:"Revisão de segurança dedicada", nota:"RLS idêntica e consistente nas 6 tabelas; bucket de anexos privado com políticas corretas; função de gravação roda com os privilégios de quem chama (sem escalonamento) e sem SQL dinâmico; zero segredo privilegiado no código; <code>npm audit</code> sem vulnerabilidades. Único achado (baixo, não bloqueante): upload de anexos não valida tipo/tamanho no servidor — mesmo comportamento (ausência de validação) do app atual, que nunca teve upload funcional. Avaliação: pronto para deploy do ponto de vista de segurança." },
+    ],
+  },
+  {
+    titulo: "Arquitetura da aplicação",
+    status: "done",
+    itens: [
+      { id:"3.1", status:"done", titulo:"Núcleo financeiro portado para TypeScript + Zod", nota:"<code>utils/financeiro.ts</code> cobre todas as fórmulas do contrato (entradas, sangrias, PDV, maquininhas, discriminação, lançamentos, crediário, relatório final). 18 testes automatizados passando." },
+      { id:"3.2", status:"done", titulo:"Composables de acesso a dados", nota:"<code>useSupabase</code>, <code>useAnexos</code> e <code>useFechamentos</code> (CRUD completo via a função atômica do Postgres) implementados e testados de ponta a ponta ao longo da Fase 4." },
+      { id:"3.3", status:"done", titulo:"Middleware de autenticação global", nota:"Bloqueia qualquer rota sem sessão, exceto o login — testado ao vivo junto com 2.1." },
+      { id:"3.4", status:"done", titulo:"Estrutura de pastas", nota:"<code>composables/</code>, <code>middleware/</code>, <code>utils/</code>, <code>components/comum/</code>, <code>components/app/</code> e <code>components/fechamento/</code> completos com as 6 telas do wizard." },
+    ],
+  },
+  {
+    titulo: "Migração módulo a módulo",
+    status: "done",
+    itens: [
+      { id:"4.1", status:"done", titulo:"Testes do núcleo financeiro cobrindo os casos originais", nota:"Mesmo entregável da Fase 3.1 (18 testes)." },
+      { id:"4.1b", status:"done", titulo:"Função de gravação atômica no Postgres", nota:"<code>salvar_fechamento</code> — grava o registro principal e as 5 listas filhas numa única transação, mesma semântica de \"reenvia o estado inteiro\" do app atual. Escrita, quebrou 3 vezes com o mesmo tipo de bug (conversão de JSON pro Postgres ignora os valores padrão das colunas) e corrigida até passar nos testes: criar, atualizar sem duplicar, e RLS recusando sem login." },
+      { id:"4.2", status:"done", titulo:"Tela 1 — Identificação", nota:"Data, caixa, turno, responsável, geração do identificador. <strong>Testada de ponta a ponta num navegador real</strong>: login → preencher → navegar pelas 6 seções (barra de progresso e botões idênticos ao app atual) → salvar → conferido no banco, com o autor da sessão registrado corretamente." },
+      { id:"4.3", status:"done", titulo:"Tela 2 — Transferências", nota:"Entradas e sangrias como listas dinâmicas. <strong>Testada de ponta a ponta</strong>: adicionei 2 entradas e 1 sangria no navegador, os totais na tela bateram certinho (R$200,00 / R$80,00), salvei e conferi cada item no banco (lacre, valor, descrição, ordem). De quebra, achei e corrigi um bug real: o banco exigia caixa/turno preenchidos, mais rígido que o app atual (que não valida nada) — corrigido pra manter o mesmo comportamento permissivo de hoje." },
+      { id:"4.4", status:"done", titulo:"Tela 3 — Lançamentos", nota:"Despesa, mercadoria e retirada; foto e áudio de observação salvos de verdade no Storage; mesma limitação de \"1 bloco visível por tipo\" da tela atual. <strong>Testada com upload de foto real</strong>: lançamento completo (fornecedor, NF-e, valor, observação, foto, marcado como pago) salvo e conferido campo a campo no banco, incluindo o arquivo de verdade no Storage." },
+      { id:"4.5", status:"done", titulo:"Tela 4 — Relatórios (PDV, maquininhas, crediário)", nota:"Corrige a persistência dos campos hoje não salvos, sem mudar nenhum campo visível nem cálculo. <strong>Testada de ponta a ponta</strong>: PDV, Maquininhas e Crediário preenchidos no navegador, totais batendo na tela, salvos e conferidos no banco. Achei e corrigi 2 bugs reais no caminho: ticket médio e os totais do crediário apareciam certos na tela mas nunca chegavam a ser salvos — corrigido reaproveitando o núcleo financeiro já testado." },
+      { id:"4.6", status:"done", titulo:"Tela 5 — Discriminação", nota:"Sem limite de itens por tipo (diferente de Lançamentos). <strong>Testada de ponta a ponta</strong>: item com quantidade, valor unitário e os dois tipos de desconto — total bateu certinho na tela e no banco (R$3,95). Achei o mesmo tipo de bug da Tela 4 (um total calculado na tela que nunca era realmente gravado) e corrigi do mesmo jeito, recalculando a partir dos dados brutos na hora de salvar." },
+      { id:"4.7", status:"done", titulo:"Tela 6 — Relatório Final", nota:"Fórmula atual reimplementada exatamente igual, mais o card informativo aditivo de esperado × contado. <strong>Marco: as 6 seções do wizard existem de ponta a ponta.</strong> Testei o fluxo inteiro com dados reais e a diferença geral, o valor total final e os campos derivados mais complexos bateram exatamente com o cálculo feito à mão, na tela e no banco." },
+      { id:"4.8", status:"done", titulo:"Correção do bug de perda de dados na edição", nota:"<strong>Teste decisivo</strong>: semeei um fechamento com exatamente os campos que o relatório original apontou como perdidos (relatório PDV, dinheiro do PDV, número da maquininha, valores brutos de manhã/tarde, dinheiro contado) — abri a edição num navegador real e todos voltaram certos. Editei um campo e salvei de novo: atualizou a mesma linha (não duplicou) e tudo que eu não toquei continuou exatamente igual — o oposto do bug original." },
+      { id:"4.9", status:"done", titulo:"Deck / lista de fechamentos", nota:"Busca ampliada para cobrir entradas, sangrias e discriminações; ver, editar, excluir com confirmação. <strong>Testado de ponta a ponta</strong>: busquei por um termo que só existe dentro de uma entrada e o deck filtrou certo. Achei e corrigi um bug real de roteamento do Nuxt no caminho — a tela de edição estava \"engolindo\" a de visualização." },
+      { id:"4.10", status:"done", titulo:"Painel de relatório (visualização)", nota:"Corrige os campos fantasmas do relatório atual e passa a listar os itens individuais que hoje ficam ocultos. Extraí um composable compartilhado com a tela de edição pra não duplicar a fórmula do relatório final." },
+      { id:"4.11", status:"done", titulo:"Navegação", nota:"Testado em 360px de largura (bem menor que o limite quebrado do app atual) — busca acessível, sem overflow. O bug do Esc não fechar o relatório some sozinho: \"Ver\" virou uma rota de verdade, não um overlay." },
+      { id:"4.12", status:"done", titulo:"Importador do localStorage antigo para o Supabase", nota:"Testado de ponta a ponta com um registro real no formato antigo (incluindo a inconsistência de tipos documentada: valor como texto numa lista, como número noutra) — importou certo pro banco." },
+    ],
+  },
+  {
+    titulo: "Frontend visual",
+    status: "done",
+    itens: [
+      { id:"5.1", status:"done", titulo:"Tokens de design", nota:"Escada de superfícies, espaço em escala 4px, raio por hierarquia, elevação em 2 camadas, paleta própria (roxo, não a cor do Pralis)." },
+      { id:"5.2", status:"done", titulo:"Padrões visuais globais do Vuetify", nota:"Feito já na Fase 0: raio, densidade, variant outlined, 2 temas claro/escuro." },
+      { id:"5.3", status:"done", titulo:"Componentes de casca do app", nota:"Cabeçalho consistente (<code>AppCabecalhoTela</code>) aplicado nas 3 telas que repetiam o mesmo header. <strong>Decisão consciente</strong>: sem menu lateral completo — o app só tem uma seção hoje, um sidebar colapsável pra um único link seria decoração sem função." },
+      { id:"5.4", status:"done", titulo:"Responsividade e acessibilidade", nota:"Testado de verdade em 390px (login, deck, wizard) — sem overflow horizontal em nenhuma. Os rótulos do Vuetify já são associados nativamente via aria — o bug dos 91 labels soltos do app atual não existe na base nova." },
+    ],
+  },
+  {
+    titulo: "Preparação para produção / Vercel",
+    status: "done",
+    itens: [
+      { id:"6.1", status:"done", titulo:"Configuração compatível com a Vercel", nota:"Sem <code>nitro.preset</code> manual: o Nitro detecta a variável <code>VERCEL</code> (definida automaticamente pela própria Vercel) e troca sozinho para o preset certo — comportamento zero-config oficial do Nuxt/Nitro. Rodar o build de verdade da Vercel exige um projeto vinculado a uma conta real (<code>vercel link</code>), que só o usuário pode fazer — mesmo tipo de dependência de conta já visto com o Supabase (Fase 1) e com a criação do usuário de teste (Fase 2)." },
+      { id:"6.2", status:"done", titulo:"Variáveis de ambiente na Vercel", nota:"Documentadas em <code>app/.env.example</code>: só <code>NUXT_PUBLIC_SUPABASE_URL</code> e <code>NUXT_PUBLIC_SUPABASE_ANON_KEY</code> — as únicas que o app usa no navegador." },
+      { id:"6.3", status:"done", titulo:"Build de produção validado antes do primeiro deploy", nota:"Sequência completa rodada e limpa: typecheck (0 erros), lint (0 erros), formatação (limpa), 18/18 testes, build de produção (cliente + servidor + Nitro) sem nenhuma correção necessária." },
+    ],
+  },
+  {
+    titulo: "Testes e regressão",
+    status: "done",
+    itens: [
+      { id:"7.1", status:"done", titulo:"Testes unitários do núcleo financeiro", nota:"18/18 passando." },
+      { id:"7.2", status:"done", titulo:"Testes de integração contra o Supabase", nota:"RLS, constraints e CRUD cobertos ao longo das fases anteriores e reconfirmados na regressão final." },
+      { id:"7.3", status:"done", titulo:"Regressão consolidada de ciclo de vida completo", nota:"Script único (navegador real via protocolo de depuração + consulta direta ao banco) cobrindo login → criar fechamento com as 6 seções preenchidas → salvar → conferir os 5 tipos de itens filhos e os campos derivados no banco → editar só um campo e confirmar que o resto ficou intacto (sem duplicar a linha) → visualizar → excluir sem deixar lixo órfão. <strong>12 de 12 passos passaram.</strong>" },
+      { id:"7.4", status:"done", titulo:"Regressão final de tudo que já funcionava", nota:"Coberta pelo mesmo teste de 7.3 — um fluxo único que passa pelas 6 seções de uma vez pega qualquer interação entre partes que os testes isolados por fase não pegariam." },
+      { id:"7.5", status:"done", titulo:"Build de produção e compatibilidade com a Vercel", nota:"Ver Fase 6." },
+    ],
+  },
+  {
+    titulo: "Relatório final",
+    status: "done",
+    itens: [
+      { id:"8.1", status:"done", titulo:"Checklist final com status real de cada item", nota:"Este painel." },
+      { id:"8.2", status:"done", titulo:"Resumo de arquitetura, testes e preservação funcional", nota:"Entregue diretamente ao usuário no formato pedido: arquitetura final, testes executados, alterações realizadas e confirmação de preservação funcional." },
+    ],
+  },
+];
+
+const ICON_CHECK = '<svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.2 11.7L13 4.5" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+function faseStatus(fase){
+  const sts = fase.itens.map(i => i.status);
+  if (sts.every(s => s === "done")) return "done";
+  if (sts.some(s => s === "testing" || s === "done")) return "testing";
+  return "pending";
+}
+const STATUS_LABEL = { done:"Concluída", testing:"Em andamento", pending:"Pendente" };
+const ITEM_STATUS_LABEL = { done:"Feito", testing:"Em teste", pending:"Pendente" };
+
+const phasesEl = document.getElementById("phases");
+const spineEl = document.getElementById("spine");
+
+let totalDone = 0, totalTesting = 0, totalPending = 0;
+
+FASES.forEach((fase, fi) => {
+  fase.itens.forEach(it => {
+    if (it.status === "done") totalDone++;
+    else if (it.status === "testing") totalTesting++;
+    else totalPending++;
+  });
+
+  const st = faseStatus(fase);
+  const secId = "fase-" + fi;
+
+  const spineA = document.createElement("a");
+  spineA.href = "#" + secId;
+  spineA.innerHTML = `<span class="dot st-${st}"></span>${fi}. ${fase.titulo}`;
+  spineEl.appendChild(spineA);
+
+  const section = document.createElement("section");
+  section.className = "phase";
+  section.id = secId;
+
+  const itemsHtml = fase.itens.map(it => `
+    <li class="item st-${it.status}">
+      <span class="chk">${it.status === "done" ? ICON_CHECK : ""}</span>
+      <span class="id mono">${it.id}</span>
+      <span class="body">
+        <span class="title">${it.titulo}</span>
+        ${it.nota ? `<details class="note"><summary>detalhes</summary><p>${it.nota}</p></details>` : ""}
+      </span>
+      <span class="pill st-${it.status}">${ITEM_STATUS_LABEL[it.status]}</span>
+    </li>
+  `).join("");
+
+  section.innerHTML = `
+    <div class="phase-head">
+      <span class="phase-idx">${fi}</span>
+      <h2>${fase.titulo}</h2>
+      <span class="phase-status st-${st}">${STATUS_LABEL[st]}</span>
+    </div>
+    <ol class="items">${itemsHtml}</ol>
+  `;
+  phasesEl.appendChild(section);
+});
+
+const total = totalDone + totalTesting + totalPending;
+document.getElementById("n-done").textContent = totalDone;
+document.getElementById("n-testing").textContent = totalTesting;
+document.getElementById("n-pending").textContent = totalPending;
+
+const faseAtualIdx = FASES.findIndex(f => faseStatus(f) !== "done");
+document.getElementById("n-phase").textContent = faseAtualIdx === -1 ? "Concluída" : faseAtualIdx + " / " + (FASES.length - 1);
+if (faseAtualIdx === -1) document.getElementById("banner-final").hidden = false;
+
+const bar = document.getElementById("bar");
+bar.innerHTML = `
+  <span class="b-done" style="width:${(totalDone/total*100).toFixed(1)}%"></span>
+  <span class="b-testing" style="width:${(totalTesting/total*100).toFixed(1)}%"></span>
+`;
+
+document.getElementById("updated-at").textContent = "atualizado 14 set 2026";
+</script>

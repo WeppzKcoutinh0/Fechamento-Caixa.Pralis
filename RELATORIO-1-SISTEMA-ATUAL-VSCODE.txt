@@ -1,0 +1,255 @@
+RELATÓRIO 1 — SISTEMA ATUAL ABERTO NO VS CODE
+Data da análise: 10/09/2026
+Arquivo analisado: FECHAMENTOCAIXA/index.html
+
+======================================================================
+1. RESUMO
+======================================================================
+
+O sistema atual é uma página de Fechamento de Caixa feita em HTML, CSS e
+JavaScript puro. Toda a interface, os cálculos, o salvamento e os relatórios
+estão concentrados em um único arquivo com 5.607 linhas.
+
+Ele funciona como um formulário manual: a pessoa digita as informações do
+caixa, do PDV, das maquininhas, das entradas, sangrias, despesas, mercadorias,
+retiradas e crediário. Depois, o navegador calcula totais e monta um relatório.
+
+Os dados não vão para um servidor. Eles ficam guardados somente no navegador
+daquele computador por meio do localStorage.
+
+Classificação: protótipo funcional de formulário e conferência manual.
+No estado atual, não deve ser usado como fonte financeira oficial porque foram
+encontrados erros críticos nos cálculos e na edição dos registros.
+
+======================================================================
+2. TELAS E NAVEGAÇÃO
+======================================================================
+
+O sistema possui:
+
+- uma tela inicial com a lista de fechamentos;
+- pesquisa por fechamento;
+- botão para criar um novo fechamento;
+- formulário dividido em seis seções;
+- painel para visualizar o relatório;
+- opções para editar e excluir;
+- menu lateral no computador;
+- navegação adaptada para celular;
+- mensagens rápidas de confirmação.
+
+O formulário é dividido em:
+
+1. Identificação;
+2. Transferências;
+3. Lançamentos;
+4. Relatórios;
+5. Discriminação;
+6. Relatório Final.
+
+Embora o texto inicial da página ainda diga “Seção 1 de 7”, o código usa seis
+seções. É uma pequena inconsistência visual.
+
+======================================================================
+3. O QUE O SISTEMA FAZ
+======================================================================
+
+3.1 Identificação
+
+- preenche a data atual automaticamente;
+- gera um identificador do tipo FC-...;
+- permite selecionar Caixa 1, 2, 3 ou 4;
+- permite escolher turno da Manhã ou Tarde;
+- recebe o nome do responsável.
+
+3.2 Entradas e sangrias
+
+- permite adicionar várias entradas;
+- cada entrada tem número do lacre, valor e descrição;
+- permite adicionar várias sangrias;
+- cada sangria tem descrição, lacre e valor;
+- calcula o total das entradas e das sangrias.
+
+3.3 Lançamentos
+
+- permite registrar despesa, mercadoria ou retirada;
+- recebe data de referência e data da nota fiscal;
+- recebe número da NF-e e fornecedor;
+- recebe tipo de mercadoria e valor;
+- permite marcar como pago ou não pago;
+- recebe vencimento;
+- permite observação em texto;
+- oferece gravação de observação em áudio;
+- exibe campos para fotos da operação e da nota/boleto.
+
+3.4 Relatório do PDV
+
+- texto/observação do relatório PDV;
+- número de clientes;
+- dinheiro;
+- crédito;
+- débito;
+- Pix;
+- voucher;
+- crediário;
+- cálculo do total do PDV;
+- cálculo do ticket médio.
+
+3.5 Relatório das maquininhas
+
+- número da maquininha;
+- valores de crédito, débito, Pix e voucher da manhã;
+- valores de crédito, débito, Pix e voucher da tarde;
+- imagens dos relatórios da manhã e da tarde;
+- cálculo líquido usando valor da tarde menos valor da manhã.
+
+3.6 Crediário
+
+- registros separados para clientes e colaboradores;
+- nome da pessoa;
+- valor;
+- campo para foto do cupom assinado;
+- total de clientes;
+- total de colaboradores;
+- total geral do crediário.
+
+3.7 Discriminação
+
+- classificação como mercadoria, despesa ou retirada;
+- quantidade;
+- nome do produto;
+- grupo;
+- valor unitário;
+- desconto em reais;
+- desconto percentual;
+- cálculo do valor total.
+
+3.8 Relatório final
+
+- total final;
+- entradas e saídas;
+- despesas, mercadorias e retiradas;
+- cartões;
+- diferenças de crédito, débito, Pix, voucher e crediário;
+- indicação visual de sobra, falta ou diferença zero;
+- relatório de visualização de cada fechamento.
+
+3.9 Lista de registros
+
+- guarda fechamentos no navegador;
+- pesquisa pelo conteúdo dos registros;
+- ordena pelos registros mais recentes;
+- mostra data, caixa, turno, responsável, valor e diferença;
+- permite visualizar, editar ou excluir.
+
+======================================================================
+4. COMO OS DADOS SÃO SALVOS
+======================================================================
+
+Os registros são transformados em texto JSON e gravados na chave
+“fechamentos_caixa” do localStorage.
+
+Consequências:
+
+- os dados só existem naquele navegador;
+- outro computador não vê os registros;
+- outro usuário do sistema não recebe atualizações;
+- limpar os dados do navegador pode apagar tudo;
+- não existe backup automático;
+- não existe sincronização;
+- não existe banco de dados central;
+- duas pessoas não conseguem trabalhar com segurança no mesmo caixa.
+
+A opção “Conta Google” não é uma autenticação Google verdadeira. O sistema
+apenas pede um endereço de e-mail e guarda esse texto no navegador.
+
+======================================================================
+5. PROBLEMAS CRÍTICOS ENCONTRADOS
+======================================================================
+
+5.1 Ciclo infinito no recálculo
+
+A função recalcularTudo chama calcTotalSangria. A função calcTotalSangria chama
+recalcularTudo novamente. Isso forma um ciclo que pode causar travamento e o
+erro “Maximum call stack size exceeded” quando a pessoa digita, avança ou salva.
+
+5.2 Sangria descontada duas vezes
+
+O total da sangria é colocado em “totalSaida”. Depois, a mesma sangria é somada
+novamente dentro de “retiradas”. Por fim, os dois valores entram no total de
+saídas. Isso pode aumentar artificialmente a falta do caixa.
+
+5.3 Não existe contagem física do dinheiro
+
+O sistema mostra “caixa fechado sem diferença”, “sobra” ou “falta”, mas não há
+um campo claro de dinheiro efetivamente contado na gaveta. Portanto, ele não
+compara corretamente dinheiro esperado com dinheiro contado.
+
+5.4 Edição pode apagar valores
+
+Quando um registro é editado, vários dados salvos não voltam para o formulário:
+
+- valores do PDV por forma de pagamento;
+- valores das maquininhas da manhã e tarde;
+- texto do relatório PDV;
+- número da maquininha;
+- fotos;
+- áudio de forma completa.
+
+Se a pessoa salvar a edição, valores antigos podem virar zero ou desaparecer.
+
+======================================================================
+6. OUTRAS LIMITAÇÕES
+======================================================================
+
+- fotos escolhidas não são gravadas no fechamento;
+- número da maquininha não é salvo;
+- relatório escrito do PDV não é salvo;
+- valores brutos da manhã/tarde não são salvos;
+- áudio pode ocupar muito espaço e não é restaurado completamente;
+- não existem campos obrigatórios nem validação geral antes de salvar;
+- qualquer pessoa pode editar ou excluir um fechamento;
+- não existe histórico de quem mudou ou apagou;
+- não existe aprovação por gerente ou tesouraria;
+- valores monetários usam números decimais comuns do JavaScript;
+- textos digitados são inseridos em HTML sem proteção adequada;
+- não existem testes automatizados;
+- todas as responsabilidades estão misturadas no mesmo arquivo.
+
+O relatório de visualização também procura campos antigos chamados
+“lacreInicial”, “entradaInicial” e “lacreFinal”, mas o salvamento atual usa listas
+de entradas e sangrias. Por isso, alguns dados podem aparecer como traço mesmo
+tendo sido preenchidos.
+
+======================================================================
+7. PONTOS POSITIVOS
+======================================================================
+
+- interface visual organizada;
+- formulário guiado por etapas;
+- adaptação para celular, tablet e computador;
+- pesquisa de fechamentos;
+- suporte a dinheiro, cartões, Pix, voucher e crediário;
+- discriminação com quantidade e descontos;
+- observação por áudio;
+- execução simples, sem precisar instalar servidor;
+- boa base visual para protótipo e demonstração.
+
+======================================================================
+8. VEREDITO
+======================================================================
+
+O sistema atual é uma boa base visual para demonstrar como preencher um
+fechamento manual. Entretanto, ele precisa de uma revisão estrutural antes de
+ser usado numa operação real.
+
+Prioridade recomendada:
+
+1. corrigir o ciclo infinito;
+2. corrigir a dupla contagem da sangria;
+3. definir dinheiro esperado e dinheiro contado;
+4. impedir perda de dados durante a edição;
+5. criar testes para todas as fórmulas;
+6. corrigir anexos e relatório;
+7. decidir se continuará local ou terá backend, banco e usuários.
+
+Nenhuma correção foi aplicada ao index.html durante esta análise.

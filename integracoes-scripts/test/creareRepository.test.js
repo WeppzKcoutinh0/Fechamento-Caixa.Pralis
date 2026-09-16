@@ -1,0 +1,86 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { montarLinhaFechamentoCaixa, montarLinhaVendaProduto } from '../src/creareRepository.js';
+
+const linhaBase = {
+  DATA_VENDA: '21/08/2026',
+  PDV: 'PDV 1',
+  OPERADOR: 'VND CAIXA PDV - 1M',
+  PRIMEIRA_VENDA: '2026-08-21 08:03:12',
+  ULTIMA_VENDA: '2026-08-21 21:47:05',
+  NUMERO_VENDAS: 128,
+  CREDIARIO: 0,
+  CREDITO: 1234.56,
+  DEBITO: 890.1,
+  DINHEIRO: 456.78,
+  PIX: 321,
+  VOUCHER: 0,
+  OUTROS: 0,
+  TOTAL_PAGAMENTO: 2902.44,
+  CLIENTES: 150,
+  COLABORADORES: 0,
+  ALIMENTACAO: 0,
+  ROUBO_FURTO: 0,
+  SOCIOS: 0,
+  SOBRA_PERDA: 0,
+};
+
+test('montarLinhaFechamentoCaixa: extrai caixa/turno do OPERADOR e preenche EMPRESA/ATUALIZADO_EM', () => {
+  const linha = montarLinhaFechamentoCaixa(linhaBase, { empresa: 'TNP CENTRAL', agora: '2026-08-22 22:10:03' });
+  assert.equal(linha.CAIXA, '1');
+  assert.equal(linha.TURNO, 'M');
+  assert.equal(linha.EMPRESA, 'TNP CENTRAL');
+  assert.equal(linha.ATUALIZADO_EM, '2026-08-22 22:10:03');
+  assert.equal(linha.CHAVE, 'TNP CENTRAL|21/08/2026|PDV 1|VND CAIXA PDV - 1M');
+  assert.equal(linha.COLABORADOR, '');
+  assert.ok(linha.HASH && linha.HASH.length === 64);
+});
+
+test('montarLinhaFechamentoCaixa: HASH é estável para as mesmas 9 partes (idempotência)', () => {
+  const contexto = { empresa: 'TNP CENTRAL', agora: '2026-08-22 22:10:03' };
+  const linha1 = montarLinhaFechamentoCaixa(linhaBase, contexto);
+  const linha2 = montarLinhaFechamentoCaixa({ ...linhaBase }, { empresa: 'TNP CENTRAL', agora: '2026-08-23 10:00:00' });
+  // ATUALIZADO_EM mudou mas nao faz parte do HASH -> mesmo HASH.
+  assert.equal(linha1.HASH, linha2.HASH);
+});
+
+test('montarLinhaFechamentoCaixa: HASH muda se NUMERO_VENDAS ou TOTAL_PAGAMENTO mudam', () => {
+  const contexto = { empresa: 'TNP CENTRAL', agora: '2026-08-22 22:10:03' };
+  const original = montarLinhaFechamentoCaixa(linhaBase, contexto);
+  const alterado = montarLinhaFechamentoCaixa({ ...linhaBase, TOTAL_PAGAMENTO: 9999 }, contexto);
+  assert.notEqual(original.HASH, alterado.HASH);
+});
+
+test('montarLinhaFechamentoCaixa: HORA passa como número quando presente, null quando ausente', () => {
+  const contexto = { empresa: 'TNP CENTRAL', agora: '2026-08-22 22:10:03' };
+  const comHora = montarLinhaFechamentoCaixa({ ...linhaBase, HORA: 8 }, contexto);
+  assert.equal(comHora.HORA, 8);
+  const semHora = montarLinhaFechamentoCaixa(linhaBase, contexto);
+  assert.equal(semHora.HORA, null);
+});
+
+test('montarLinhaFechamentoCaixa: HORA não faz parte do HASH (só PRIMEIRA_VENDA/ULTIMA_VENDA já diferenciam por hora)', () => {
+  const contexto = { empresa: 'TNP CENTRAL', agora: '2026-08-22 22:10:03' };
+  const semHora = montarLinhaFechamentoCaixa(linhaBase, contexto);
+  const comHora = montarLinhaFechamentoCaixa({ ...linhaBase, HORA: 8 }, contexto);
+  assert.equal(semHora.HASH, comHora.HASH);
+});
+
+test('montarLinhaFechamentoCaixa: valores ausentes viram 0, não NaN', () => {
+  const linha = montarLinhaFechamentoCaixa(
+    { DATA_VENDA: '01/01/2026', PDV: 'PDV 1', OPERADOR: 'X' },
+    { empresa: 'TNP CENTRAL', agora: '2026-01-01 00:00:00' },
+  );
+  assert.equal(linha.CREDITO, 0);
+  assert.equal(linha.TOTAL_PAGAMENTO, 0);
+});
+
+test('montarLinhaVendaProduto: monta e calcula HASH', () => {
+  const linha = montarLinhaVendaProduto(
+    { DATA_VENDA: '21/08/2026', PRODUTO_CODIGO: '123', PRODUTO: 'Pão Francês', QUANTIDADE: 12.5, VALOR_UNITARIO: 1.2, TOTAL: 15 },
+    { empresa: 'TNP CENTRAL', agora: '2026-08-22 22:10:03' },
+  );
+  assert.equal(linha.PRODUTO, 'Pão Francês');
+  assert.equal(linha.QUANTIDADE, 12.5);
+  assert.ok(linha.HASH && linha.HASH.length === 64);
+});

@@ -1,0 +1,18 @@
+{
+  "name": "@fechamento-caixa/integracoes-scripts",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Agente local (roda na loja) que lê o CREARE/Compilart e envia o resumo diário de vendas por caixa/PDV para o app (POST /vendas/importar) — mesmo contrato/modelo do bot_padaria_v3 já em produção, sem a parte de Google Sheets.",
+  "scripts": {
+    "sincronizar": "node --env-file-if-exists=.env.producao src/sincronizar.js",
+    "agente": "node --env-file-if-exists=.env.producao src/loop.js",
+    "importar-planilha": "node --env-file-if-exists=.env.producao src/importarPlanilha.js",
+    "test": "node --test",
+    "check": "node --check src/database.js && node --check src/dateService.js && node --check src/env.js && node --check src/hashService.js && node --check src/lockService.js && node --check src/loop.js && node --check src/operadorService.js && node --check src/pralisClient.js && node --check src/creareRepository.js && node --check src/sincronizar.js && node --check src/sheetsRepository.js && node --check src/importarPlanilha.js"
+  },
+  "dependencies": {
+    "googleapis": "^181.0.0",
+    "mysql2": "^3.15.3"
+  }
+}

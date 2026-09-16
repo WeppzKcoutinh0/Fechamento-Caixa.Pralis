@@ -1,0 +1,41 @@
+{
+  "name": "@fechamento-caixa/app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "typecheck": "nuxt typecheck",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"**/*.{ts,vue,css,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,vue,css,json,md}\"",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@mdi/font": "7.4.47",
+    "@supabase/supabase-js": "2.116.0",
+    "jspdf": "^4.2.1",
+    "nuxt": "4.5.2",
+    "vue": "3.5.42",
+    "vuetify": "3.13.4",
+    "vuetify-nuxt-module": "1.0.0-rc.6",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@nuxt/eslint": "1.17.0",
+    "@vue/test-utils": "2.5.0",
+    "eslint": "10.10.0",
+    "happy-dom": "20.14.5",
+    "prettier": "3.9.6",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.70.0",
+    "vitest": "5.0.0",
+    "vue-tsc": "3.3.11"
+  }
+}

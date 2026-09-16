@@ -1,0 +1,26 @@
+# Estado local do Claude Code (lock de tarefas agendadas etc.) — não é código do projeto.
+.claude/
+
+# Segredos/ambiente local — cada subpasta (app/, integracoes-scripts/) também tem o próprio
+# .gitignore mais específico; isto aqui é reforço, não a única barreira.
+.env
+.env.local
+.env.producao
+*.local
+
+# Dependências — cada subprojeto instala a própria.
+node_modules/
+
+# Build/cache
+.nuxt/
+.output/
+dist/
+*.log
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Cache local do Supabase CLI (regenerado sozinho a cada comando, não é segredo mas também não é
+# código do projeto).
+supabase/.temp/

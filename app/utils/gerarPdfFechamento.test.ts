@@ -84,6 +84,7 @@ describe('gerarPdfFechamento', () => {
         vencimento: '',
         dataPagamento: '',
         fotoNotaPath: null,
+        origemAjusteCreare: '',
       });
     }
     const doc = gerarPdfFechamento(draft, dadosVazios());

@@ -400,6 +400,24 @@ body {
 .lc-data-row .lc-input {
   flex: 1;
 }
+/* `input[type=date]` nativo não encolhe abaixo de ~130px (o browser reserva espaço fixo pros
+   segmentos dia/mês/ano + ícone, `flex-shrink` não tem efeito nisso) — nas 3 colunas iguais
+   padrão do `.lc-tres` (~150-166px cada) não sobra espaço pro botão "Hoje" do lado sem estourar
+   a coluna e invadir "Data Doc. Fiscal" (que também tem um `input[type=date]`, com o mesmo piso).
+   `.lc-tres-datas` dá largura assimétrica só nesta linha: "Data Lanç" fica maior (carrega botão +
+   campo), "N° Doc. Fiscal" cede espaço (é só texto livre, sem piso de largura nativo). Só acima
+   de 560px — abaixo disso a regra de empilhar tudo (100%) já resolve sozinha. */
+@media (width > 560px) {
+  .lc-tres-datas > .lc-campo:nth-child(1) {
+    flex-basis: 42%;
+  }
+  .lc-tres-datas > .lc-campo:nth-child(2) {
+    flex-basis: 32%;
+  }
+  .lc-tres-datas > .lc-campo:nth-child(3) {
+    flex-basis: 22%;
+  }
+}
 .lc-pill {
   border: 0.5px solid var(--cx-line);
   background: none;
@@ -589,11 +607,11 @@ body {
   cursor: default;
 }
 
-@media (width <= 768px) {
-  .lc-tres > .lc-campo {
-    flex-basis: calc(50% - 4px);
-  }
-}
+/* Não existe mais um degrau intermediário pra `.lc-tres` (768px, 2 colunas): com 3 campos, o
+   terceiro sobrava sozinho na segunda linha, alinhado embaixo do primeiro — "um em cima do
+   outro" que o usuário reportou (Data Lanç / Data Doc. Fiscal / N° Doc. Fiscal). Fica em 3
+   colunas (`flex: 1 1 33%`, cabe até a mesma largura de coluna do desktop) até empilhar tudo de
+   vez, sem meio-termo torto. */
 @media (width <= 560px) {
   .lc-tres > .lc-campo,
   .lc-dois > .lc-campo,

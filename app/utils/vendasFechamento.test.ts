@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { criarFechamentoVazio } from '~/types/fechamento';
+import type { ResumoVendasDia } from '~/types/vendasFechamento';
 import {
+  aplicarAjustesComoLancamentos,
   caixaParaNumero,
   calcularResumoVendasDia,
   formatarDataBr,
@@ -91,5 +94,99 @@ describe('calcularResumoVendasDia', () => {
     const registros = [linha({ total_pagamento: 100 })];
     const resumo = calcularResumoVendasDia('2026-08-21', registros);
     expect(resumo.ajustes).toEqual({ colaboradores: 0, alimentacao: 0, rouboFurto: 0, socios: 0, sobraPerda: 0 });
+  });
+});
+
+function resumoComAjustes(ajustes: Partial<ResumoVendasDia['ajustes']>): ResumoVendasDia {
+  return {
+    data: '2026-09-16',
+    registros: 1,
+    numeroVendas: 0,
+    totalPagamento: 0,
+    porForma: { dinheiro: 0, credito: 0, debito: 0, pix: 0, voucher: 0, crediario: 0, outros: 0 },
+    ajustes: { colaboradores: 0, alimentacao: 0, rouboFurto: 0, socios: 0, sobraPerda: 0, ...ajustes },
+  };
+}
+
+describe('aplicarAjustesComoLancamentos', () => {
+  it('cria uma Despesa por categoria presente, colaboradores com tipoCredor "colaborador"', () => {
+    const draft = criarFechamentoVazio();
+    aplicarAjustesComoLancamentos(draft, resumoComAjustes({ colaboradores: 35.09, rouboFurto: 12 }));
+
+    expect(draft.lancamentos).toHaveLength(2);
+    const colab = draft.lancamentos.find((l) => l.origemAjusteCreare === 'colaboradores')!;
+    expect(colab.tipo).toBe('despesa');
+    expect(colab.tipoCredor).toBe('colaborador');
+    expect(colab.valorCents).toBe(3509);
+    expect(colab.dataRef).toBe('2026-09-16');
+
+    const furto = draft.lancamentos.find((l) => l.origemAjusteCreare === 'rouboFurto')!;
+    expect(furto.tipoCredor).toBe('fornecedor');
+    expect(furto.valorCents).toBe(1200);
+  });
+
+  it('categoria zerada/ausente não cria lançamento', () => {
+    const draft = criarFechamentoVazio();
+    aplicarAjustesComoLancamentos(draft, resumoComAjustes({ colaboradores: 10 }));
+    expect(draft.lancamentos).toHaveLength(1);
+  });
+
+  it('chamar de novo com valor diferente ATUALIZA o mesmo lançamento, não duplica', () => {
+    const draft = criarFechamentoVazio();
+    aplicarAjustesComoLancamentos(draft, resumoComAjustes({ colaboradores: 10 }));
+    const idOriginal = draft.lancamentos[0]!.id;
+
+    aplicarAjustesComoLancamentos(draft, resumoComAjustes({ colaboradores: 25 }));
+    expect(draft.lancamentos).toHaveLength(1);
+    expect(draft.lancamentos[0]!.id).toBe(idOriginal);
+    expect(draft.lancamentos[0]!.valorCents).toBe(2500);
+  });
+
+  it('categoria que zera numa nova busca remove o lançamento automático anterior', () => {
+    const draft = criarFechamentoVazio();
+    aplicarAjustesComoLancamentos(draft, resumoComAjustes({ sobraPerda: 8 }));
+    expect(draft.lancamentos).toHaveLength(1);
+
+    aplicarAjustesComoLancamentos(draft, resumoComAjustes({ sobraPerda: 0 }));
+    expect(draft.lancamentos).toHaveLength(0);
+  });
+
+  it('nunca mexe num lançamento manual (origemAjusteCreare vazio)', () => {
+    const draft = criarFechamentoVazio();
+    draft.lancamentos.push({
+      id: 'manual-1',
+      tipo: 'despesa',
+      status: 'naopago',
+      dataRef: '2026-09-16',
+      dataNfe: '',
+      nNfe: '',
+      fornecedor: 'Lançado à mão',
+      tipoMer: '',
+      valorCents: 999,
+      valorAcrescimoCents: 0,
+      tipoCredor: 'fornecedor',
+      obsTipo: '',
+      obsTexto: '',
+      obsAudioPath: null,
+      fotoPath: null,
+      vencimento: '',
+      dataPagamento: '',
+      fotoNotaPath: null,
+      origemAjusteCreare: '',
+    });
+
+    aplicarAjustesComoLancamentos(draft, resumoComAjustes({ colaboradores: 10 }));
+    expect(draft.lancamentos).toHaveLength(2);
+    const manual = draft.lancamentos.find((l) => l.id === 'manual-1')!;
+    expect(manual.valorCents).toBe(999);
+  });
+
+  it('valor negativo (ex.: sobra) vira Despesa com valor absoluto, sinal original registrado em obsTexto', () => {
+    const draft = criarFechamentoVazio();
+    aplicarAjustesComoLancamentos(draft, resumoComAjustes({ sobraPerda: -15.5 }));
+
+    const lancamento = draft.lancamentos[0]!;
+    expect(lancamento.valorCents).toBe(1550);
+    expect(lancamento.obsTexto).toContain('-R$ 15,50');
   });
 });

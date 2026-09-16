@@ -106,6 +106,13 @@ export interface LancamentoDraft {
   // Só tem sentido quando `status === 'pago'` — dia em que o pagamento realmente saiu.
   dataPagamento: string;
   fotoNotaPath: string | null;
+  // '' = lançamento manual (comportamento de sempre). Uma das chaves de
+  // `ResumoVendasDia.ajustes` (ver types/vendasFechamento.ts) quando este lançamento foi CRIADO
+  // AUTOMATICAMENTE a partir do ajuste que o CREARE já manda (Colaboradores/Alimentação/
+  // Furto-Roubo/Sócios/Sobra-Perda) — ver aplicarAjustesComoLancamentos em
+  // utils/vendasFechamento.ts. Só serve pra achar/atualizar o MESMO lançamento numa nova busca
+  // (idempotência, nunca duplica) sem impedir o usuário de editar/remover normalmente.
+  origemAjusteCreare: string;
 }
 
 export interface DiscriminacaoDraft {

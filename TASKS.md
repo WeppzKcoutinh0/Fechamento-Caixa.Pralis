@@ -2,6 +2,38 @@
 
 ## Histórico de decisão (mais recente primeiro)
 
+**16/09/2026 (12ª revisão) — ajustes do CREARE (Colaboradores/Alimentação-Lanches/Furto-Roubo/
+Sócios/Sobra-Perda) viram Despesa automática, não só aviso informativo.** Usuário mostrou o aviso
+amarelo "não entram em nenhum cálculo automático" e pediu pra virar automático também, citando a
+planilha original (colunas COLABORADOR/SOBRA-PERDA/FURTO-ROUBO/LANCHES — "Lanches" é o mesmo campo
+`alimentacao`, só com outro rótulo na planilha do bot original). Perguntei o mecanismo antes de
+mexer no cálculo (`calculateRelatorioFinal` já foi validado a fundo pra fechar R$0,00, não dava pra
+arriscar) — usuário escolheu: criar Despesa automática e EDITÁVEL (não somar direto/escondido), e
+incluir também "Sócios" (5ª coluna que ele não tinha citado).
+
+Implementado em `utils/vendasFechamento.ts` (`aplicarAjustesComoLancamentos`), chamado logo depois
+de `aplicarResumoAoPrimeiroPdv` nos dois lugares que já buscavam vendas (`SecaoIdentificacao.vue` e
+`SecaoRelatorios.vue`): pra cada categoria de ajuste presente, cria (ou atualiza, se já existir) uma
+Despesa com `tipoCredor: 'colaborador'` só pra "Colaboradores" (as outras 4 não têm categoria melhor
+no modelo atual, ficam 'fornecedor' com o rótulo completo, ex. "Furto/Roubo (CREARE)", identificando
+a origem). Valor sempre positivo (`Math.abs`) — o valor original com sinal fica registrado em
+`obsTexto` (não há documentação do CREARE sobre o que um "Sobra/Perda" negativo significa). Nova
+coluna `origem_ajuste_creare` em `lancamentos` (migrations `20260916190000`/`20260916190100`,
+aplicadas no banco real com `supabase db push --db-url postgresql://postgres:...@db.<ref>.supabase.co:5432/postgres`
+— o pooler `aws-0-sa-east-1.pooler.supabase.com` que tentei primeiro deu erro de tenant, a conexão
+direta funcionou) é a marca que faz uma nova busca ATUALIZAR o mesmo lançamento em vez de duplicar;
+categoria que zera numa nova busca remove o lançamento automático (nunca mexe em lançamento manual).
+Mesmo comportamento de "sobrescreve no re-fetch" que `aplicarResumoAoPrimeiroPdv` já tinha.
+
+Reaproveita 100% do cálculo já testado (`calculateLancamentosPorTipo`/`calculateRelatorioFinal`) —
+nenhuma fórmula nova, só mais uma Despesa na lista. **Testado de verdade**: linha real do banco
+(TNP CENTRAL, 31/08/2026, Caixa 1 Manhã, colaboradores R$50) via Playwright — aviso virou verde
+("já lançados automaticamente"), Despesa "Colaboradores (CREARE) R$ 50,00" apareceu na lista,
+editável (campo de valor clicável, botão Remover presente), Relatório Final mostrou "DESPESAS: R$
+50,00" corretamente. 6 testes novos em `vendasFechamento.test.ts` (cria, não duplica em busca
+repetida, remove se zerar, nunca mexe em lançamento manual, sinal negativo vira valor absoluto com
+nota). Typecheck/lint/82 testes/build limpos.
+
 **16/09/2026 (11ª revisão) — sync automático diário da planilha (fecha a Pendência #2a).** Usuário
 reportou "o bot já está rodando desde ontem, tem que sincronizar sempre e automático, sem dar
 erro". Conferi o banco antes de mexer em qualquer coisa: `vendas_fechamento_caixa_dia` ainda

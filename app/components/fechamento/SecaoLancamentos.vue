@@ -93,6 +93,7 @@ function novoLancamento(tipo: TipoLancamento): LancamentoDraft {
     vencimento: '',
     dataPagamento: '',
     fotoNotaPath: null,
+    origemAjusteCreare: '',
   };
 }
 
@@ -324,8 +325,11 @@ const totalGeralDiscriminacao = computed(() =>
             </label>
           </div>
 
-          <!-- Linha 3: Data Lanç · Data Doc Fiscal · Nº Doc Fiscal -->
-          <div class="lc-tres">
+          <!-- Linha 3: Data Lanç · Data Doc Fiscal · Nº Doc Fiscal — larguras assimétricas
+               (.lc-tres-datas), não as 3 colunas iguais padrão do .lc-tres: "Data Lanç" carrega
+               o botão "Hoje" + o campo, "N° Doc. Fiscal" é só texto livre (sem largura mínima de
+               input nativo) — é quem cede espaço pros outros dois caberem lado a lado. -->
+          <div class="lc-tres lc-tres-datas">
             <label class="lc-campo">
               <span class="lc-campo-lbl">Data Lanç</span>
               <div class="lc-data-row">

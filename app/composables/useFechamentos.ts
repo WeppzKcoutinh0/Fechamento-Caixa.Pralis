@@ -67,6 +67,7 @@ interface LancamentoRow {
   vencimento: string | null;
   data_pagamento: string | null;
   foto_nota_path: string | null;
+  origem_ajuste_creare: string;
 }
 interface DiscriminacaoRow {
   ordem: number;
@@ -232,6 +233,7 @@ function linhaParaDraft(row: FechamentoRow): FechamentoDraft {
       vencimento: l.vencimento ?? '',
       dataPagamento: l.data_pagamento ?? '',
       fotoNotaPath: l.foto_nota_path,
+      origemAjusteCreare: l.origem_ajuste_creare ?? '',
     })),
     relatorioPdv: row.relatorio_pdv,
     pdvEntradas: ordenado(row.pdv_entradas).map((p): PdvEntradaDraft => ({
@@ -440,6 +442,7 @@ export function useFechamentos() {
         vencimento: l.vencimento,
         dataPagamento: l.dataPagamento,
         fotoNotaPath: l.fotoNotaPath,
+        origemAjusteCreare: l.origemAjusteCreare,
       })),
       discriminacoes: draft.discriminacoes.map((d) => ({
         lancamentoId: d.lancamentoId,

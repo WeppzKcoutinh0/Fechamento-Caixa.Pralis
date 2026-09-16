@@ -6,6 +6,7 @@ import CartaoValor from '~/components/comum/CartaoValor.vue';
 import { useVendasFechamento } from '~/composables/useVendasFechamento';
 import { calculatePdvEntradas, formatCents, toCents } from '~/utils/financeiro';
 import {
+  aplicarAjustesComoLancamentos,
   aplicarResumoAoPrimeiroPdv,
   caixaParaNumero,
   formatarDataBr,
@@ -60,10 +61,12 @@ async function buscarVendasDoDia(): Promise<void> {
   vendasEncontradas.value = Boolean(resumo && resumo.registros > 0);
   if (!resumo || resumo.registros === 0) return;
   aplicarResumoAoPrimeiroPdv(props.draft, resumo);
+  aplicarAjustesComoLancamentos(props.draft, resumo);
 }
 
-// Colaboradores/Alimentação/Furto-Roubo/Sócios/Sobra-Perda — mesmo aviso informativo de
-// SecaoIdentificacao.vue, aqui também: o CREARE já manda, mas não entra em nenhum cálculo.
+// Colaboradores/Alimentação/Furto-Roubo/Sócios/Sobra-Perda — mesmo comportamento de
+// SecaoIdentificacao.vue: `buscarVendasDoDia` já lança automaticamente (aplicarAjustesComoLancamentos),
+// isto aqui só lista o que foi lançado.
 const ajustesPresentesRelatorios = computed(() => {
   if (!resumoVendas.value) return [];
   const { colaboradores, alimentacao, rouboFurto, socios, sobraPerda } = resumoVendas.value.ajustes;
@@ -268,13 +271,13 @@ const crediarioAberto = ref(false);
 
           <v-alert
             v-if="ajustesPresentesRelatorios.length"
-            type="warning"
+            type="success"
             variant="tonal"
             density="comfortable"
           >
             <div class="text-caption font-weight-bold">
-              O CREARE também registrou estes ajustes — não entram em nenhum cálculo automático,
-              avalie se vale lançar manualmente (passo 3):
+              O CREARE também registrou estes ajustes — já lançados automaticamente como Despesa
+              (passo 3), já entram no cálculo do fechamento:
             </div>
             <ul class="text-caption mt-1 pl-4">
               <li v-for="[nome, valor] in ajustesPresentesRelatorios" :key="nome">

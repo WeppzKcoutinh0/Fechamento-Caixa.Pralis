@@ -2,9 +2,9 @@
  * Resumo do dia a partir das linhas já sincronizadas de `vendas_fechamento_caixa_dia` (uma linha
  * por PDV/operador/dia) — cálculo puro, mesma convenção de `utils/painel.ts`/`utils/financeiro.ts`.
  */
-import type { FechamentoDraft, Caixa, Turno } from '~/types/fechamento';
+import type { FechamentoDraft, Caixa, LancamentoDraft, TipoCredor, Turno } from '~/types/fechamento';
 import type { ResumoVendasDia } from '~/types/vendasFechamento';
-import { toCents } from '~/utils/financeiro';
+import { formatCents, toCents } from '~/utils/financeiro';
 
 /**
  * "Caixa 1" -> "1" — o bot grava só o número na coluna `caixa` (extraído do texto do operador,
@@ -43,6 +43,88 @@ export function aplicarResumoAoPrimeiroPdv(draft: FechamentoDraft, resumo: Resum
     draft.pdvEntradas.push({ id: crypto.randomUUID(), ...valores });
   } else {
     Object.assign(draft.pdvEntradas[0]!, valores);
+  }
+}
+
+interface AjusteCategoria {
+  chave: keyof ResumoVendasDia['ajustes'];
+  rotulo: string;
+  tipoCredor: TipoCredor;
+}
+
+// "Colaboradores" já tem categoria de credor própria (TIPOS_CREDOR); os outros 4 não têm um
+// "tipo" melhor no modelo atual (não são fornecedor nem colaborador de verdade) — ficam como
+// 'fornecedor' só pra ocupar um valor válido, o rótulo completo (com "(CREARE)") é quem
+// realmente identifica a categoria na lista de despesas.
+const AJUSTES_CATEGORIAS: AjusteCategoria[] = [
+  { chave: 'colaboradores', rotulo: 'Colaboradores', tipoCredor: 'colaborador' },
+  { chave: 'alimentacao', rotulo: 'Alimentação/Lanches', tipoCredor: 'fornecedor' },
+  { chave: 'rouboFurto', rotulo: 'Furto/Roubo', tipoCredor: 'fornecedor' },
+  { chave: 'socios', rotulo: 'Sócios', tipoCredor: 'fornecedor' },
+  { chave: 'sobraPerda', rotulo: 'Sobra/Perda', tipoCredor: 'fornecedor' },
+];
+
+/**
+ * Cria (ou atualiza, se já existir) uma Despesa por categoria de ajuste que o CREARE já manda
+ * (Colaboradores/Alimentação-Lanches/Furto-Roubo/Sócios/Sobra-Perda — ver
+ * `ResumoVendasDia.ajustes`) — pedido do usuário: até aqui esses valores só apareciam num aviso
+ * informativo, sem entrar em nenhum cálculo; agora entram automaticamente como Despesa (passo 3),
+ * pelo MESMO caminho já testado de `calculateRelatorioFinal`/`calculateLancamentosPorTipo`, sem
+ * nenhuma fórmula nova. `valorCents` usa o valor ABSOLUTO (toda Despesa é um valor positivo no
+ * modelo atual) — o valor original com sinal fica registrado em `obsTexto` pra auditoria, caso o
+ * CREARE mande um "Sobra/Perda" negativo (não há documentação do CREARE sobre o que um sinal
+ * negativo significa aqui; o usuário pode corrigir o valor manualmente se a leitura como Despesa
+ * não fizer sentido pro caso).
+ *
+ * Idempotente por `origemAjusteCreare` (nunca duplica numa nova busca): acha o lançamento da MESMA
+ * categoria pela marca, atualiza o valor se existir, cria se não. Mesmo comportamento de
+ * "sobrescreve no re-fetch" que `aplicarResumoAoPrimeiroPdv` já tinha pros campos de PDV — se o
+ * usuário remover manualmente um lançamento automático e buscar vendas de novo pro mesmo dia, ele
+ * volta (mesma lógica: buscar vendas é sempre a verdade mais recente, não um valor travado).
+ * Categoria que chegou zerada (correção no CREARE) remove o lançamento automático anterior, se
+ * houver — nunca mexe num lançamento criado manualmente pelo usuário.
+ */
+export function aplicarAjustesComoLancamentos(draft: FechamentoDraft, resumo: ResumoVendasDia): void {
+  for (const { chave, rotulo, tipoCredor } of AJUSTES_CATEGORIAS) {
+    const valorOriginal = Number(resumo.ajustes[chave]);
+    const existente = draft.lancamentos.find((l) => l.origemAjusteCreare === chave);
+
+    if (Math.abs(valorOriginal) < 0.005) {
+      if (existente) draft.lancamentos.splice(draft.lancamentos.indexOf(existente), 1);
+      continue;
+    }
+
+    const valorCents = toCents(Math.abs(valorOriginal));
+    const sinal = valorOriginal < 0 ? '-' : '';
+    const obsTexto = `Ajuste automático do CREARE (${rotulo}) — valor original: ${sinal}R$ ${formatCents(valorCents)}.`;
+
+    if (existente) {
+      existente.valorCents = valorCents;
+      existente.obsTexto = obsTexto;
+    } else {
+      const novo: LancamentoDraft = {
+        id: crypto.randomUUID(),
+        tipo: 'despesa',
+        status: 'naopago',
+        dataRef: resumo.data,
+        dataNfe: '',
+        nNfe: '',
+        fornecedor: `${rotulo} (CREARE)`,
+        tipoMer: '',
+        valorCents,
+        valorAcrescimoCents: 0,
+        tipoCredor,
+        obsTipo: 'texto',
+        obsTexto,
+        obsAudioPath: null,
+        fotoPath: null,
+        vencimento: '',
+        dataPagamento: '',
+        fotoNotaPath: null,
+        origemAjusteCreare: chave,
+      };
+      draft.lancamentos.push(novo);
+    }
   }
 }
 

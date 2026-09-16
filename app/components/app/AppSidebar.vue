@@ -10,9 +10,17 @@
 //   - Sem grupo "Configuração"/"Geral": não têm destino real ainda, e o usuário pediu pra tirar
 //     o estado desabilitado "Em breve" em vez de manter como placeholder.
 import { computed, ref } from 'vue';
+import { useModoEscuro } from '~/composables/useModoEscuro';
 import { useSidebarMobile } from '~/composables/useSidebarMobile';
 
 const recolhida = ref(false);
+
+// Logo cheia tem o texto "CICLUZ / Gestão Profissional" num cinza escuro sólido — ilegível em
+// cima do surface escuro do tema `fechamentoDark` (#191f26). `logo-cicluz-dark.png` é a mesma
+// arte com só o texto repintado de branco (ícone colorido intacto), gerada uma vez (script
+// descartável, não faz parte do build) a partir do original.
+const { escuro } = useModoEscuro();
+const logoSrc = computed(() => (escuro.value ? '/marca/logo-cicluz-dark.png' : '/marca/logo-cicluz.png'));
 
 // Abaixo de 900px o menu não fica mais fixo empurrando o conteúdo (era o que acontecia antes —
 // numa tela de celular ele sozinho ocupava mais da metade da largura) — vira um painel
@@ -62,10 +70,10 @@ const grupos: GrupoNav[] = [
     rail-width="76"
     class="app-sidebar"
   >
-    <div class="sidebar-topo">
+    <div class="sidebar-topo" :class="{ 'sidebar-topo--rail': recolhida && !mobile }">
       <img
         v-if="!recolhida || mobile"
-        src="/marca/logo-cicluz.png"
+        :src="logoSrc"
         alt="Cicluz Gestão Profissional"
         class="sidebar-logo"
       />
@@ -111,7 +119,12 @@ const grupos: GrupoNav[] = [
       />
     </div>
 
-    <v-list nav density="comfortable" class="sidebar-grupos">
+    <v-list
+      nav
+      density="comfortable"
+      class="sidebar-grupos"
+      :class="{ 'sidebar-grupos--rail': recolhida && !mobile }"
+    >
       <v-list-item
         v-for="grupo in grupos"
         :key="grupo.id"
@@ -143,14 +156,23 @@ const grupos: GrupoNav[] = [
   padding: var(--cx-sp-4) var(--cx-sp-3);
 }
 
+/* Símbolo (28px) + botão de recolher (~32px) lado a lado não cabem nos 76px do rail sem
+   estourar/desalinhar (76 - 2*12 de padding = 52px úteis) — empilha e centraliza os dois em vez
+   de forçar `space-between` numa largura que não comporta ambos numa linha só. */
+.sidebar-topo--rail {
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--cx-sp-2);
+}
+
 .sidebar-logo {
   height: 30px;
   width: auto;
 }
 
 .sidebar-simbolo {
-  height: 28px;
-  width: 28px;
+  height: 32px;
+  width: 32px;
   object-fit: contain;
 }
 
@@ -175,6 +197,30 @@ const grupos: GrupoNav[] = [
 .sidebar-grupo-item {
   margin-bottom: var(--cx-sp-1);
   border-radius: var(--cx-r-md);
+}
+
+/* `v-list-item` renderiza como `display:grid` com colunas em px fixo (prepend/content/append) —
+   o item encolhe pro tamanho do conteúdo em vez de ocupar a linha toda, então `justify-content`
+   sozinho não tem espaço sobrando pra centralizar nada. E dentro do prepend (52px) o ícone fica
+   colado à esquerda porque o `.v-list-item__spacer` do Vuetify (reservado pra separar ícone de
+   texto) continua ocupando o resto da coluna mesmo sem rótulo nenhum. Solução: troca pra flex,
+   esconde o conteúdo/spacer vazios (só sobra o ícone) e força o item a ocupar a largura toda do
+   rail pra centralizar de verdade — mesmo eixo do botão "+" acima. */
+.sidebar-grupos--rail :deep(.v-list-item) {
+  display: flex !important;
+  width: 100%;
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.sidebar-grupos--rail :deep(.v-list-item__content),
+.sidebar-grupos--rail :deep(.v-list-item__spacer) {
+  display: none;
+}
+
+.sidebar-grupos--rail :deep(.v-list-item__prepend) {
+  margin-inline-end: 0;
+  width: auto;
 }
 
 .grupo-icone {

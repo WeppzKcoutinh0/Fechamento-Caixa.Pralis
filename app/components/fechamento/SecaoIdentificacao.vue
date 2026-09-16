@@ -4,6 +4,7 @@ import { CAIXAS, TURNOS, type Caixa, type FechamentoDraft, type Turno } from '~/
 import { useVendasFechamento } from '~/composables/useVendasFechamento';
 import { formatCents, toCents } from '~/utils/financeiro';
 import {
+  aplicarAjustesComoLancamentos,
   aplicarResumoAoPrimeiroPdv,
   caixaParaNumero,
   formatarDataBr,
@@ -85,6 +86,7 @@ async function buscarVendas() {
   });
   if (!resultado || resultado.registros === 0) return;
   aplicarResumoAoPrimeiroPdv(props.draft, resultado);
+  aplicarAjustesComoLancamentos(props.draft, resultado);
 }
 
 const formasPagamento = computed(() => {
@@ -101,10 +103,11 @@ const formasPagamento = computed(() => {
   ].filter(([, valor]) => Math.abs(Number(valor)) >= 0.005) as [string, number][];
 });
 
-// Colaboradores/Alimentação/Furto-Roubo/Sócios/Sobra-Perda: o CREARE já manda esses valores, mas
-// até agora nenhuma tela mostrava (ver types/vendasFechamento.ts ResumoVendasDia.ajustes) — puro
-// informativo, não entra em nenhuma conta. Fica visível pra você decidir se vale lançar como
-// despesa/mercadoria manualmente (passo 3) quando aparecer algo aqui.
+// Colaboradores/Alimentação/Furto-Roubo/Sócios/Sobra-Perda: o CREARE já manda esses valores (ver
+// types/vendasFechamento.ts ResumoVendasDia.ajustes) — pedido do usuário (16/09/2026): não é mais
+// só informativo, `buscarVendas` já cria/atualiza uma Despesa por categoria automaticamente (ver
+// aplicarAjustesComoLancamentos em utils/vendasFechamento.ts). Isto aqui só lista o que foi
+// lançado, pra você conferir/editar no passo 3 se precisar.
 const ajustesPresentes = computed(() => {
   if (!resumo.value) return [];
   const { colaboradores, alimentacao, rouboFurto, socios, sobraPerda } = resumo.value.ajustes;
@@ -210,10 +213,10 @@ const ajustesPresentes = computed(() => {
           </div>
         </v-alert>
 
-        <v-alert v-if="ajustesPresentes.length" type="warning" variant="tonal" density="comfortable">
+        <v-alert v-if="ajustesPresentes.length" type="success" variant="tonal" density="comfortable">
           <div class="text-caption font-weight-bold">
-            O CREARE também registrou estes ajustes — não entram em nenhum cálculo automático,
-            avalie se vale lançar manualmente (passo 3):
+            O CREARE também registrou estes ajustes — já lançados automaticamente como Despesa
+            (passo 3), já entram no cálculo do fechamento:
           </div>
           <ul class="text-caption mt-1 pl-4">
             <li v-for="[nome, valor] in ajustesPresentes" :key="nome">

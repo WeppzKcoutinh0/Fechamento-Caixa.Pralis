@@ -124,6 +124,7 @@ export function draftDoRegistroAntigo(reg: RegistroAntigo): FechamentoDraft {
     vencimento: textoDe(l.vencimento),
     dataPagamento: '',
     fotoNotaPath: null,
+    origemAjusteCreare: '',
   }));
   // Formato antigo só tinha `tipo` na discriminação (nunca existiu mais de 1 lançamento por tipo
   // lá) — liga ao primeiro lançamento migrado daquele tipo, que é exatamente a que ela pertencia.

@@ -2,6 +2,28 @@
 
 ## Histórico de decisão (mais recente primeiro)
 
+**17/09/2026 (13ª revisão) — botão "Sincronizar vendas agora" + `.env.producao` do agente real
+pronto, falta só instalar na loja.** Usuário testou buscar vendas de hoje de manhã (17/09, 07h20) e
+não achou nada — perguntei antes de mexer em qualquer cálculo: confirmei no banco que o sync
+automático segue funcionando certo (dado até ontem, 16/09), então não era bug, era exatamente a
+limitação já documentada (bot da loja só escreve na planilha 1x/dia, 22h10). Usuário pediu um botão
+de sincronizar no formulário mesmo assim — implementado (`server/utils/sincronizarPlanilha.ts`,
+núcleo extraído do cron pra ser reaproveitado; rota nova `POST /vendas/sincronizar`, autenticada
+pela sessão Supabase do usuário, não pelo `CRON_SECRET`), com aviso explícito na tela de que isso
+não traz venda de hoje enquanto a loja está aberta — só evita esperar o cron da manhã seguinte
+depois que o bot já rodou à noite. Testado de verdade: botão relê a planilha (1443
+fechamentos/74996 produtos regravados, sem duplicar), confirmado no banco que a data mais recente
+continua 16/09 mesmo depois de sincronizar (comportamento correto, não um bug).
+
+Usuário então perguntou se dava pra ter a venda das 14h do mesmo dia (fecha caixa nesse horário) —
+resposta honesta: não, com a planilha não dá, o único jeito é o agente `sincronizar.js` lendo o
+CREARE direto. Usuário pediu pra preparar a instalação — com autorização explícita, preenchi
+`integracoes-scripts/.env.producao` com as credenciais REAIS do CREARE (as mesmas do bot original,
+extraídas do `bot.rar`) + URL de produção + chave de integração. **Fica só nesta máquina de dev,
+gitignored, nunca foi pro git** — falta alguém com acesso à máquina da loja copiar a pasta
+`integracoes-scripts/` (código do git + esse `.env.producao`, transferido por fora do git) pra lá e
+seguir "Rodar como serviço no Windows" (NSSM) no README.md. Ver Pendência #1 atualizada.
+
 **16/09/2026 (12ª revisão) — ajustes do CREARE (Colaboradores/Alimentação-Lanches/Furto-Roubo/
 Sócios/Sobra-Perda) viram Despesa automática, não só aviso informativo.** Usuário mostrou o aviso
 amarelo "não entram em nenhum cálculo automático" e pediu pra virar automático também, citando a
@@ -318,11 +340,17 @@ contrato em `docs/CONTRATO-COMPORTAMENTO-ATUAL.md`.
    linha lá — isso é comportamento esperado da RLS, não bug). Linha de teste apagada depois de
    confirmar. Em produção (Vercel) `NUXT_SUPABASE_SERVICE_ROLE_KEY` e `NUXT_INTEGRACAO_VENDAS_CHAVE`
    foram configuradas na 9ª revisão (deploy) — resolvido também lá.
-1. **Teste com CREARE real.** Toda a lógica está implementada e testada com dados simulados. O que
-   falta é rodar o agente contra o MySQL real: copie `integracoes-scripts/.env.producao.example`
-   para `.env.producao`, preencha (as 5 linhas de CREARE podem ser copiadas do `.env.producao` do
-   bot original, se ele já estiver configurado nesta loja), e rode `npm run sincronizar`. Compare
-   com o que aparece no próprio CREARE/planilha do bot original para o mesmo dia.
+1. **Teste com CREARE real — falta só instalar na máquina da loja.** Toda a lógica está
+   implementada e testada com dados simulados. `integracoes-scripts/.env.producao` já existe
+   preenchido (17/09/2026, com autorização do usuário) com as credenciais reais do CREARE — as
+   MESMAS que o `bot_padaria_v3` original já usa nesta loja, extraídas do `bot.rar` — mais a URL
+   de produção e a chave de integração. **Fica só local nesta máquina de dev (gitignored, nunca
+   foi pro git)** — falta alguém com acesso à máquina da loja (a MESMA que já roda o
+   `bot_padaria_v3`, já que o CREARE é "localhost" a partir de lá) copiar essa pasta
+   `integracoes-scripts/` (código + o `.env.producao` preenchido, transferido por um caminho
+   seguro, não por git) pra lá e seguir "Rodar como serviço no Windows" no README.md (NSSM
+   recomendado). Só então roda contra o MySQL real — sem isso, o app segue limitado ao que a
+   planilha do bot tem (nunca antes das 22h10, ver 11ª/13ª revisão).
 2. **Segurança do `bot.rar`**: esse arquivo contém credenciais reais de produção (CREARE, chave de
    serviço do Google) e está dentro de `app/PRALIS-INTELIGENTE DESIGNER/`, uma pasta sincronizada
    pelo OneDrive. Recomendo fortemente mover esse arquivo (e o `.zip` do Pralís, mesma pasta) para

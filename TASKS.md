@@ -2,6 +2,38 @@
 
 ## Histórico de decisão (mais recente primeiro)
 
+**17/09/2026 (15ª revisão) — vendas superestimadas (18.721 vendas/R$250mil num caixa só) por
+snapshots duplicados; corrigido, mas dedupe ingênuo causou 504 na Vercel, corrigido de novo.**
+Consequência direta da 14ª revisão (bot escrevendo a cada ~1min): usuário reportou "Caixa 2"
+mostrando números absurdos. Causa: cada escrita do bot é um SNAPSHOT CUMULATIVO do dia inteiro
+(PRIMEIRA_VENDA/ULTIMA_VENDA mudam a cada minuto), não um incremento — sem dedupe, cada snapshot
+virava linha nova (hash muda) e `calcularResumoVendasDia` somava TODOS os snapshots sobrepostos do
+mesmo total. Real: ~250-300 vendas por caixa; exibido: 18.721.
+
+Primeira correção (`limparSnapshotsSuperados` em `importarVendas.ts`, mantém só a linha mais
+recente por chave) funcionou nos dados, mas fazia 1 SELECT+DELETE por chave individual — com
+centenas de produtos distintos isso virou centenas de round-trips sequenciais e estourou o timeout
+da função na Vercel (`504 FUNCTION_INVOCATION_TIMEOUT`, confirmado em produção). Reescrita pra 1
+SELECT por (empresa, data_venda), agrupa/decide em memória, 1 DELETE em lote — de ~270 queries
+sequenciais pra ~2.
+
+Segunda causa do timeout, independente do dedupe: `VENDAS_PRODUTOS` já tinha acumulado 75 mil+
+linhas na planilha (nunca usada em nenhuma tela do app — pendência #4) e ler/validar/gravar tudo
+isso levava a sincronização inteira a **4 minutos**, muito acima de qualquer teto de função da
+Vercel. Desliguei essa aba por padrão (`NUXT_SINCRONIZAR_PRODUTOS`, false) — sem ela, ~20s em
+produção real (medido). Configurei também `nitro.vercel.functions.maxDuration = 60` (teto do plano
+Hobby) como margem de segurança.
+
+**Testado de verdade em produção** (não só local): sync real levou 20,5s, HTTP 200. Conferido no
+banco depois: exatamente 7 linhas hoje (uma por caixa/turno), todas com números plausíveis (ex.:
+Caixa 2 Manhã = 305 vendas / R$4.303,81, não mais 18.721/R$250mil). Typecheck/lint/82 testes/build
+limpos antes de cada deploy.
+
+**Pendência nova**: `VENDAS_PRODUTOS` ficou desligado — reativar (`NUXT_SINCRONIZAR_PRODUTOS=true`
+na Vercel) só quando essa aba passar a ser usada de verdade em alguma tela, e nessa hora vale a
+pena resolver leitura incremental (só linhas novas da planilha, não ela inteira) antes de ligar,
+senão o problema de tempo de execução volta.
+
 **17/09/2026 (14ª revisão) — bot da loja passou a escrever a cada ~1min; cron da Vercel (1x/dia)
 não acompanha mais isso — GitHub Actions a cada 5min cobre o gap.** Usuário avisou que "o bot está
 programado pra atualizar de 1 em 1 minuto" e pediu pra sempre buscar as vendas. Confirmei antes de

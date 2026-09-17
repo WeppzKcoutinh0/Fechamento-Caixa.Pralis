@@ -61,30 +61,41 @@ export async function sincronizarPlanilhaCreare(): Promise<ResumoSincronizacaoPl
     fechamentoGravadas += gravadas;
   }
 
-  const todosProdutos = await lerAbaPlanilha({
-    credenciaisJson: config.googleServiceAccountJson,
-    spreadsheetId: config.googleSpreadsheetIdSecundario || config.googleSpreadsheetId,
-    aba: 'VENDAS_PRODUTOS',
-    colunaInicial,
-  });
-  const linhasProdutosBrutas = filtrarPorEmpresa(todosProdutos, empresa);
+  // VENDAS_PRODUTOS desligado por padrão (17/09/2026): a aba não é usada em NENHUM lugar do app
+  // ainda (ver TASKS.md, pendência #4) e, desde que o bot passou a escrever a cada ~1min, já
+  // acumulou 75 mil+ linhas — ler/validar/gravar tudo isso é o que faz o sync inteiro estourar o
+  // limite de execução da Vercel (confirmado: 4min rodando local, bem acima do teto de function
+  // da Vercel). Reativa setando NUXT_SINCRONIZAR_PRODUTOS=true quando essa aba passar a ser usada
+  // de verdade — aí vale a pena resolver a leitura incremental (só linhas novas, não a planilha
+  // inteira) antes de ligar de novo.
   let produtosRecebidas = 0;
   let produtosGravadas = 0;
   let produtosInvalidas = 0;
-  for (const lote of loteEmGrupos(linhasProdutosBrutas)) {
-    const parseadas = lote.map((linha) => linhaVendaProdutoDiaSchema.safeParse(linha));
-    produtosInvalidas += parseadas.filter((p) => !p.success).length;
-    const validas = parseadas.filter((p) => p.success).map((p) => p.data);
-    if (validas.length === 0) continue;
-    const { recebidas, gravadas } = await processarImportacao('venda_produto_dia', validas);
-    produtosRecebidas += recebidas;
-    produtosGravadas += gravadas;
+  let produtosNaPlanilha = 0;
+  if (config.sincronizarProdutos) {
+    const todosProdutos = await lerAbaPlanilha({
+      credenciaisJson: config.googleServiceAccountJson,
+      spreadsheetId: config.googleSpreadsheetIdSecundario || config.googleSpreadsheetId,
+      aba: 'VENDAS_PRODUTOS',
+      colunaInicial,
+    });
+    const linhasProdutosBrutas = filtrarPorEmpresa(todosProdutos, empresa);
+    produtosNaPlanilha = linhasProdutosBrutas.length;
+    for (const lote of loteEmGrupos(linhasProdutosBrutas)) {
+      const parseadas = lote.map((linha) => linhaVendaProdutoDiaSchema.safeParse(linha));
+      produtosInvalidas += parseadas.filter((p) => !p.success).length;
+      const validas = parseadas.filter((p) => p.success).map((p) => p.data);
+      if (validas.length === 0) continue;
+      const { recebidas, gravadas } = await processarImportacao('venda_produto_dia', validas);
+      produtosRecebidas += recebidas;
+      produtosGravadas += gravadas;
+    }
   }
 
   return {
     ok: true,
     executadoEm: new Date().toISOString(),
     fechamentoCaixa: { naPlanilha: linhasFechamentoBrutas.length, recebidas: fechamentoRecebidas, gravadas: fechamentoGravadas, invalidas: fechamentoInvalidas },
-    vendasProdutos: { naPlanilha: linhasProdutosBrutas.length, recebidas: produtosRecebidas, gravadas: produtosGravadas, invalidas: produtosInvalidas },
+    vendasProdutos: { naPlanilha: produtosNaPlanilha, recebidas: produtosRecebidas, gravadas: produtosGravadas, invalidas: produtosInvalidas },
   };
 }

@@ -8,6 +8,15 @@ export default defineNuxtConfig({
     strict: true,
     typeCheck: false,
   },
+  // maxDuration: as rotas de sync (cron/importar-planilha, vendas/sincronizar) relêem a planilha
+  // inteira do bot — mesmo com VENDAS_PRODUTOS desligado (ver sincronizarPlanilha.ts), o teto
+  // padrão de função da Vercel (10s) não é suficiente pra ler+gravar ~1700 linhas de fechamento
+  // (medido: ~50s local). 60 é o máximo que o plano Hobby permite sem precisar do Pro.
+  nitro: {
+    vercel: {
+      functions: { maxDuration: 60 },
+    },
+  },
   runtimeConfig: {
     // Server-only (nunca vai para o client): usados só pela rota de ingestão de vendas
     // (server/routes/vendas/importar.post.ts). Mapeiam para NUXT_SUPABASE_SERVICE_ROLE_KEY e
@@ -22,6 +31,9 @@ export default defineNuxtConfig({
     googleSpreadsheetIdSecundario: '',
     empresaPralis: 'TNP CENTRAL',
     planilhaColunaInicial: 'F',
+    // Desligado por padrão — ver comentário em server/utils/sincronizarPlanilha.ts (aba não usada
+    // em lugar nenhum do app ainda, e ficou grande demais pra ler inteira em toda sincronização).
+    sincronizarProdutos: false,
     public: {
       supabaseUrl: '',
       supabaseAnonKey: '',

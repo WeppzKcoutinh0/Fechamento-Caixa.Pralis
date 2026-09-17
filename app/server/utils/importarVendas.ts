@@ -64,38 +64,50 @@ async function limparLinhasTurnoSuperadas(
 // entram nele mudam) e somar "o dia todo" soma dezenas de snapshots sobrepostos do MESMO total,
 // inflando o resultado várias vezes (visto ao vivo: "18.721 vendas / R$250mil" num caixa só numa
 // manhã, real era ~250 vendas). Mantém só a linha com `atualizado_em_origem` (fallback
-// `ultima_venda`) mais recente por chave — as outras são só fotos mais antigas da mesma contagem,
-// substituídas pela mais nova assim que ela chega.
+// `criado_em`) mais recente por chave (`colunasChave`) — as outras são fotos mais antigas da
+// mesma contagem, substituídas pela mais nova assim que ela chega.
+//
+// UMA query de SELECT por (empresa, data_venda) — não por chave individual (primeira versão fazia
+// isso e tomou timeout na Vercel: um lote com ~270 produtos distintos virava ~270 SELECTs + ~270
+// DELETEs sequenciais). Agrupa/decide em memória, um DELETE só por par (empresa, data_venda) com
+// todos os ids supérfluos daquele dia de uma vez.
 async function limparSnapshotsSuperados(
   supabase: ReturnType<typeof useSupabaseAdmin>,
   tabela: 'vendas_fechamento_caixa_dia' | 'vendas_produto_dia',
-  linhas: { empresa: string; data_venda: string | null; chave: Record<string, string | number | null> }[],
+  colunasChave: string[],
+  linhas: { empresa: string; data_venda: string | null }[],
 ): Promise<void> {
-  const chaves = new Map<string, Record<string, string | number | null>>();
+  const pares = new Map<string, { empresa: string; data_venda: string }>();
   for (const linha of linhas) {
     if (linha.data_venda === null) continue;
-    const identificador = JSON.stringify(linha.chave);
-    chaves.set(identificador, linha.chave);
+    pares.set(`${linha.empresa}|${linha.data_venda}`, { empresa: linha.empresa, data_venda: linha.data_venda });
   }
 
-  for (const chave of chaves.values()) {
-    // `atualizado_em_origem`/`criado_em` existem nas duas tabelas (fechamento e produto) — não usa
-    // `ultima_venda` aqui de propósito, ela só existe em `vendas_fechamento_caixa_dia`.
-    let consulta = supabase.from(tabela).select('id, atualizado_em_origem, criado_em');
-    for (const [coluna, valor] of Object.entries(chave)) {
-      consulta = valor === null ? consulta.is(coluna, null) : consulta.eq(coluna, valor);
-    }
-    const { data: existentes } = await consulta;
-    if (!existentes || existentes.length <= 1) continue;
+  for (const { empresa, data_venda } of pares.values()) {
+    // `atualizado_em_origem`/`criado_em` existem nas duas tabelas — não usa `ultima_venda` aqui de
+    // propósito, ela só existe em `vendas_fechamento_caixa_dia`.
+    const { data: existentes } = await supabase
+      .from(tabela)
+      .select(['id', 'atualizado_em_origem', 'criado_em', ...colunasChave].join(','))
+      .eq('empresa', empresa)
+      .eq('data_venda', data_venda);
+    if (!existentes || existentes.length === 0) continue;
 
-    const ordenadas = [...(existentes as { id: string; atualizado_em_origem: string | null; criado_em: string }[])].sort(
-      (a, b) => {
-        const ta = a.atualizado_em_origem ?? a.criado_em;
-        const tb = b.atualizado_em_origem ?? b.criado_em;
-        return tb.localeCompare(ta);
-      },
-    );
-    const idsParaRemover = ordenadas.slice(1).map((l) => l.id);
+    type Linha = { id: string; atualizado_em_origem: string | null; criado_em: string } & Record<string, unknown>;
+    const grupos = new Map<string, Linha[]>();
+    for (const linha of existentes as unknown as Linha[]) {
+      const chave = colunasChave.map((c) => String(linha[c] ?? '')).join('|');
+      const grupo = grupos.get(chave);
+      if (grupo) grupo.push(linha);
+      else grupos.set(chave, [linha]);
+    }
+
+    const idsParaRemover: string[] = [];
+    for (const grupo of grupos.values()) {
+      if (grupo.length <= 1) continue;
+      grupo.sort((a, b) => (b.atualizado_em_origem ?? b.criado_em).localeCompare(a.atualizado_em_origem ?? a.criado_em));
+      idsParaRemover.push(...grupo.slice(1).map((l) => l.id));
+    }
     if (idsParaRemover.length > 0) {
       await supabase.from(tabela).delete().in('id', idsParaRemover);
     }
@@ -118,15 +130,7 @@ export async function processarImportacao(
             .upsert(linhas, { onConflict: 'hash', count: 'exact' });
           if (!error) {
             await limparLinhasTurnoSuperadas(supabase, linhas);
-            await limparSnapshotsSuperados(
-              supabase,
-              'vendas_fechamento_caixa_dia',
-              linhas.map((l) => ({
-                empresa: l.empresa,
-                data_venda: l.data_venda,
-                chave: { empresa: l.empresa, data_venda: l.data_venda, pdv: l.pdv, operador: l.operador, hora: l.hora },
-              })),
-            );
+            await limparSnapshotsSuperados(supabase, 'vendas_fechamento_caixa_dia', ['pdv', 'operador', 'hora'], linhas);
           }
           return { error, count, recebidas: linhas.length };
         })()
@@ -137,15 +141,7 @@ export async function processarImportacao(
             .from('vendas_produto_dia')
             .upsert(linhas, { onConflict: 'hash', count: 'exact' });
           if (!error) {
-            await limparSnapshotsSuperados(
-              supabase,
-              'vendas_produto_dia',
-              linhas.map((l) => ({
-                empresa: l.empresa,
-                data_venda: l.data_venda,
-                chave: { empresa: l.empresa, data_venda: l.data_venda, produto_codigo: l.produto_codigo, produto: l.produto },
-              })),
-            );
+            await limparSnapshotsSuperados(supabase, 'vendas_produto_dia', ['produto_codigo', 'produto'], linhas);
           }
           return { error, count, recebidas: linhas.length };
         })();

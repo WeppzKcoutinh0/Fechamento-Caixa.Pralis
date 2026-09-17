@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { CAIXAS, TURNOS, type Caixa, type FechamentoDraft, type Turno } from '~/types/fechamento';
+import { useSupabase } from '~/composables/useSupabase';
 import { useVendasFechamento } from '~/composables/useVendasFechamento';
 import { formatCents, toCents } from '~/utils/financeiro';
 import {
@@ -89,6 +90,46 @@ async function buscarVendas() {
   aplicarAjustesComoLancamentos(props.draft, resultado);
 }
 
+// "Sincronizar vendas agora" (pedido do usuário, 17/09/2026): puxa a planilha na hora, sem
+// esperar o cron automático (1x/dia, de madrugada — ver server/utils/sincronizarPlanilha.ts).
+// ATENÇÃO, real: isto NUNCA traz vendas de HOJE enquanto a loja ainda está aberta — o bot da loja
+// só escreve na planilha à noite (22h10). Isto só evita esperar até o cron da manhã SEGUINTE
+// depois que o bot já rodou — não é tempo real durante o dia (a mensagem abaixo do botão deixa
+// isso explícito, pra não parecer que "sincronizar" traz venda que ainda nem existe na origem).
+const sincronizando = ref(false);
+const sincronizacaoErro = ref('');
+const sincronizacaoResultado = ref<{ gravadasFechamento: number; gravadasProdutos: number } | null>(null);
+
+async function sincronizarAgora() {
+  sincronizando.value = true;
+  sincronizacaoErro.value = '';
+  sincronizacaoResultado.value = null;
+  try {
+    const supabase = useSupabase();
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) throw new Error('Sessão expirada — faça login de novo.');
+
+    const resposta = await $fetch<{
+      fechamentoCaixa: { gravadas: number };
+      vendasProdutos: { gravadas: number };
+    }>('/vendas/sincronizar', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    sincronizacaoResultado.value = {
+      gravadasFechamento: resposta.fechamentoCaixa.gravadas,
+      gravadasProdutos: resposta.vendasProdutos.gravadas,
+    };
+    // Re-busca automaticamente pro filtro atual, pra já mostrar se algo novo chegou.
+    if (jaBuscou.value) await buscarVendas();
+  } catch (erro) {
+    sincronizacaoErro.value = erro instanceof Error ? erro.message : 'Falha ao sincronizar.';
+  } finally {
+    sincronizando.value = false;
+  }
+}
+
 const formasPagamento = computed(() => {
   if (!resumo.value) return [];
   const { dinheiro, credito, debito, pix, voucher, crediario, outros } = resumo.value.porForma;
@@ -170,16 +211,39 @@ const ajustesPresentes = computed(() => {
         </p>
       </template>
 
-      <v-btn
-        color="primary"
-        variant="tonal"
-        :loading="carregando"
-        :disabled="carregando || !dataVendas"
-        class="align-self-start"
-        @click="buscarVendas"
-      >
-        {{ carregando ? 'Buscando vendas...' : 'Buscar vendas' }}
-      </v-btn>
+      <div class="d-flex flex-wrap ga-2 align-center">
+        <v-btn
+          color="primary"
+          variant="tonal"
+          :loading="carregando"
+          :disabled="carregando || !dataVendas"
+          @click="buscarVendas"
+        >
+          {{ carregando ? 'Buscando vendas...' : 'Buscar vendas' }}
+        </v-btn>
+        <v-btn
+          variant="text"
+          size="small"
+          prepend-icon="mdi-cloud-sync-outline"
+          :loading="sincronizando"
+          :disabled="sincronizando"
+          @click="sincronizarAgora"
+        >
+          {{ sincronizando ? 'Sincronizando...' : 'Sincronizar vendas agora' }}
+        </v-btn>
+      </div>
+      <p class="text-caption text-medium-emphasis mt-n2">
+        Puxa a planilha do bot na hora, sem esperar o sync automático de madrugada — mas só traz o
+        que o bot da loja já escreveu lá. Vendas de HOJE só aparecem depois que o bot rodar hoje à
+        noite (22h10), mesmo sincronizando agora.
+      </p>
+      <v-alert v-if="sincronizacaoErro" type="error" variant="tonal" density="comfortable">
+        {{ sincronizacaoErro }}
+      </v-alert>
+      <v-alert v-else-if="sincronizacaoResultado" type="info" variant="tonal" density="comfortable">
+        Planilha relida: {{ sincronizacaoResultado.gravadasFechamento }} linha(s) de fechamento e
+        {{ sincronizacaoResultado.gravadasProdutos }} de produto gravadas (reenviar não duplica).
+      </v-alert>
 
       <template v-if="jaBuscou && !carregando">
         <v-alert v-if="erro" type="error" variant="tonal" density="comfortable">

@@ -1,8 +1,5 @@
-import { linhaFechamentoCaixaDiaSchema, linhaVendaProdutoDiaSchema } from '../../../types/vendasFechamento';
-import { lerAbaPlanilha } from '../../utils/googleSheets';
-import { ErroImportacaoVendas, processarImportacao } from '../../utils/importarVendas';
-
-const TAMANHO_LOTE = 500;
+import { ErroImportacaoVendas } from '../../utils/importarVendas';
+import { sincronizarPlanilhaCreare } from '../../utils/sincronizarPlanilha';
 
 /**
  * Sync automático: lê a MESMA planilha Google Sheets que o `bot_padaria_v3` já preenche (rodando
@@ -15,20 +12,12 @@ const TAMANHO_LOTE = 500;
  * leva 401. Ver https://vercel.com/docs/cron-jobs/manage-cron-jobs#securing-cron-jobs.
  *
  * Plano Hobby da Vercel só permite 1 execução/dia por cron — isso já tira a dependência de alguém
- * rodar na mão, mas não é "em tempo real". Ver TASKS.md pra opção de pingar esta rota com mais
- * frequência via um cron externo (cron-job.org etc.) usando o mesmo CRON_SECRET.
+ * rodar na mão, mas não é "em tempo real". Ver `server/routes/vendas/sincronizar.post.ts` (sync
+ * manual disparado pelo usuário logado, sem esperar o cron) e TASKS.md pra mais contexto.
+ *
+ * Lógica de leitura/gravação em si mora em `server/utils/sincronizarPlanilha.ts`, reaproveitada
+ * também pela rota manual — só a autenticação muda entre as duas.
  */
-
-function filtrarPorEmpresa<T extends { EMPRESA?: string }>(linhas: T[], empresa: string): T[] {
-  return linhas.filter((linha) => String(linha.EMPRESA ?? '').trim() === empresa);
-}
-
-function loteEmGrupos<T>(linhas: T[]): T[][] {
-  const grupos: T[][] = [];
-  for (let i = 0; i < linhas.length; i += TAMANHO_LOTE) grupos.push(linhas.slice(i, i + TAMANHO_LOTE));
-  return grupos.length > 0 ? grupos : [[]];
-}
-
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig();
 
@@ -39,55 +28,7 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    const empresa = config.empresaPralis;
-    const colunaInicial = config.planilhaColunaInicial || 'F';
-
-    const todasFechamento = await lerAbaPlanilha({
-      credenciaisJson: config.googleServiceAccountJson,
-      spreadsheetId: config.googleSpreadsheetId,
-      aba: 'FECHAMENTOS_CAIXAS',
-      colunaInicial,
-    });
-    const linhasFechamentoBrutas = filtrarPorEmpresa(todasFechamento, empresa);
-    let fechamentoRecebidas = 0;
-    let fechamentoGravadas = 0;
-    let fechamentoInvalidas = 0;
-    for (const lote of loteEmGrupos(linhasFechamentoBrutas)) {
-      const parseadas = lote.map((linha) => linhaFechamentoCaixaDiaSchema.safeParse(linha));
-      fechamentoInvalidas += parseadas.filter((p) => !p.success).length;
-      const validas = parseadas.filter((p) => p.success).map((p) => p.data);
-      if (validas.length === 0) continue;
-      const { recebidas, gravadas } = await processarImportacao('fechamento_caixa_dia', validas);
-      fechamentoRecebidas += recebidas;
-      fechamentoGravadas += gravadas;
-    }
-
-    const todosProdutos = await lerAbaPlanilha({
-      credenciaisJson: config.googleServiceAccountJson,
-      spreadsheetId: config.googleSpreadsheetIdSecundario || config.googleSpreadsheetId,
-      aba: 'VENDAS_PRODUTOS',
-      colunaInicial,
-    });
-    const linhasProdutosBrutas = filtrarPorEmpresa(todosProdutos, empresa);
-    let produtosRecebidas = 0;
-    let produtosGravadas = 0;
-    let produtosInvalidas = 0;
-    for (const lote of loteEmGrupos(linhasProdutosBrutas)) {
-      const parseadas = lote.map((linha) => linhaVendaProdutoDiaSchema.safeParse(linha));
-      produtosInvalidas += parseadas.filter((p) => !p.success).length;
-      const validas = parseadas.filter((p) => p.success).map((p) => p.data);
-      if (validas.length === 0) continue;
-      const { recebidas, gravadas } = await processarImportacao('venda_produto_dia', validas);
-      produtosRecebidas += recebidas;
-      produtosGravadas += gravadas;
-    }
-
-    return {
-      ok: true,
-      executadoEm: new Date().toISOString(),
-      fechamentoCaixa: { naPlanilha: linhasFechamentoBrutas.length, recebidas: fechamentoRecebidas, gravadas: fechamentoGravadas, invalidas: fechamentoInvalidas },
-      vendasProdutos: { naPlanilha: linhasProdutosBrutas.length, recebidas: produtosRecebidas, gravadas: produtosGravadas, invalidas: produtosInvalidas },
-    };
+    return await sincronizarPlanilhaCreare();
   } catch (erro) {
     if (erro instanceof ErroImportacaoVendas) {
       throw createError({ statusCode: erro.statusCode, statusMessage: erro.message, data: erro.data });

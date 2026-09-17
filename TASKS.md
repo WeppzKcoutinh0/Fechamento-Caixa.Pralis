@@ -2,6 +2,34 @@
 
 ## Histórico de decisão (mais recente primeiro)
 
+**17/09/2026 (14ª revisão) — bot da loja passou a escrever a cada ~1min; cron da Vercel (1x/dia)
+não acompanha mais isso — GitHub Actions a cada 5min cobre o gap.** Usuário avisou que "o bot está
+programado pra atualizar de 1 em 1 minuto" e pediu pra sempre buscar as vendas. Confirmei antes de
+mexer em qualquer coisa: consultei `vendas_fechamento_caixa_dia` de hoje (17/09) e achei dezenas de
+snapshots por PDV, `ultima_venda` avançando de ~1-2 em 1-2 minutos ao longo do dia (16:57, 16:56,
+16:55...) — bate exatamente com o que o usuário disse. `hora` de todas essas linhas é `null`
+(formato de planilha, não do agente `sincronizar.js` direto) — confirma que é o `bot_padaria_v3`
+original que mudou de frequência (escrevendo na planilha bem mais vezes por dia), não algo que
+alguém instalou do nosso lado.
+
+Problema real: nosso único sync automático era o Cron Job da Vercel, capado em 1x/dia (plano
+Hobby — ver 11ª revisão), então mesmo com o bot escrevendo a cada minuto, o app só puxava isso de
+manhã cedo do dia seguinte. Solução: `.github/workflows/sync-vendas.yml` — GitHub Actions
+(`schedule: cron: '*/5 * * * *'`, o intervalo mínimo confiável que o GitHub aceita) chamando o
+MESMO endpoint `/cron/importar-planilha` com o `CRON_SECRET`, sem precisar de Vercel Pro nem de
+ninguém clicando em nada. Repositório é público, então roda de graça, sem limite de minutos.
+**Pendência do usuário**: precisa cadastrar o secret `CRON_SECRET` no GitHub (Settings -> Secrets
+and variables -> Actions -> New repository secret, mesmo valor já configurado na Vercel) pro
+workflow funcionar — não tenho token com escopo pra fazer isso por API nesta sessão, e mesmo se
+tivesse, cadastrar segredo de repositório é ação melhor deixada pra interface do próprio dono.
+
+**Efeito colateral notado, não é bug**: com o bot escrevendo a cada minuto, cada snapshot vira uma
+linha nova em `vendas_fechamento_caixa_dia` (hash muda porque `PRIMEIRA_VENDA`/`ULTIMA_VENDA`
+mudam a cada snapshot) — a tabela cresce rápido (centenas de linhas por PDV por dia, em vez de
+uma). Não quebra nada (o resumo continua somando certo, `calcularResumoVendasDia` já soma todas as
+linhas do dia), só ocupa mais espaço no banco. Sem ação necessária agora; watch se algum dia isso
+virar problema de performance/custo.
+
 **17/09/2026 (13ª revisão) — botão "Sincronizar vendas agora" + `.env.producao` do agente real
 pronto, falta só instalar na loja.** Usuário testou buscar vendas de hoje de manhã (17/09, 07h20) e
 não achou nada — perguntei antes de mexer em qualquer cálculo: confirmei no banco que o sync

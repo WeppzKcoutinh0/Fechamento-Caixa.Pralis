@@ -9,9 +9,14 @@ name: Sincronizar vendas (planilha CREARE)
 # atividade — o GitHub Actions atrasa/pula agendamentos frequentes sem aviso, é documentado que
 # isso pode acontecer, mas na prática foi bem mais severo que "só um atraso ocasional". Por isso
 # o `schedule` aqui dispara só de 6 em 6 horas (agendamentos menos frequentes parecem sofrer menos
-# esse atraso) e, uma vez que UMA execução começa, ela mesma fica em loop chamando o endpoint a
-# cada 5 minutos por dentro, por quase as 6 horas seguintes — assim a frequência real não depende
-# do agendador do GitHub voltar a disparar, só de UMA execução ter começado.
+# esse atraso) e, uma vez que UMA execução começa, ela mesma fica em loop chamando o endpoint por
+# dentro a cada ~1 minuto (pedido do usuário, 18/09/2026 — bate com o ritmo do bot da loja), por
+# quase as 6 horas seguintes. Assim a frequência real não depende do agendador do GitHub voltar a
+# disparar toda hora, só de UMA execução ter começado — mas repare que o intervalo ENTRE disparos
+# do `schedule` (as 6h) ainda depende do GitHub, só o que roda DENTRO de uma execução já iniciada é
+# garantido. Único jeito de tirar essa dependência de vez é `vercel.json` cron nativo por minuto,
+# que exige o plano Pro da Vercel (Hobby só permite 1x/dia, ver 11ª revisão) — decisão de custo do
+# usuário, não implementada aqui.
 #
 # Precisa do secret CRON_SECRET (Settings -> Secrets and variables -> Actions -> New repository
 # secret) com o MESMO valor da env var CRON_SECRET configurada no projeto da Vercel.
@@ -31,7 +36,7 @@ jobs:
     # do limite de 6h por job do GitHub (Hobby/free) e não sobrepor com a próxima execução.
     timeout-minutes: 350
     steps:
-      - name: Sincronizar em loop por ~5h50 (chama de 5 em 5 minutos)
+      - name: Sincronizar em loop por ~5h50 (chama a cada ~1 minuto)
         run: |
           fim=$((SECONDS + 350*60))
           tentativa=0
@@ -39,7 +44,7 @@ jobs:
           erros=0
           while [ "$SECONDS" -lt "$fim" ]; do
             tentativa=$((tentativa + 1))
-            if curl --fail --show-error --silent --max-time 90 \
+            if curl --fail --show-error --silent --max-time 65 \
                  -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
                  "https://fechamento-caixa-pralis.vercel.app/cron/importar-planilha"; then
               ok=$((ok + 1))
@@ -48,7 +53,10 @@ jobs:
               echo "::warning::tentativa $tentativa falhou (isolada, o loop continua)"
             fi
             echo
-            sleep 300
+            # A própria chamada já leva ~20-40s (mediu-se em produção) — este sleep curto é o que
+            # aproxima o ciclo total (chamada + espera) de ~1 minuto, sem precisar cronometrar a
+            # chamada em si.
+            sleep 20
           done
           echo "Resumo: $tentativa tentativas, $ok ok, $erros com erro."
           # Só falha o job (e manda e-mail) se TODAS as tentativas falharam — uma falha isolada de

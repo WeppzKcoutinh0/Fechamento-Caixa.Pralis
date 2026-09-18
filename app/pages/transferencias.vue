@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import ConsultaPorPeriodo from '~/components/consulta/ConsultaPorPeriodo.vue';
 import FormularioTransferenciaTesouraria from '~/components/tesouraria/FormularioTransferenciaTesouraria.vue';
 import ConfirmacaoDialog from '~/components/comum/ConfirmacaoDialog.vue';
@@ -44,6 +44,12 @@ function statusDe(t: TransferenciaTesouraria): { texto: string; cor: string } {
   return { texto: 'Confirmada', cor: 'success' };
 }
 
+// Pedido do usuário (18/09/2026): recebimentos pendentes saem do meio da lista de transferências
+// e viram uma notificação própria (sininho com contador) — a lista principal fica só com o
+// registro em si (origem/destino/valor/status), sem o botão de ação misturado em cada cartão.
+const pendentes = computed(() => transferencias.value.filter((t) => !t.dataRecebimento));
+const notificacoesAbertas = ref(false);
+
 async function confirmarExclusao(): Promise<void> {
   if (!paraExcluir.value) return;
   await excluir(paraExcluir.value);
@@ -70,6 +76,47 @@ async function confirmarRecebimentoDe(id: string): Promise<void> {
       <div class="d-flex align-center ga-2 mb-6 flex-wrap">
         <span class="consulta-disco"><v-icon icon="mdi-safe-square-outline" size="20" /></span>
         <h1 class="text-h5 flex-grow-1">Tesouraria</h1>
+
+        <v-menu v-model="notificacoesAbertas" location="bottom end" :close-on-content-click="false">
+          <template #activator="{ props: menuProps }">
+            <v-btn v-bind="menuProps" icon variant="text" aria-label="Recebimentos pendentes">
+              <v-badge v-if="pendentes.length" :content="pendentes.length" color="warning" floating>
+                <v-icon icon="mdi-bell-outline" />
+              </v-badge>
+              <v-icon v-else icon="mdi-bell-outline" />
+            </v-btn>
+          </template>
+          <v-card min-width="340" max-width="420" rounded="lg">
+            <v-card-title class="text-subtitle-1">Recebimentos pendentes</v-card-title>
+            <v-divider />
+            <v-list v-if="pendentes.length" density="comfortable" class="py-0">
+              <v-list-item v-for="t in pendentes" :key="t.id" class="py-3">
+                <div class="d-flex flex-column ga-1">
+                  <div class="d-flex align-center ga-2">
+                    <strong>{{ t.caixaOrigem }} → {{ t.caixaDestino }}</strong>
+                    <v-spacer />
+                    <strong>R$ {{ formatCents(t.valorCents) }}</strong>
+                  </div>
+                  <span class="text-caption text-medium-emphasis">Lacre {{ t.lacre }} · {{ formatarDataBr(t.dataLanc) }}</span>
+                  <v-btn
+                    size="small"
+                    variant="tonal"
+                    color="success"
+                    class="mt-1"
+                    :loading="confirmando === t.id"
+                    @click="confirmarRecebimentoDe(t.id)"
+                  >
+                    Confirmar recebimento
+                  </v-btn>
+                </div>
+              </v-list-item>
+            </v-list>
+            <v-card-text v-else class="text-body-2 text-medium-emphasis">
+              Nenhum recebimento pendente.
+            </v-card-text>
+          </v-card>
+        </v-menu>
+
         <v-btn color="primary" prepend-icon="mdi-plus" @click="modalAberto = true">Nova Transferência</v-btn>
       </div>
 
@@ -92,16 +139,6 @@ async function confirmarRecebimentoDe(id: string): Promise<void> {
             <span class="text-caption text-medium-emphasis">{{ formatarDataBr(t.dataLanc) }}</span>
             <v-spacer />
             <strong>R$ {{ formatCents(t.valorCents) }}</strong>
-            <v-btn
-              v-if="!t.dataRecebimento"
-              size="small"
-              variant="tonal"
-              color="success"
-              :loading="confirmando === t.id"
-              @click="confirmarRecebimentoDe(t.id)"
-            >
-              Confirmar recebimento
-            </v-btn>
             <v-btn size="small" variant="text" color="error" icon="mdi-delete-outline" @click="paraExcluir = t.id" />
           </div>
           <p v-if="t.observacao" class="text-caption text-medium-emphasis mt-2 mb-0">{{ t.observacao }}</p>

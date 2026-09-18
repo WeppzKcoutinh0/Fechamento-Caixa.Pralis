@@ -2,6 +2,33 @@
 
 ## Histórico de decisão (mais recente primeiro)
 
+**18/09/2026 (16ª revisão) — GitHub Actions `schedule` não é confiável pra 5min; workflow virou
+loop de ~6h.** `CRON_SECRET` nunca tinha sido cadastrado no GitHub (todas as execuções falhavam em
+4s por 401, mandando e-mail de falha toda vez — usuário reportou "todo dia tendo que arrumar
+isso"). Usuário forneceu um token fine-grained (permissão Secrets: Read and write) — cadastrei o
+secret via API (`PUT /repos/.../actions/secrets/CRON_SECRET`, valor cifrado com a chave pública do
+repositório via `libsodium-wrappers`, confirmado com `GET` retornando o `created_at`). Primeiro
+token que o usuário gerou só tinha "Secrets: Read" mesmo depois de eu pedir Read+write — segundo
+token (novo, do zero) funcionou de primeira; a edição do primeiro não deve ter propagado.
+
+Mesmo com o secret certo, **o agendamento em si não rodou nem uma vez em >1h15 depois do fix** —
+medido: das últimas execuções, intervalo médio real de ~2-4h pra um cron configurado como "a cada
+5 minutos". Confirmado que não é o app (testei o endpoint direto, 200 OK, dados novos gravados) —
+é o agendador do GitHub Actions mesmo, que atrasa/pula agendamentos muito frequentes em
+repositórios com pouca atividade, bem mais severamente do que a documentação sugere.
+
+Correção: `schedule` do workflow passou de `*/5 * * * *` pra `0 */6 * * *` (agendamentos menos
+frequentes parecem sofrer menos atraso) — e a execução, uma vez que COMEÇA, fica em loop interno
+chamando o endpoint a cada 5 minutos por ~5h50 (`timeout-minutes: 350`, abaixo do limite de 6h por
+job do GitHub) antes de terminar. Assim a frequência real de chamadas não depende mais do
+agendador disparar toda hora, só de uma execução ter começado a cada ~6h. Job só falha (e manda
+e-mail) se TODAS as tentativas daquela janela falharem — uma falha de rede isolada não gera alarme
+sozinha.
+
+**Pendência**: ainda não confirmei uma execução completa e bem-sucedida desse novo formato ao vivo
+(o token que tenho só tem permissão de Secrets, não de Actions, então não consigo disparar
+`workflow_dispatch` pra testar na hora — só o agendador natural). Verificar de novo mais tarde.
+
 **17/09/2026 (15ª revisão) — vendas superestimadas (18.721 vendas/R$250mil num caixa só) por
 snapshots duplicados; corrigido, mas dedupe ingênuo causou 504 na Vercel, corrigido de novo.**
 Consequência direta da 14ª revisão (bot escrevendo a cada ~1min): usuário reportou "Caixa 2"

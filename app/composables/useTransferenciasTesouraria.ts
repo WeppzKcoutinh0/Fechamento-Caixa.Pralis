@@ -114,6 +114,9 @@ export function useTransferenciasTesouraria() {
     transferenciaRetorno: boolean;
     observacao: string;
   }): Promise<TransferenciaTesouraria> {
+    const destinosExtras = [...new Set(dados.destinosExtra.map((d) => d.caixa))]
+      .filter((caixa) => caixa !== dados.caixaOrigem && caixa !== dados.caixaDestino)
+      .map((caixa) => ({ caixa }));
     const { data, error } = await supabase
       .from('transferencias_tesouraria')
       .insert({
@@ -124,7 +127,7 @@ export function useTransferenciasTesouraria() {
         caixa_origem: dados.caixaOrigem,
         caixa_destino: dados.caixaDestino,
         multiplo_destino: dados.multiploDestino,
-        destinos_extra: dados.destinosExtra.map((d) => ({ caixa: d.caixa })),
+        destinos_extra: destinosExtras,
         tempo_confirmacao: dados.tempoConfirmacao,
         transferencia_retorno: dados.transferenciaRetorno,
         observacao: dados.observacao,

@@ -1,7 +1,8 @@
--- A função anterior era SECURITY DEFINER, mas aceitava qualquer fechamento,
--- caixa e valor enviados por um usuário autenticado. Isso permitia forjar
--- retornos de tesouraria via RPC direto. O retorno só pode ser criado para o
--- próprio fechamento e precisa usar os dados persistidos desse fechamento.
+-- Reaplica `criar_retorno_automatico_tesouraria` com `is distinct from` em vez de `<>`
+-- (20260918101300 foi editada depois de já aplicada: `<>` com NULL avalia pra NULL, não TRUE, e o
+-- `if` nunca dispara — um fechamento com `criado_por` nulo, que existe em linhas antigas de antes
+-- desta coluna existir, passaria a checagem de dono sem erro nenhum. `is distinct from` trata
+-- NULL corretamente).
 create or replace function public.criar_retorno_automatico_tesouraria(
   p_fechamento_id uuid,
   p_caixa text,

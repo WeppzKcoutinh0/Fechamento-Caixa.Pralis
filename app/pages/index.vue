@@ -4,7 +4,7 @@ import { usePerfil } from '~/composables/usePerfil';
 import PainelAdmin from '~/components/app/PainelAdmin.vue';
 import PainelCaixaOperacional from '~/components/app/PainelCaixaOperacional.vue';
 
-const { perfil, carregando, isAdmin, carregar } = usePerfil();
+const { perfil, carregando, erro: erroPerfil, isAdmin, carregar } = usePerfil();
 onMounted(carregar);
 </script>
 
@@ -13,5 +13,10 @@ onMounted(carregar);
     <v-progress-circular indeterminate color="primary" />
   </div>
   <PainelAdmin v-else-if="isAdmin" />
-  <PainelCaixaOperacional v-else />
+  <PainelCaixaOperacional v-else-if="perfil" />
+  <v-container v-else class="py-6" style="max-width: 640px">
+    <v-alert type="error" variant="tonal">
+      {{ erroPerfil || 'Seu usuário ainda não possui um perfil operacional configurado. Procure o administrador.' }}
+    </v-alert>
+  </v-container>
 </template>

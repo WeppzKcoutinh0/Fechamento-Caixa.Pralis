@@ -109,6 +109,13 @@ const caixasDestinoDisponiveis = computed(() =>
   CAIXAS.filter((c) => c !== transferenciaAtual.value?.caixaOrigem),
 );
 
+// "Caixa destino" obrigatório (pedido do usuário, 18/09/2026) — sem isso o registro fica "—" na
+// lista, sem indicar pra onde o dinheiro foi. Bloqueia só o "Salvar" (fechar o "X" continua livre,
+// pro usuário poder desistir/remover em vez de ficar preso no modal).
+const transferenciaSemDestino = computed(
+  () => tipoModal.value === 'transferencia' && !transferenciaAtual.value?.caixaDestino,
+);
+
 function remover(): void {
   if (indiceEditando.value === null) return;
   if (tipoModal.value === 'entrada') props.draft.entradas.splice(indiceEditando.value, 1);
@@ -310,13 +317,21 @@ const totalTransferenciasCents = computed(() =>
                 </select>
               </label>
               <label class="lc-campo">
-                <span class="lc-campo-lbl">Caixa destino</span>
-                <select v-model="transferenciaAtual.caixaDestino" class="lc-input">
+                <span class="lc-campo-lbl">Caixa destino *</span>
+                <select
+                  v-model="transferenciaAtual.caixaDestino"
+                  class="lc-input"
+                  required
+                  :class="{ 'lc-input-erro': transferenciaSemDestino }"
+                >
                   <option value="">Selecione...</option>
                   <option v-for="c in caixasDestinoDisponiveis" :key="c" :value="c">{{ c }}</option>
                 </select>
               </label>
             </div>
+            <p v-if="transferenciaSemDestino" class="lc-erro-campo">
+              Selecione o caixa destino pra poder salvar.
+            </p>
 
             <div class="lc-dois">
               <label class="lc-campo">
@@ -362,7 +377,14 @@ const totalTransferenciasCents = computed(() =>
 
         <div class="lc-acoes">
           <button type="button" class="lc-salvar-nova" @click="remover">Remover</button>
-          <button type="button" class="lc-salvar" @click="modalAberto = false">Salvar</button>
+          <button
+            type="button"
+            class="lc-salvar"
+            :disabled="transferenciaSemDestino"
+            @click="modalAberto = false"
+          >
+            Salvar
+          </button>
         </div>
       </div>
     </v-dialog>

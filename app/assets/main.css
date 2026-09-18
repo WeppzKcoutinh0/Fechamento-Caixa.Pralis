@@ -392,45 +392,15 @@ body {
   background: var(--cx-surface-sunken);
   color: var(--cx-ink-soft);
 }
-.lc-data-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+/* .lc-input-erro / .lc-erro-campo: destaque de campo obrigatório não preenchido (ex.: "Caixa
+   destino" da transferência — pedido do usuário, 18/09/2026). */
+.lc-input-erro {
+  border-color: var(--cx-negative) !important;
 }
-.lc-data-row .lc-input {
-  flex: 1;
-}
-/* `input[type=date]` nativo não encolhe abaixo de ~130px (o browser reserva espaço fixo pros
-   segmentos dia/mês/ano + ícone, `flex-shrink` não tem efeito nisso) — nas 3 colunas iguais
-   padrão do `.lc-tres` (~150-166px cada) não sobra espaço pro botão "Hoje" do lado sem estourar
-   a coluna e invadir "Data Doc. Fiscal" (que também tem um `input[type=date]`, com o mesmo piso).
-   `.lc-tres-datas` dá largura assimétrica só nesta linha: "Data Lanç" fica maior (carrega botão +
-   campo), "N° Doc. Fiscal" cede espaço (é só texto livre, sem piso de largura nativo). Só acima
-   de 560px — abaixo disso a regra de empilhar tudo (100%) já resolve sozinha. */
-@media (width > 560px) {
-  .lc-tres-datas > .lc-campo:nth-child(1) {
-    flex-basis: 42%;
-  }
-  .lc-tres-datas > .lc-campo:nth-child(2) {
-    flex-basis: 32%;
-  }
-  .lc-tres-datas > .lc-campo:nth-child(3) {
-    flex-basis: 22%;
-  }
-}
-.lc-pill {
-  border: 0.5px solid var(--cx-line);
-  background: none;
-  padding: 8px 10px;
-  border-radius: var(--cx-r-pill);
-  color: var(--cx-ink-soft);
-  font-size: var(--cx-fs-caption);
-  cursor: pointer;
-}
-.lc-pill.ativo {
-  background: var(--cat-soft);
-  border-color: transparent;
-  color: var(--cat-tinta);
+.lc-erro-campo {
+  color: var(--cx-negative);
+  font-size: var(--cx-fs-micro);
+  margin: -6px 0 10px;
 }
 .lc-chips {
   display: flex;

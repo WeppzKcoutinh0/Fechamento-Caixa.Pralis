@@ -326,12 +326,12 @@ const totalGeralDiscriminacao = computed(() =>
             </label>
           </div>
 
-          <!-- Linha 3: Data Lanç · Data Doc Fiscal · Nº Doc Fiscal — larguras assimétricas
-               (.lc-tres-datas), não as 3 colunas iguais padrão do .lc-tres: "N° Doc. Fiscal" é só
-               texto livre (sem largura mínima de input nativo) — é quem cede espaço pros outros
-               dois caberem lado a lado. Data Lanç/Data Doc. Fiscal travadas na data do fechamento
-               (pedido do usuário, 18/09/2026) — sem botão "Hoje", ficou redundante. -->
-          <div class="lc-tres lc-tres-datas">
+          <!-- Linha 3: Data Lanç · Data Doc Fiscal · Nº Doc Fiscal — Data Lanç/Data Doc. Fiscal
+               travadas na data do fechamento (pedido do usuário, 18/09/2026); sem o botão "Hoje"
+               de antes, cada campo é só um input[type=date] sozinho — cabe tranquilo nas 3
+               colunas iguais padrão do .lc-tres, não precisa mais da largura assimétrica que
+               existia só pra caber o botão + campo juntos. -->
+          <div class="lc-tres">
             <label class="lc-campo">
               <span class="lc-campo-lbl">Data Lanç</span>
               <input v-model="lancamentoAtual.dataRef" type="date" class="lc-input" readonly />

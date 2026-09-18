@@ -37,17 +37,11 @@ onMounted(async () => {
   if (isAdmin.value) await carregar();
 });
 
-function statusDe(t: TransferenciaTesouraria): { texto: string; cor: string } {
-  if (t.dataRecebimento) return { texto: 'Confirmada', cor: 'success' };
-  if (t.agendamento) return { texto: 'Agendada', cor: 'warning' };
-  if (t.tempoConfirmacao) return { texto: 'Aguardando confirmação', cor: 'warning' };
-  return { texto: 'Confirmada', cor: 'success' };
-}
-
-// Pedido do usuário (18/09/2026): recebimentos pendentes saem do meio da lista de transferências
-// e viram uma notificação própria (sininho com contador) — a lista principal fica só com o
-// registro em si (origem/destino/valor/status), sem o botão de ação misturado em cada cartão.
+// Pedido do usuário (18/09/2026): recebimentos pendentes saem da lista principal por completo e
+// só aparecem dentro do sininho de notificações — a lista principal mostra só o que já foi
+// confirmado. Ao confirmar pelo sininho, o item sai da notificação e passa a aparecer aqui.
 const pendentes = computed(() => transferencias.value.filter((t) => !t.dataRecebimento));
+const confirmadas = computed(() => transferencias.value.filter((t) => !!t.dataRecebimento));
 const notificacoesAbertas = ref(false);
 
 async function confirmarExclusao(): Promise<void> {
@@ -126,14 +120,14 @@ async function confirmarRecebimentoDe(id: string): Promise<void> {
         <v-progress-circular indeterminate color="primary" />
       </div>
 
-      <v-alert v-else-if="transferencias.length === 0" type="info" variant="tonal">
-        Nenhuma transferência de tesouraria registrada ainda.
+      <v-alert v-else-if="confirmadas.length === 0" type="info" variant="tonal">
+        Nenhuma transferência confirmada ainda.
       </v-alert>
 
       <div v-else class="d-flex flex-column ga-2">
-        <v-card v-for="t in transferencias" :key="t.id" variant="outlined" rounded="lg" class="pa-4">
+        <v-card v-for="t in confirmadas" :key="t.id" variant="outlined" rounded="lg" class="pa-4">
           <div class="d-flex align-center flex-wrap ga-3">
-            <v-chip :color="statusDe(t).cor" size="small" variant="tonal">{{ statusDe(t).texto }}</v-chip>
+            <v-icon icon="mdi-check-circle" color="success" size="20" />
             <strong>{{ t.caixaOrigem }} → {{ t.caixaDestino }}</strong>
             <span class="text-caption text-medium-emphasis">Lacre {{ t.lacre }}</span>
             <span class="text-caption text-medium-emphasis">{{ formatarDataBr(t.dataLanc) }}</span>

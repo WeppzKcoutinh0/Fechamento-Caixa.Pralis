@@ -38,7 +38,7 @@ function horaDoRegistro(criadoEm: string): string {
 
     <v-card class="pa-4 mb-6" variant="outlined" rounded="lg">
       <div class="d-flex flex-column flex-sm-row ga-3 align-sm-end flex-wrap">
-        <v-text-field v-model="data" label="Data" type="date" style="max-width: 200px" />
+        <v-text-field v-model="data" label="Data" type="date" style="max-width: 200px" readonly />
         <v-text-field v-model="horarioDe" label="Horário de" type="time" style="max-width: 160px" />
         <v-text-field v-model="horarioAte" label="Horário até" type="time" style="max-width: 160px" />
         <v-btn color="primary" :loading="carregando" :disabled="carregando || !data" @click="filtrar">

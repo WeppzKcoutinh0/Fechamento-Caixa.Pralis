@@ -69,17 +69,18 @@ const ROTULOS_GRUPO: Record<string, string> = {
   outros: 'Outros',
 };
 
-function hojeISO(): string {
-  return new Date().toISOString().split('T')[0]!;
-}
-
+// Pedido do usuário (18/09/2026): todo campo de data do lançamento fica travado na data do
+// PRÓPRIO fechamento (`draft.data` — sempre "hoje" no momento em que o fechamento foi criado,
+// nunca muda depois), não mais editável. Ciente do trade-off avisado e aceito pelo usuário: nota
+// fiscal atrasada, vencimento futuro e pagamento em outro dia deixam de ser representáveis aqui —
+// decisão deliberada dele, "é fechamento de caixa daquele dia específico".
 function novoLancamento(tipo: TipoLancamento): LancamentoDraft {
   return {
     id: crypto.randomUUID(),
     tipo,
     status: 'naopago',
-    dataRef: hojeISO(),
-    dataNfe: '',
+    dataRef: props.draft.data,
+    dataNfe: props.draft.data,
     nNfe: '',
     fornecedor: '',
     tipoMer: '',
@@ -90,8 +91,8 @@ function novoLancamento(tipo: TipoLancamento): LancamentoDraft {
     obsTexto: '',
     obsAudioPath: null,
     fotoPath: null,
-    vencimento: '',
-    dataPagamento: '',
+    vencimento: props.draft.data,
+    dataPagamento: props.draft.data,
     fotoNotaPath: null,
     origemAjusteCreare: '',
   };
@@ -326,27 +327,18 @@ const totalGeralDiscriminacao = computed(() =>
           </div>
 
           <!-- Linha 3: Data Lanç · Data Doc Fiscal · Nº Doc Fiscal — larguras assimétricas
-               (.lc-tres-datas), não as 3 colunas iguais padrão do .lc-tres: "Data Lanç" carrega
-               o botão "Hoje" + o campo, "N° Doc. Fiscal" é só texto livre (sem largura mínima de
-               input nativo) — é quem cede espaço pros outros dois caberem lado a lado. -->
+               (.lc-tres-datas), não as 3 colunas iguais padrão do .lc-tres: "N° Doc. Fiscal" é só
+               texto livre (sem largura mínima de input nativo) — é quem cede espaço pros outros
+               dois caberem lado a lado. Data Lanç/Data Doc. Fiscal travadas na data do fechamento
+               (pedido do usuário, 18/09/2026) — sem botão "Hoje", ficou redundante. -->
           <div class="lc-tres lc-tres-datas">
             <label class="lc-campo">
               <span class="lc-campo-lbl">Data Lanç</span>
-              <div class="lc-data-row">
-                <button
-                  type="button"
-                  class="lc-pill"
-                  :class="{ ativo: lancamentoAtual.dataRef === hojeISO() }"
-                  @click="lancamentoAtual.dataRef = hojeISO()"
-                >
-                  Hoje
-                </button>
-                <input v-model="lancamentoAtual.dataRef" type="date" class="lc-input" />
-              </div>
+              <input v-model="lancamentoAtual.dataRef" type="date" class="lc-input" readonly />
             </label>
             <label class="lc-campo">
               <span class="lc-campo-lbl">Data Doc. Fiscal</span>
-              <input v-model="lancamentoAtual.dataNfe" type="date" class="lc-input" />
+              <input v-model="lancamentoAtual.dataNfe" type="date" class="lc-input" readonly />
             </label>
             <label class="lc-campo">
               <span class="lc-campo-lbl">N° Doc. Fiscal</span>
@@ -570,12 +562,13 @@ const totalGeralDiscriminacao = computed(() =>
                 v-model="lancamentoAtual.dataPagamento"
                 type="date"
                 class="lc-input"
+                readonly
                 :disabled="lancamentoAtual.status !== 'pago'"
               />
             </label>
             <label class="lc-campo">
               <span class="lc-campo-lbl">Data Vencimento</span>
-              <input v-model="lancamentoAtual.vencimento" type="date" class="lc-input" />
+              <input v-model="lancamentoAtual.vencimento" type="date" class="lc-input" readonly />
             </label>
           </div>
 

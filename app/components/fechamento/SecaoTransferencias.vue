@@ -38,18 +38,16 @@ const TRANSFERENCIA_VARS = {
   '--cat-tinta': 'var(--cat-retiradas-tinta)',
 };
 
-function hojeISO(): string {
-  return new Date().toISOString().split('T')[0]!;
-}
-
 function novaEntrada(): EntradaDraft {
   return { lacre: '', valorCents: 0, descricao: '' };
 }
 function novaSangria(): SangriaDraft {
   return { descricao: '', lacre: '', valorCents: 0 };
 }
+// Data travada na data do fechamento (pedido do usuário, 18/09/2026) — ver mesma decisão em
+// SecaoLancamentos.vue.
 function novaTransferencia(): TransferenciaCaixaDraft {
-  return { caixaOrigem: '', caixaDestino: '', valorCents: 0, lacre: '', data: hojeISO(), observacao: '' };
+  return { caixaOrigem: '', caixaDestino: '', valorCents: 0, lacre: '', data: props.draft.data, observacao: '' };
 }
 
 const modalAberto = ref(false);
@@ -327,17 +325,7 @@ const totalTransferenciasCents = computed(() =>
               </label>
               <label class="lc-campo">
                 <span class="lc-campo-lbl">Data</span>
-                <div class="lc-data-row">
-                  <button
-                    type="button"
-                    class="lc-pill"
-                    :class="{ ativo: transferenciaAtual.data === hojeISO() }"
-                    @click="transferenciaAtual.data = hojeISO()"
-                  >
-                    Hoje
-                  </button>
-                  <input v-model="transferenciaAtual.data" type="date" class="lc-input" />
-                </div>
+                <input v-model="transferenciaAtual.data" type="date" class="lc-input" readonly />
               </label>
             </div>
 

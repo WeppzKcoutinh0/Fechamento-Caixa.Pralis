@@ -191,7 +191,7 @@ const ajustesPresentes = computed(() => {
 
     <div class="d-flex flex-column ga-3">
       <div class="text-subtitle-2 text-medium-emphasis">Vendas do dia</div>
-      <v-text-field v-model="dataVendas" label="Data das vendas" type="date" />
+      <v-text-field v-model="dataVendas" label="Data das vendas" type="date" readonly />
 
       <v-switch
         v-model="filtrarPorHorario"

@@ -1,17 +1,21 @@
 <script setup lang="ts">
 // Menu lateral do app — visual portado da identidade Cicluz (mesma marca do Sistema Inteligente
-// Pralís, ver assets/main.css). Diferente daquele projeto: aqui não existem páginas próprias de
-// Resultados/Configuração — só o wizard de fechamento e as 3 telas de consulta por período. Por
-// isso:
-//   - "+ NOVO FECHAMENTO" vai direto pro formulário (pages/fechamentos/novo.vue).
+// Pralís, ver assets/main.css). Todo o conteúdo deste menu (grupos de navegação) é admin-only —
+// ver `grupos` abaixo — porque cada um desses destinos olha o histórico de TODOS os fechamentos,
+// não o do caixa de quem está logado:
 //   - ENTRADAS/TRANSFERENCIAS/SAIDAS abrem as telas de consulta por data/horário
 //     (pages/entradas.vue, transferencias.vue, saidas.vue).
-//   - RESULTADOS aponta pro painel (é o mais perto que este app tem de "relatório geral").
+//   - HISTÓRICO é a lista de sessões/fechamentos de todo mundo (pages/historico.vue).
+//   - Sem "RESULTADOS" (removido a pedido do usuário, 18/09/2026) — apontava pro painel
+//     (`/`), redundante com simplesmente ir pra home.
+//   - Sem "+ NOVO FECHAMENTO" (removido a pedido do usuário, 18/09/2026) — a única forma de
+//     criar um fechamento agora é pelo fluxo de Abrir Caixa (`PainelCaixaOperacional.vue`).
 //   - Sem grupo "Configuração"/"Geral": não têm destino real ainda, e o usuário pediu pra tirar
 //     o estado desabilitado "Em breve" em vez de manter como placeholder.
 import { computed, ref } from 'vue';
 import { useModoEscuro } from '~/composables/useModoEscuro';
 import { useSidebarMobile } from '~/composables/useSidebarMobile';
+import { usePerfil } from '~/composables/usePerfil';
 
 const recolhida = ref(false);
 
@@ -46,18 +50,31 @@ interface GrupoNav {
 
 // Mesmo ícone usado no cabeçalho de cada tela de consulta (ConsultaPorPeriodo) — o menu recolhido
 // (rail) só mostra o ícone, então ele precisa já dizer sozinho do que se trata.
-const grupos: GrupoNav[] = [
-  { id: 'entradas', label: 'Entradas', to: '/entradas', icone: 'mdi-arrow-bottom-left-thick', cor: 'var(--cat-venda-base)' },
-  {
-    id: 'transferencias',
-    label: 'Transferências',
-    to: '/transferencias',
-    icone: 'mdi-swap-horizontal-bold',
-    cor: 'var(--cat-transferencias-base)',
-  },
-  { id: 'saidas', label: 'Saídas', to: '/saidas', icone: 'mdi-arrow-top-right-thick', cor: 'var(--cat-despesas-base)' },
-  { id: 'resultados', label: 'Resultados', to: '/', icone: 'mdi-view-dashboard-outline', cor: 'var(--cat-resultado-base)' },
-];
+//
+// Fluxo de Caixa (18/09/2026, atualizado por pedido do usuário): uma conta CAIXA só faz uma
+// coisa neste app — abrir o próprio caixa e preencher o fechamento dele (fluxo todo dentro de
+// `PainelCaixaOperacional`/`WizardFechamento`). Nenhum item de navegação por período
+// (Entradas/Transferências/Saídas) ou visão geral (Histórico) faz sentido pra ela — são todas
+// telas que olham o histórico de TODOS os fechamentos, não o caixa dela. RLS já
+// bloqueia o acesso aos dados de qualquer forma; isto é só a navegação não oferecer um link que
+// levaria a uma tela vazia/redirecionada. Só admin vê o menu (e o botão "+ NOVO FECHAMENTO",
+// abaixo) por completo.
+const { isAdmin } = usePerfil();
+const grupos = computed<GrupoNav[]>(() => {
+  if (!isAdmin.value) return [];
+  return [
+    { id: 'entradas', label: 'Entradas', to: '/entradas', icone: 'mdi-arrow-bottom-left-thick', cor: 'var(--cat-venda-base)' },
+    {
+      id: 'transferencias',
+      label: 'Transferências',
+      to: '/transferencias',
+      icone: 'mdi-swap-horizontal-bold',
+      cor: 'var(--cat-transferencias-base)',
+    },
+    { id: 'saidas', label: 'Saídas', to: '/saidas', icone: 'mdi-arrow-top-right-thick', cor: 'var(--cat-despesas-base)' },
+    { id: 'historico', label: 'Histórico', to: '/historico', icone: 'mdi-archive-clock-outline', cor: 'var(--cat-resultado-base)' },
+  ];
+});
 </script>
 
 <template>
@@ -93,29 +110,6 @@ const grupos: GrupoNav[] = [
         size="small"
         aria-label="Fechar menu"
         @click="aberto = false"
-      />
-    </div>
-
-    <div class="sidebar-acao" :class="{ 'sidebar-acao--rail': recolhida && !mobile }">
-      <v-btn
-        v-if="!recolhida || mobile"
-        to="/fechamentos/novo"
-        color="primary"
-        block
-        class="sidebar-novo-btn"
-        prepend-icon="mdi-plus"
-        @click="aoNavegar"
-      >
-        NOVO FECHAMENTO
-      </v-btn>
-      <v-btn
-        v-else
-        to="/fechamentos/novo"
-        color="primary"
-        icon="mdi-plus"
-        size="44"
-        aria-label="Novo fechamento"
-        @click="aoNavegar"
       />
     </div>
 
@@ -174,20 +168,6 @@ const grupos: GrupoNav[] = [
   height: 32px;
   width: 32px;
   object-fit: contain;
-}
-
-.sidebar-acao {
-  padding: 0 var(--cx-sp-3) var(--cx-sp-3);
-}
-
-.sidebar-acao--rail {
-  display: flex;
-  justify-content: center;
-}
-
-.sidebar-novo-btn {
-  font-weight: 700;
-  letter-spacing: 0.02em;
 }
 
 .sidebar-grupos {

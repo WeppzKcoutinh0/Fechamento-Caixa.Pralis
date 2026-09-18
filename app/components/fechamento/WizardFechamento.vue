@@ -3,6 +3,8 @@ import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useFechamentoForm } from '~/composables/useFechamentoForm';
 import { useFechamentos } from '~/composables/useFechamentos';
+import { useSessaoCaixa } from '~/composables/useSessaoCaixa';
+import { useTransferenciasTesouraria } from '~/composables/useTransferenciasTesouraria';
 import SecaoIdentificacao from '~/components/fechamento/SecaoIdentificacao.vue';
 import SecaoTransferencias from '~/components/fechamento/SecaoTransferencias.vue';
 import SecaoLancamentos from '~/components/fechamento/SecaoLancamentos.vue';
@@ -27,6 +29,8 @@ const {
   irPara,
 } = useFechamentoForm();
 const { salvar } = useFechamentos();
+const { fecharSessao } = useSessaoCaixa();
+const { criarRetornoAutomatico } = useTransferenciasTesouraria();
 const router = useRouter();
 
 const salvando = ref(false);
@@ -46,7 +50,30 @@ async function onSalvar() {
   erro.value = null;
   salvando.value = true;
   try {
-    await salvar(draft.value);
+    const fechamentoId = await salvar(draft.value);
+    // Fluxo de Caixa (18/09/2026): fechamento salvo com sucesso é o único gatilho que fecha a
+    // sessão — se isto falhar depois do salvar_fechamento já ter comitado, o fechamento já está
+    // gravado (não se perde), só a sessão fica ABERTA até uma nova tentativa/ação admin.
+    if (draft.value.cashSessionId) {
+      await fecharSessao(draft.value.cashSessionId, fechamentoId);
+    }
+    // Retorno automático pro cofre (18/09/2026, pedido do usuário — versão simplificada do que o
+    // Sistema Inteligente Pralís faz): melhor esforço, depois do fechamento já salvo — uma falha
+    // aqui não desfaz o salvamento, só deixa de gerar o retorno automático desta vez.
+    if (draft.value.caixa && draft.value.dinheiroContadoCents > 0) {
+      try {
+        await criarRetornoAutomatico({
+          fechamentoId,
+          caixa: draft.value.caixa,
+          codigo: draft.value.codigo,
+          valorCents: draft.value.dinheiroContadoCents,
+        });
+      } catch (e) {
+        // O fechamento já foi salvo, mas o retorno precisa ficar visível para
+        // permitir uma conferência/repetição posterior sem esconder a falha.
+        console.error('[fechamento] falha ao criar retorno automático:', e);
+      }
+    }
     await router.push('/');
   } catch (e) {
     erro.value = e instanceof Error ? e.message : 'Não foi possível salvar o fechamento.';

@@ -32,18 +32,20 @@ function fechamento(overrides: Partial<FechamentoComItens>): FechamentoComItens 
     entradas: [],
     sangrias: [],
     lancamentos: [],
+    transferenciasCaixa: [],
     ...overrides,
   };
 }
 
 describe('extrairLinhas', () => {
-  it('tipo "entradas": só entradas, ignora sangrias e lançamentos', () => {
+  it('tipo "entradas": só entradas, ignora sangrias/lançamentos/transferências', () => {
     const linhas = extrairLinhas(
       [
         fechamento({
           entradas: [{ descricao: 'Troco', lacre: '1', valorCents: 10000 }],
           sangrias: [{ descricao: 'Sangria X', lacre: '2', valorCents: 5000 }],
           lancamentos: [{ tipo: 'despesa', fornecedor: 'Fornecedor', valorCents: 3000 }],
+          transferenciasCaixa: [{ caixaOrigem: 'Caixa 1', caixaDestino: 'Caixa 2', lacre: '3', observacao: '', valorCents: 7000 }],
         }),
       ],
       'entradas',
@@ -53,29 +55,38 @@ describe('extrairLinhas', () => {
     expect(linhas[0]?.valorCents).toBe(10000);
   });
 
-  it('tipo "transferencias": entradas positivas e sangrias negativas', () => {
+  it('tipo "transferencias": mostra a tabela real de transferências entre caixas', () => {
     const linhas = extrairLinhas(
       [
         fechamento({
           entradas: [{ descricao: 'Troco', lacre: '1', valorCents: 10000 }],
-          sangrias: [{ descricao: 'Sangria X', lacre: '2', valorCents: 5000 }],
+          transferenciasCaixa: [
+            { caixaOrigem: 'Caixa 1', caixaDestino: 'Caixa 2', lacre: '9', observacao: 'Troco emprestado', valorCents: 7000 },
+          ],
         }),
       ],
       'transferencias',
     );
-    expect(linhas).toHaveLength(2);
-    expect(linhas.find((l) => l.descricao === 'Troco')?.valorCents).toBe(10000);
-    expect(linhas.find((l) => l.descricao === 'Sangria X')?.valorCents).toBe(-5000);
+    expect(linhas).toHaveLength(1);
+    expect(linhas[0]?.descricao).toBe('Troco emprestado');
+    expect(linhas[0]?.detalhe).toBe('Caixa 1 → Caixa 2 · Lacre 9');
+    expect(linhas[0]?.valorCents).toBe(7000);
   });
 
-  it('tipo "saidas": só lançamentos, rótulo por tipo quando sem fornecedor', () => {
+  it('tipo "saidas": sangrias + lançamentos, rótulo por tipo quando sem fornecedor', () => {
     const linhas = extrairLinhas(
-      [fechamento({ lancamentos: [{ tipo: 'mercadoria', fornecedor: '', valorCents: 2000 }] })],
+      [
+        fechamento({
+          sangrias: [{ descricao: 'Sangria X', lacre: '2', valorCents: 5000 }],
+          lancamentos: [{ tipo: 'mercadoria', fornecedor: '', valorCents: 2000 }],
+        }),
+      ],
       'saidas',
     );
-    expect(linhas).toHaveLength(1);
-    expect(linhas[0]?.descricao).toBe('Mercadoria');
-    expect(linhas[0]?.detalhe).toBe('Mercadoria');
+    expect(linhas).toHaveLength(2);
+    expect(linhas.find((l) => l.descricao === 'Sangria X')?.valorCents).toBe(5000);
+    const mercadoria = linhas.find((l) => l.descricao === 'Mercadoria');
+    expect(mercadoria?.detalhe).toBe('Mercadoria');
   });
 
   it('ordena por criadoEm', () => {
@@ -91,10 +102,15 @@ describe('extrairLinhas', () => {
 });
 
 describe('somarValores', () => {
-  it('soma os valores das linhas (negativos incluídos)', () => {
+  it('soma os valores das linhas', () => {
     const linhas = extrairLinhas(
-      [fechamento({ entradas: [{ descricao: 'E', lacre: '', valorCents: 10000 }], sangrias: [{ descricao: 'S', lacre: '', valorCents: 4000 }] })],
-      'transferencias',
+      [
+        fechamento({
+          sangrias: [{ descricao: 'S', lacre: '', valorCents: 4000 }],
+          lancamentos: [{ tipo: 'despesa', fornecedor: '', valorCents: 2000 }],
+        }),
+      ],
+      'saidas',
     );
     expect(somarValores(linhas)).toBe(6000);
   });

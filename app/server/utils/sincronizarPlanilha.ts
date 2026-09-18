@@ -1,11 +1,32 @@
 import { linhaFechamentoCaixaDiaSchema, linhaVendaProdutoDiaSchema } from '../../types/vendasFechamento';
 import { lerAbaPlanilha } from './googleSheets';
 import { processarImportacao } from './importarVendas';
+import { parseDataBot } from './parseValoresBot';
 
 const TAMANHO_LOTE = 500;
 
+// Janela de dias recentes (18/09/2026, achado real em produção): a planilha do bot é ACUMULATIVA
+// — nunca reescreve/limpa linhas antigas, só cresce (2726 linhas de FECHAMENTOS_CAIXAS num único
+// dia de teste; vai crescer todo dia, pra sempre). Reprocessar a planilha INTEIRA em toda
+// execução (ler+validar+lote+upsert+dedupe por data) cresce junto — dias antigos já sincronizados
+// com sucesso nunca mais mudam, então reprocessá-los de novo e de novo é trabalho 100% jogado
+// fora, e foi exatamente isso que estourou o timeout de 60s da Vercel de novo (confirmado: 5
+// execuções consecutivas do workflow falharam). Só as datas dos últimos `JANELA_DIAS` dias podem
+// ainda estar recebendo snapshots novos do bot — datas mais antigas que isso já se estabilizaram
+// há muito tempo e não precisam ser tocadas de novo.
+const JANELA_DIAS = 14;
+
 function filtrarPorEmpresa<T extends { EMPRESA?: string }>(linhas: T[], empresa: string): T[] {
   return linhas.filter((linha) => String(linha.EMPRESA ?? '').trim() === empresa);
+}
+
+function filtrarPorJanelaRecente<T extends { DATA_VENDA?: string }>(linhas: T[], dias: number): T[] {
+  const corteMs = Date.now() - dias * 24 * 60 * 60 * 1000;
+  return linhas.filter((linha) => {
+    const dataVenda = parseDataBot(linha.DATA_VENDA);
+    if (!dataVenda) return true; // deixa passar — validarDatas() já rejeita formato inválido depois, com o erro certo
+    return new Date(`${dataVenda}T00:00:00Z`).getTime() >= corteMs;
+  });
 }
 
 function loteEmGrupos<T>(linhas: T[]): T[][] {
@@ -47,7 +68,7 @@ export async function sincronizarPlanilhaCreare(): Promise<ResumoSincronizacaoPl
     aba: 'FECHAMENTOS_CAIXAS',
     colunaInicial,
   });
-  const linhasFechamentoBrutas = filtrarPorEmpresa(todasFechamento, empresa);
+  const linhasFechamentoBrutas = filtrarPorJanelaRecente(filtrarPorEmpresa(todasFechamento, empresa), JANELA_DIAS);
   let fechamentoRecebidas = 0;
   let fechamentoGravadas = 0;
   let fechamentoInvalidas = 0;
@@ -79,7 +100,7 @@ export async function sincronizarPlanilhaCreare(): Promise<ResumoSincronizacaoPl
       aba: 'VENDAS_PRODUTOS',
       colunaInicial,
     });
-    const linhasProdutosBrutas = filtrarPorEmpresa(todosProdutos, empresa);
+    const linhasProdutosBrutas = filtrarPorJanelaRecente(filtrarPorEmpresa(todosProdutos, empresa), JANELA_DIAS);
     produtosNaPlanilha = linhasProdutosBrutas.length;
     for (const lote of loteEmGrupos(linhasProdutosBrutas)) {
       const parseadas = lote.map((linha) => linhaVendaProdutoDiaSchema.safeParse(linha));

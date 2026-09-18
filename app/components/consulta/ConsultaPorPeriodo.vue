@@ -2,6 +2,11 @@
 // Tela de consulta por data + horário (Entradas/Transferências/Saídas do menu). O horário filtra
 // pelo `criado_em` do fechamento — o único horário real que existe (ver utils/consultaPeriodo.ts);
 // não existe horário individual por entrada/sangria/lançamento no banco.
+//
+// Data EDITÁVEL de propósito (18/09/2026, pedido explícito do usuário) — exceção à regra geral
+// de "todo campo de data travado em hoje": esta tela é uma ferramenta de CONSULTA histórica pro
+// admin (escolher qualquer dia passado e ver as entradas/saídas daquele dia), não um dado
+// operacional do fechamento de hoje.
 import { computed, ref } from 'vue';
 import { useConsultaPeriodo } from '~/composables/useConsultaPeriodo';
 import { formatCents } from '~/utils/financeiro';
@@ -38,7 +43,7 @@ function horaDoRegistro(criadoEm: string): string {
 
     <v-card class="pa-4 mb-6" variant="outlined" rounded="lg">
       <div class="d-flex flex-column flex-sm-row ga-3 align-sm-end flex-wrap">
-        <v-text-field v-model="data" label="Data" type="date" style="max-width: 200px" readonly />
+        <v-text-field v-model="data" label="Data" type="date" style="max-width: 200px" />
         <v-text-field v-model="horarioDe" label="Horário de" type="time" style="max-width: 160px" />
         <v-text-field v-model="horarioAte" label="Horário até" type="time" style="max-width: 160px" />
         <v-btn color="primary" :loading="carregando" :disabled="carregando || !data" @click="filtrar">

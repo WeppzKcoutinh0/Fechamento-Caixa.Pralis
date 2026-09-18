@@ -203,6 +203,13 @@ export interface FechamentoDraft {
 
   // Seção 6 — card aditivo esperado × contado (decisão do plano)
   dinheiroContadoCents: number;
+
+  // Fluxo de Caixa (18/09/2026): liga este fechamento à sessão de caixa que o originou —
+  // `null` quando não veio de uma sessão (ex.: fechamento criado direto pelo admin). Quando
+  // presente, Caixa/Turno da Seção 1 ficam travados no valor da sessão (ver
+  // SecaoIdentificacao.vue) e o wizard fecha a sessão automaticamente ao salvar (ver
+  // WizardFechamento.vue).
+  cashSessionId: string | null;
 }
 
 /**
@@ -242,16 +249,25 @@ export function hojeISO(): string {
   return `${ano}-${mes}-${dia}`;
 }
 
+/** Contexto de uma sessão de caixa ABERTA, repassado por `pages/fechamentos/novo.vue` quando o
+ * usuário logado tem uma (ver `useSessaoCaixa.ts`) — trava Caixa/Turno/Data no valor da sessão. */
+export interface ContextoSessaoCaixa {
+  id: string;
+  caixa: Caixa;
+  turno: Turno;
+  businessDate: string;
+}
+
 /** Estado inicial de um fechamento novo — mesma lógica de `novoFechamento()`/`resetarFormulario()`. */
-export function criarFechamentoVazio(): FechamentoDraft {
+export function criarFechamentoVazio(contexto?: ContextoSessaoCaixa): FechamentoDraft {
   return {
     // Gerado no client desde já (não só ao salvar) para os anexos (Storage) terem um caminho
     // estável mesmo antes do primeiro "Salvar" — o RPC aceita esse id como o da linha final.
     id: crypto.randomUUID(),
     codigo: gerarCodigo(),
-    data: hojeISO(),
-    caixa: '',
-    turno: '',
+    data: contexto?.businessDate ?? hojeISO(),
+    caixa: contexto?.caixa ?? '',
+    turno: contexto?.turno ?? '',
     responsavel: '',
     entradas: [],
     sangrias: [],
@@ -276,5 +292,6 @@ export function criarFechamentoVazio(): FechamentoDraft {
     crediario: [],
     discriminacoes: [],
     dinheiroContadoCents: 0,
+    cashSessionId: contexto?.id ?? null,
   };
 }

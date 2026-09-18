@@ -1,6 +1,176 @@
 # Integração de Vendas (CREARE → Fechamento de Caixa)
 
+## Fluxo de Caixa (Abertura → Operação → Fechamento → Histórico)
+
+Pedido do usuário (18/09/2026): camada de sessão de caixa + papéis
+ADMIN/CAIXA em volta do wizard de fechamento existente, sem alterar suas
+etapas/campos/fórmulas. Plano completo, com o desenho validado por 2
+agentes de exploração + 1 de revisão, em
+`C:\Users\kayla\.claude\plans\eventual-conjuring-moler.md`. Só marcar `[x]`
+depois de implementar **e** testar **e** validar (regra do próprio usuário).
+
+- [x] Migration `profiles` (role, nome, caixa_padrao/turno_padrao) + RLS própria
+- [x] Migration `is_admin()` (security definer)
+- [x] Migration `cash_sessions` (2 estados, 2 unique indexes parciais) + RLS
+- [x] Migration `fechamentos.cash_session_id`
+- [x] Migration RLS role-aware nos 8 policies "authenticated: tudo"
+- [x] Migration `salvar_fechamento` preservando `cash_session_id` no update
+- [x] Aplicar todas as migrations no banco real (`supabase db push`) e confirmar
+- [x] Script `scripts/provisionar-contas-caixa.mjs` (8 contas + profiles + admin do Rodrigo)
+- [x] Rodar o script de verdade, confirmar as 9 contas/profiles no banco
+- [x] `usePerfil.ts` / `useSessaoCaixa.ts`
+- [x] `FormularioAbrirCaixa.vue`
+- [x] `PainelAdmin.vue` (extração literal do `index.vue` atual) / `PainelCaixaOperacional.vue`
+- [x] `pages/index.vue` como despachante por papel
+- [x] Contexto de sessão no wizard (`novoFechamento`/`criarFechamentoVazio`/`useFechamentos`)
+- [x] Trava de Caixa/Turno em `SecaoIdentificacao.vue` quando há sessão
+- [x] Fechar sessão no `onSalvar` do `WizardFechamento.vue`
+- [x] `pages/historico.vue` (admin) + filtros + ação "encerrar sem fechamento"
+- [x] Sidebar filtrado por papel (Histórico só admin, Resultados escondido pro caixa)
+- [x] Middleware `admin.ts`
+- [x] typecheck/lint/test/build limpos
+- [x] Teste manual real: abertura, duplicidade bloqueada, fluxo completo sem regressão, fechamento, some do painel do caixa, aparece no histórico
+- [x] Teste de segurança real: RLS bloqueando caixa via REST direto (dados de outro operador, histórico admin)
+- [x] Rodada final com subagentes (security-reviewer + regressão + tentativa de bypass) — 4 achados reais corrigidos e reconfirmados
+- [x] Limpeza de contas de teste temporárias
+
 ## Histórico de decisão (mais recente primeiro)
+
+**18/09/2026 (18ª revisão) — Tesouraria central + busca automática de valor por N° Lacre.**
+Pedido do usuário: uma "Nova Transferência" independente de fechamento (cofre/tesouraria
+central, inspirada no Sistema Inteligente Pralís), e quando um CAIXA lança uma Entrada com o
+MESMO número de lacre, o valor é preenchido sozinho.
+
+- Migration `20260918101000_transferencias_tesouraria.sql`: tabela nova `transferencias_tesouraria`
+  (independente de `fechamentos`), lacre com índice único (é a chave do lookup), RLS: leitura
+  direta e `insert/update/delete` só admin; o caixa consulta um lacre específico pelo RPC
+  restrito de `20260918101100_lookup_tesouraria_restrito.sql`.
+- `useTransferenciasTesouraria.ts` (novo): `listar`, `criar`, `buscarPorLacre`,
+  `confirmarRecebimento`, `excluir`.
+- `FormularioTransferenciaTesouraria.vue` (novo): formulário completo — Valor, N° Lacre, Data
+  Lanç. (travada em hoje), Origem/Destino (Cofre + Caixa 1-4), Agendamento, Múltiplo Destino
+  (lista de destinos extras), Tempo de confirmação, Transferência de retorno (só habilitado
+  Cofre → um caixa específico). "Salvar" e "Salvar e criar nova".
+- `pages/transferencias.vue`: ganhou a seção "Tesouraria" (admin-only) com o botão "Nova
+  Transferência" e a lista, acima da consulta por período que já existia (que continua mostrando
+  as transferências ligadas a fechamento, sem mudança).
+- `SecaoTransferencias.vue`: campo "Nº Lacre" da Entrada, ao perder o foco, busca na tesouraria —
+  se encontrar, preenche o valor sozinho e mostra confirmação; se não encontrar, nada muda
+  (usuário digita o valor à mão, como sempre).
+
+**Dois bugs reais encontrados e corrigidos testando isto:**
+1. `pages/transferencias.vue` nunca carregava o perfil do usuário por conta própria — chegar
+   direto nela (bookmark/recarregar) sem passar por `/` deixava `isAdmin` sempre falso, escondendo
+   a seção de Tesouraria até pro admin de verdade. Corrigido na raiz: `layouts/default.vue`
+   (aplicado a toda página autenticada) agora chama `usePerfil().carregar()` no próprio mount —
+   antes só `pages/index.vue` fazia isso.
+2. (Já documentado acima, 17ª revisão) fix do cache de perfil entre troca de conta.
+
+**Decisões tomadas sem confirmação explícita do usuário (avisar se não for o esperado):**
+- "Tempo de confirmação": marca a transferência como pendente até uma ação futura de confirmar
+  (`confirmarRecebimento()` já existe no composable, mas ainda sem botão na tela — a lista mostra
+  o status "Aguardando confirmação").
+- "Transferência de retorno": por enquanto é só um marcador (`transferencia_retorno = true`) —
+  NÃO gera automaticamente uma segunda transferência de volta. Se for pra gerar de verdade, avisar.
+- "Múltiplo Destino": alinhado ao comportamento do Pralís de referência — o destino principal e
+  os destinos extras são candidatos, todos para o valor inteiro da transferência; não existe
+  rateio por destino e a tela não pede valores extras.
+
+Testado de ponta a ponta com contas reais/descartáveis: admin cria transferência com lacre pelo
+formulário de verdade (aparece na lista com o valor certo) e conta real `caixa1.manha`, ao digitar
+o mesmo lacre numa Entrada, recebe o valor automaticamente. Gate completo (typecheck/lint/82
+testes/build) verde.
+
+**18/09/2026 (17ª revisão) — Fluxo de Caixa (Abertura/Operação/Fechamento/Histórico) implementado
+e validado; achado real de pentest corrigido no mesmo dia.** Camada completa de sessão de
+caixa + papéis ADMIN/CAIXA construída em cima do wizard existente, sem alterar nenhuma etapa/
+campo/fórmula dele (confirmado por diff literal — `PainelAdmin.vue` é byte-a-byte igual ao
+`index.vue` antigo). 7 migrations aplicadas no banco real; 9 contas reais provisionadas (8
+caixa + admin do Rodrigo); gate completo (typecheck/lint/82 testes/build) verde; 14/14 checagens
+reais de RLS via REST (duplicidade bloqueada nos dois unique indexes, isolamento entre usuários,
+admin vê tudo, auto-promoção a admin bloqueada) e um smoke test real em browser logado na conta
+`caixa1.manha` de produção (abriu caixa, confirmou Seção 1 travada, confirmou menu sem
+Resultados/Histórico) — sessão de teste limpa depois.
+
+Rodada final com 3 subagentes (pedido explícito do usuário): regressão (verde, sem achados) e
+tentativa ativa de bypass encontraram 1 problema real — `salvar_fechamento` deixava um usuário
+CAIXA criar um fechamento **seu** (RLS de `criado_por` continuava correta) mas com
+`cash_session_id` apontando pra sessão de **outro** usuário, sem checar dono. Não vazava nem
+alterava dado alheio (RLS em fechamentos/filhos e em `cash_sessions.fechamento_id` seguiam
+travadas), mas criava um fechamento forjado plausível "pendurado" na sessão de outra pessoa.
+Corrigido na mesma sessão: migration `20260918100700_valida_dono_cash_session.sql` adiciona, logo
+depois do coalesce-preserve, uma checagem explícita (`cash_session_id` não nulo + não-admin exige
+`cash_sessions.opened_by = auth.uid()`, senão `raise exception` com `42501`). Aplicada no banco
+real e reconfirmada com um teste dedicado reproduzindo exatamente o ataque do pentest: tentativa
+bloqueada (403), controle (usuário anexando à própria sessão) continua funcionando (200).
+
+**Rodada 2 do `security-reviewer`** (revisão de código, não só teste ativo) achou mais 3
+problemas reais nesta mesma camada, que a rodada de pentest anterior não cobria (ela testou só
+as tabelas novas, não Storage nem o comportamento de UPDATE de `cash_sessions`):
+
+1. **CRÍTICO** — bucket `anexos` (fotos/áudio dos lançamentos) só checava `bucket_id = 'anexos'`
+   pra qualquer `authenticated`, sem ligação com o dono do fechamento — qualquer conta logada
+   conseguia listar/ler/apagar os anexos de QUALQUER fechamento, não só os próprios. Corrigido em
+   `20260918100800_correcoes_pentest_seguranca.sql`: as 4 policies do bucket agora reusam
+   `fechamento_visivel`/`fechamento_editavel` (as mesmas funções que já protegem a tabela
+   `fechamentos`) via `(storage.foldername(name))[1]::uuid` (o path de cada anexo já é
+   `{fechamento_id}/{arquivo}`). Reconfirmado com teste real: B não lê/lista/apaga anexo de A.
+2. **ALTO** — depois de fechar a sessão, o próprio dono conseguia REABRIR (`status` de volta pra
+   `ABERTO`) via PATCH direto em `cash_sessions`, e com ela reaberta o `salvar_fechamento`
+   destravava e deixava editar o fechamento já fechado de novo — também dava pra reescrever
+   `caixa`/`turno`/`business_date`/`lacre_abertura`/`opened_at` de uma sessão passada. RLS não
+   consegue comparar valor antigo x novo de uma coluna, então a correção é um trigger
+   (`cash_sessions_protege_imutaveis`, mesma migration): não-admin não reabre uma sessão FECHADO
+   nem toca nos campos de abertura; admin continua livre. Reconfirmado com teste real.
+3. **MÉDIO** — a trava de Caixa/Turno no formulário "Abrir Caixa" é só de UI; no banco,
+   `cash_sessions_insert` só checava `opened_by = auth.uid()`, então uma conta conseguia abrir
+   sessão em QUALQUER caixa/turno via REST direto — o que, por causa da unique index parcial,
+   bloquearia a conta REAL daquele caixa/turno de abrir a dela no mesmo dia (negação de serviço
+   contra outro operador). Corrigido com a função `cash_session_caixa_turno_permitido` na mesma
+   migration, usada no `with check` do insert. Reconfirmado com teste real.
+
+Também corrigido, mesma migration: `salvar_fechamento` ganhou `search_path` fixado (só
+consistência com as outras funções, sem impacto prático hoje); e em `useSessaoCaixa.ts`,
+`fecharSessao`/`encerrarSemFechamento` passaram a exigir `.select().single()` no retorno do
+update, pra não ficar em silêncio se a RLS bloquear 0 linhas sem erro (achado do agente, também
+corrigido).
+
+**Cadastro público** — usuário desligou manualmente no Dashboard do Supabase (Authentication →
+Settings), confirmado via API (`disable_signup: true`) no mesmo dia. Resolvido.
+
+**Senhas únicas por conta** (18/09/2026, aprovado pelo usuário) — as 8 contas de caixa deixaram
+de compartilhar senha por turno; `scripts/rotacionar-senhas-caixa.mjs` (novo, sem segredo no
+código) gerou e aplicou uma senha própria pra cada uma via Admin API, confirmando login com a
+senha nova em cada uma das 8 antes de terminar. Senhas entregues ao usuário fora do repositório
+(nunca gravadas em arquivo/log/código).
+
+**Ajustes de fluxo pedidos pelo usuário depois de testar (18/09/2026):**
+1. Menu lateral (`AppSidebar.vue`) fica **totalmente vazio** pra conta CAIXA (nem
+   Entradas/Transferências/Saídas, que ainda apareciam) — só admin vê qualquer item de
+   navegação, incluindo o botão "+ NOVO FECHAMENTO" (também escondido pra caixa agora).
+2. Fluxo de abrir caixa mudou: abrir NÃO navega mais direto pro wizard — fica no painel
+   mostrando um cartão "Caixa X · Turno · Aberto às HH:MM · Toque para continuar o fechamento",
+   e só entra no formulário quando o operador CLICA nesse cartão (o cartão inteiro é clicável,
+   não um botão separado). `FormularioAbrirCaixa.vue` perdeu o emit `aberta` (não tinha mais
+   ninguém escutando).
+3. **Bug real encontrado testando o item 2**: o modal "Abrir Caixa" travava silenciosamente
+   (botão de confirmar ficava desabilitado, sem nenhum erro visível) numa corrida de tempo real
+   — `caixaSelecionado`/`turnoSelecionado`/`caixaTravado`/`turnoTravado` eram inicializados uma
+   ÚNICA vez, no instante em que o componente nascia (que é ANTES do `usePerfil()` terminar de
+   buscar o perfil, disparado assíncrono no `onMounted` de `pages/index.vue`) — se o perfil
+   ainda não tivesse chegado nesse instante exato, os campos ficavam vazios pra sempre, mesmo
+   depois do perfil carregar. Corrigido trocando pra `computed`/`watch(perfil, ..., {immediate:
+   true})` em vez de `ref()` inicializado uma vez — reage a QUALQUER momento em que o perfil
+   chegar. Reproduzido meio-intermitente (corrida de tempo real) e reconfirmado 2x consecutivas
+   com teste real em browser logado em `caixa1.manha`, sem falha.
+
+**Vendas isoladas por caixa/turno** (18/09/2026, aprovado pelo usuário) — migration
+`20260918100900_rls_vendas_por_caixa.sql`: `vendas_fechamento_caixa_dia` agora só é visível pra
+quem é admin OU cujo `profiles.caixa_padrao/turno_padrao` bate com aquela linha (função
+`venda_visivel`, convertendo "Caixa 1"/"Manhã" pro formato "1"/"M" que o bot grava);
+`vendas_produto_dia` (sem coluna de caixa, não usada pelo app) ficou admin-only. Confirmado com
+contas de teste (cada uma só via a própria linha, admin via as duas) e com a conta real
+`caixa1.manha` (continua lendo normalmente as próprias vendas depois da mudança).
 
 **18/09/2026 (16ª revisão) — GitHub Actions `schedule` não é confiável pra 5min; workflow virou
 loop de ~6h.** `CRON_SECRET` nunca tinha sido cadastrado no GitHub (todas as execuções falhavam em

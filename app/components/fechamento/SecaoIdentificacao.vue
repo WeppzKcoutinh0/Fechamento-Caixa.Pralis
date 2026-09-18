@@ -171,6 +171,7 @@ const ajustesPresentes = computed(() => {
         :items="[...CAIXAS]"
         label="Caixa"
         placeholder="Selecione..."
+        :readonly="!!draft.cashSessionId"
       />
     </div>
     <div class="d-flex flex-column flex-sm-row ga-3">
@@ -179,6 +180,7 @@ const ajustesPresentes = computed(() => {
         :items="[...TURNOS]"
         label="Turno"
         placeholder="Selecione..."
+        :readonly="!!draft.cashSessionId"
       />
       <v-text-field
         v-model="draft.responsavel"

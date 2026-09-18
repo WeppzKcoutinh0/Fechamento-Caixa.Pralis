@@ -1,4 +1,4 @@
-import { criarFechamentoVazio, type FechamentoDraft } from '~/types/fechamento';
+import { criarFechamentoVazio, type ContextoSessaoCaixa, type FechamentoDraft } from '~/types/fechamento';
 
 const TOTAL_SECOES = 5;
 
@@ -39,8 +39,11 @@ export function useFechamentoForm() {
     irPara(secaoAtual.value - 1);
   }
 
-  function novoFechamento(): void {
-    draft.value = criarFechamentoVazio();
+  // `contexto` (Fluxo de Caixa, 18/09/2026): quando o usuário logado tem uma sessão de caixa
+  // ABERTA, `pages/fechamentos/novo.vue` repassa ela aqui pra travar Caixa/Turno/Data já na
+  // criação do draft (ver `criarFechamentoVazio`/`ContextoSessaoCaixa`).
+  function novoFechamento(contexto?: ContextoSessaoCaixa): void {
+    draft.value = criarFechamentoVazio(contexto);
     secaoAtual.value = 1;
   }
 

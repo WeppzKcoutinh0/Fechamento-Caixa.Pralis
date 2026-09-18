@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import { CAIXAS, type EntradaDraft, type FechamentoDraft, type SangriaDraft, type TransferenciaCaixaDraft } from '~/types/fechamento';
 import CartaoValor from '~/components/comum/CartaoValor.vue';
 import { formatCents } from '~/utils/financeiro';
+import { useTransferenciasTesouraria } from '~/composables/useTransferenciasTesouraria';
 
 const props = defineProps<{ draft: FechamentoDraft }>();
 
@@ -54,15 +55,44 @@ const modalAberto = ref(false);
 const tipoModal = ref<TipoModal>('entrada');
 const indiceEditando = ref<number | null>(null);
 
+// Busca automática por lacre (pedido do usuário, 18/09/2026): a "tesouraria" (tela
+// /transferencias, admin) cadastra um lacre com valor pré-definido — quando o CAIXA digita esse
+// MESMO número aqui, o valor da Entrada é preenchido sozinho. Não encontrar não é erro: o usuário
+// só digita o valor à mão, como sempre fez.
+const { buscarPorLacre } = useTransferenciasTesouraria();
+const lacreEncontradoMsg = ref<string | null>(null);
+async function aoSairDoLacreEntrada(): Promise<void> {
+  if (tipoModal.value !== 'entrada' || indiceEditando.value === null) return;
+  const entrada = props.draft.entradas[indiceEditando.value];
+  const alvo = entrada?.lacre.trim();
+  if (!entrada || !alvo) {
+    lacreEncontradoMsg.value = null;
+    return;
+  }
+  try {
+    const resultado = await buscarPorLacre(alvo);
+    if (resultado) {
+      entrada.valorCents = resultado.valorCents;
+      lacreEncontradoMsg.value = `Valor preenchido automaticamente: R$ ${formatCents(resultado.valorCents)} (transferência ${resultado.caixaOrigem} → ${resultado.caixaDestino}).`;
+    } else {
+      lacreEncontradoMsg.value = null;
+    }
+  } catch {
+    lacreEncontradoMsg.value = null;
+  }
+}
+
 function abrirNovaEntrada(): void {
   props.draft.entradas.push(novaEntrada());
   indiceEditando.value = props.draft.entradas.length - 1;
   tipoModal.value = 'entrada';
+  lacreEncontradoMsg.value = null;
   modalAberto.value = true;
 }
 function abrirEntrada(indice: number): void {
   indiceEditando.value = indice;
   tipoModal.value = 'entrada';
+  lacreEncontradoMsg.value = null;
   modalAberto.value = true;
 }
 function abrirNovaSangria(): void {
@@ -362,8 +392,12 @@ const totalTransferenciasCents = computed(() =>
                 class="lc-input"
                 placeholder="000000"
                 inputmode="numeric"
+                @blur="tipoModal === 'entrada' ? aoSairDoLacreEntrada() : undefined"
               />
             </label>
+            <p v-if="tipoModal === 'entrada' && lacreEncontradoMsg" class="lc-erro-campo" style="color: var(--cx-positive)">
+              {{ lacreEncontradoMsg }}
+            </p>
             <label class="lc-campo">
               <span class="lc-campo-lbl">Descrição</span>
               <input

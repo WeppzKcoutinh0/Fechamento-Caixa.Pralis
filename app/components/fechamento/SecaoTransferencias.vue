@@ -377,6 +377,7 @@ const totalTransferenciasCents = computed(() =>
                 placeholder="000000"
                 inputmode="numeric"
                 @blur="tipoModal === 'entrada' ? aoSairDoLacreEntrada() : undefined"
+                @keydown.enter.prevent="tipoModal === 'entrada' ? aoSairDoLacreEntrada() : undefined"
               />
             </label>
             <p v-if="tipoModal === 'entrada' && lacreEncontradoMsg" class="lc-erro-campo" style="color: var(--cx-positive)">

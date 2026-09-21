@@ -121,6 +121,7 @@ describe('aplicarAjustesComoLancamentos', () => {
     expect(colab.dataRef).toBe('2026-09-16');
 
     const furto = draft.lancamentos.find((l) => l.origemAjusteCreare === 'rouboFurto')!;
+    expect(furto.tipo).toBe('mercadoria');
     expect(furto.tipoCredor).toBe('fornecedor');
     expect(furto.valorCents).toBe(1200);
   });
@@ -181,11 +182,12 @@ describe('aplicarAjustesComoLancamentos', () => {
     expect(manual.valorCents).toBe(999);
   });
 
-  it('valor negativo (ex.: sobra) vira Despesa com valor absoluto, sinal original registrado em obsTexto', () => {
+  it('valor negativo (ex.: sobra) vira Mercadoria com valor absoluto, sinal original registrado em obsTexto', () => {
     const draft = criarFechamentoVazio();
     aplicarAjustesComoLancamentos(draft, resumoComAjustes({ sobraPerda: -15.5 }));
 
     const lancamento = draft.lancamentos[0]!;
+    expect(lancamento.tipo).toBe('mercadoria');
     expect(lancamento.valorCents).toBe(1550);
     expect(lancamento.obsTexto).toContain('-R$ 15,50');
   });

@@ -2,7 +2,7 @@
  * Resumo do dia a partir das linhas já sincronizadas de `vendas_fechamento_caixa_dia` (uma linha
  * por PDV/operador/dia) — cálculo puro, mesma convenção de `utils/painel.ts`/`utils/financeiro.ts`.
  */
-import type { FechamentoDraft, Caixa, LancamentoDraft, TipoCredor, Turno } from '~/types/fechamento';
+import type { FechamentoDraft, Caixa, LancamentoDraft, TipoCredor, TipoLancamento, Turno } from '~/types/fechamento';
 import type { ResumoVendasDia } from '~/types/vendasFechamento';
 import { formatCents, toCents } from '~/utils/financeiro';
 
@@ -49,26 +49,28 @@ export function aplicarResumoAoPrimeiroPdv(draft: FechamentoDraft, resumo: Resum
 interface AjusteCategoria {
   chave: keyof ResumoVendasDia['ajustes'];
   rotulo: string;
+  tipo: TipoLancamento;
   tipoCredor: TipoCredor;
 }
 
-// "Colaboradores" já tem categoria de credor própria (TIPOS_CREDOR); os outros 4 não têm um
-// "tipo" melhor no modelo atual (não são fornecedor nem colaborador de verdade) — ficam como
-// 'fornecedor' só pra ocupar um valor válido, o rótulo completo (com "(CREARE)") é quem
-// realmente identifica a categoria na lista de despesas.
+// "Colaboradores" já tem categoria de credor própria (TIPOS_CREDOR); os outros não têm um
+// credor melhor no modelo atual — ficam como 'fornecedor' só pra ocupar um valor válido. O
+// `tipo` segue a mesma divisão visual/contábil da tela: colaboradores, alimentação e sócios são
+// despesas; furto/roubo e sobra/perda são mercadorias.
 const AJUSTES_CATEGORIAS: AjusteCategoria[] = [
-  { chave: 'colaboradores', rotulo: 'Colaboradores', tipoCredor: 'colaborador' },
-  { chave: 'alimentacao', rotulo: 'Alimentação/Lanches', tipoCredor: 'fornecedor' },
-  { chave: 'rouboFurto', rotulo: 'Furto/Roubo', tipoCredor: 'fornecedor' },
-  { chave: 'socios', rotulo: 'Sócios', tipoCredor: 'fornecedor' },
-  { chave: 'sobraPerda', rotulo: 'Sobra/Perda', tipoCredor: 'fornecedor' },
+  { chave: 'colaboradores', rotulo: 'Colaboradores', tipo: 'despesa', tipoCredor: 'colaborador' },
+  { chave: 'alimentacao', rotulo: 'Alimentação/Lanches', tipo: 'despesa', tipoCredor: 'fornecedor' },
+  { chave: 'rouboFurto', rotulo: 'Furto/Roubo', tipo: 'mercadoria', tipoCredor: 'fornecedor' },
+  { chave: 'socios', rotulo: 'Sócios', tipo: 'despesa', tipoCredor: 'fornecedor' },
+  { chave: 'sobraPerda', rotulo: 'Sobra/Perda', tipo: 'mercadoria', tipoCredor: 'fornecedor' },
 ];
 
 /**
- * Cria (ou atualiza, se já existir) uma Despesa por categoria de ajuste que o CREARE já manda
+ * Cria (ou atualiza, se já existir) um lançamento por categoria de ajuste que o CREARE já manda
  * (Colaboradores/Alimentação-Lanches/Furto-Roubo/Sócios/Sobra-Perda — ver
  * `ResumoVendasDia.ajustes`) — pedido do usuário: até aqui esses valores só apareciam num aviso
- * informativo, sem entrar em nenhum cálculo; agora entram automaticamente como Despesa (passo 3),
+ * informativo, sem entrar em nenhum cálculo; agora entram automaticamente como lançamentos
+ * classificados por categoria (passo 3),
  * pelo MESMO caminho já testado de `calculateRelatorioFinal`/`calculateLancamentosPorTipo`, sem
  * nenhuma fórmula nova. `valorCents` usa o valor ABSOLUTO (toda Despesa é um valor positivo no
  * modelo atual) — o valor original com sinal fica registrado em `obsTexto` pra auditoria, caso o
@@ -85,7 +87,7 @@ const AJUSTES_CATEGORIAS: AjusteCategoria[] = [
  * houver — nunca mexe num lançamento criado manualmente pelo usuário.
  */
 export function aplicarAjustesComoLancamentos(draft: FechamentoDraft, resumo: ResumoVendasDia): void {
-  for (const { chave, rotulo, tipoCredor } of AJUSTES_CATEGORIAS) {
+  for (const { chave, rotulo, tipo, tipoCredor } of AJUSTES_CATEGORIAS) {
     const valorOriginal = Number(resumo.ajustes[chave]);
     const existente = draft.lancamentos.find((l) => l.origemAjusteCreare === chave);
 
@@ -99,12 +101,16 @@ export function aplicarAjustesComoLancamentos(draft: FechamentoDraft, resumo: Re
     const obsTexto = `Ajuste automático do CREARE (${rotulo}) — valor original: ${sinal}R$ ${formatCents(valorCents)}.`;
 
     if (existente) {
+      // Normaliza também lançamentos criados antes da classificação por categoria. O marcador
+      // `origemAjusteCreare` identifica um registro automático, então o tipo correto vem sempre
+      // da configuração acima, sem depender do valor antigo persistido no rascunho.
+      existente.tipo = tipo;
       existente.valorCents = valorCents;
       existente.obsTexto = obsTexto;
     } else {
       const novo: LancamentoDraft = {
         id: crypto.randomUUID(),
-        tipo: 'despesa',
+        tipo,
         status: 'naopago',
         dataRef: resumo.data,
         dataNfe: '',

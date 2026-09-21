@@ -98,12 +98,38 @@ function novoLancamento(tipo: TipoLancamento): LancamentoDraft {
   };
 }
 
+// Lançamentos Automáticos (pedido do usuário, 21/09/2026): 4 das 5 categorias de "ajuste" que o
+// bot já sincroniza (ver AJUSTES_CATEGORIAS/aplicarAjustesComoLancamentos em vendasFechamento.ts)
+// ganham um bloco somente-leitura dedicado, abaixo dos lançamentos manuais — Colaborador/Lanches
+// em Despesas, Sobra/Perda e Furto/Roubo em Mercadorias. "Sócios" (a 5ª categoria) não tem slot
+// automático pedido, então continua aparecendo na lista manual normalmente. Os itens com essas 4
+// origens somem da lista MANUAL (já são mostrados no bloco automático) mas continuam gravados em
+// `draft.lancamentos` com `tipo: 'despesa'` de sempre — o motor de cálculo real
+// (useRelatorioCalculado/calculateLancamentosPorTipo) nunca filtra por `origemAjusteCreare` e
+// continua somando todos eles normalmente; isto é só uma mudança de exibição.
+const ORIGENS_COM_BLOCO_AUTOMATICO: readonly string[] = ['colaboradores', 'alimentacao', 'sobraPerda', 'rouboFurto'];
+
 function lancamentosPorTipo(tipo: TipoLancamento): LancamentoDraft[] {
-  return props.draft.lancamentos.filter((l) => l.tipo === tipo);
+  return props.draft.lancamentos.filter(
+    (l) => l.tipo === tipo && !ORIGENS_COM_BLOCO_AUTOMATICO.includes(l.origemAjusteCreare),
+  );
 }
 function totalPorTipo(tipo: TipoLancamento): number {
   return lancamentosPorTipo(tipo).reduce((soma, l) => soma + l.valorCents + l.valorAcrescimoCents, 0);
 }
+
+function valorPorOrigem(origem: string): number {
+  const lancamento = props.draft.lancamentos.find((l) => l.origemAjusteCreare === origem);
+  return lancamento ? lancamento.valorCents + lancamento.valorAcrescimoCents : 0;
+}
+const despesasAutomaticas = computed(() => [
+  { rotulo: 'COLABORADOR', valorCents: valorPorOrigem('colaboradores') },
+  { rotulo: 'LANCHES', valorCents: valorPorOrigem('alimentacao') },
+]);
+const mercadoriasAutomaticas = computed(() => [
+  { rotulo: 'SOBRA/PERDA', valorCents: valorPorOrigem('sobraPerda') },
+  { rotulo: 'FURTO/ROUBO', valorCents: valorPorOrigem('rouboFurto') },
+]);
 
 const modalAberto = ref(false);
 const indiceEditando = ref<number | null>(null);
@@ -210,6 +236,8 @@ const totalGeralDiscriminacao = computed(() =>
 
 <template>
   <div class="d-flex flex-column ga-4">
+    <p class="lc-grupo-titulo">Lançamentos Manuais</p>
+
     <div
       v-for="tipo in TIPOS_LANCAMENTO"
       :key="tipo"
@@ -253,6 +281,51 @@ const totalGeralDiscriminacao = computed(() =>
         </p>
         <div v-else class="grade-cartoes lc-mt">
           <CartaoValor :rotulo="`Total ${ROTULOS_TIPO[tipo]}`" :valor="`R$ ${formatCents(totalPorTipo(tipo))}`" />
+        </div>
+      </div>
+    </div>
+
+    <div class="lc-bloco-automatico">
+      <p class="lc-grupo-titulo">Lançamentos Automáticos</p>
+      <p class="text-caption text-medium-emphasis mb-0">
+        Identificado e somado automaticamente a partir dos ajustes já sincronizados das vendas — sem edição manual aqui.
+      </p>
+
+      <div class="lc-painel" :style="{ '--cat': 'var(--cat-despesas-base)', '--cat-soft': 'var(--cat-despesas-soft)', '--cat-faixa': 'var(--cat-despesas-faixa)', '--cat-tinta': 'var(--cat-despesas-tinta)' }">
+        <div class="lc-faixa">
+          <div class="lc-head">
+            <span class="lc-ic"><v-icon size="19">mdi-robot-outline</v-icon></span>
+            <span class="lc-titulo">Despesas Automáticas</span>
+          </div>
+        </div>
+        <div class="lc-painel-corpo">
+          <div class="grade-cartoes">
+            <CartaoValor
+              v-for="item in despesasAutomaticas"
+              :key="item.rotulo"
+              :rotulo="item.rotulo"
+              :valor="`R$ ${formatCents(item.valorCents)}`"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div class="lc-painel" :style="{ '--cat': 'var(--cat-mercadorias-base)', '--cat-soft': 'var(--cat-mercadorias-soft)', '--cat-faixa': 'var(--cat-mercadorias-faixa)', '--cat-tinta': 'var(--cat-mercadorias-tinta)' }">
+        <div class="lc-faixa">
+          <div class="lc-head">
+            <span class="lc-ic"><v-icon size="19">mdi-robot-outline</v-icon></span>
+            <span class="lc-titulo">Mercadorias Automáticas</span>
+          </div>
+        </div>
+        <div class="lc-painel-corpo">
+          <div class="grade-cartoes">
+            <CartaoValor
+              v-for="item in mercadoriasAutomaticas"
+              :key="item.rotulo"
+              :rotulo="item.rotulo"
+              :valor="`R$ ${formatCents(item.valorCents)}`"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -592,6 +665,28 @@ const totalGeralDiscriminacao = computed(() =>
 </template>
 
 <style scoped>
+.lc-grupo-titulo {
+  margin: 0;
+  color: var(--cx-ink-soft);
+  font-size: var(--cx-fs-micro);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Bloco Automático como zona própria (pedido do usuário, 21/09/2026) — mesma ideia de
+   SecaoTransferencias.vue: separa visualmente "editável" (lista manual solta) de "só leitura"
+   (grupo com fundo/borda próprios), sem trocar as cores de categoria de cada painel. */
+.lc-bloco-automatico {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cx-sp-3);
+  margin-top: var(--cx-sp-2);
+  padding: var(--cx-sp-4);
+  border: 1px dashed var(--cx-line);
+  border-radius: var(--cx-r-lg);
+  background: var(--cx-surface-sunken);
+}
 .lc-resumo-item {
   display: flex;
   align-items: center;

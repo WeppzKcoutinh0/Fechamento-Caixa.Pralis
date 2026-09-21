@@ -3,7 +3,6 @@ import { computed, ref, toRef } from 'vue';
 import type { FechamentoDraft } from '~/types/fechamento';
 import CampoDinheiro from '~/components/comum/CampoDinheiro.vue';
 import CartaoValor from '~/components/comum/CartaoValor.vue';
-import CockpitCategorias from '~/components/fechamento/CockpitCategorias.vue';
 import { useRelatorioCalculado } from '~/composables/useRelatorioCalculado';
 import { useVendasProdutoDia } from '~/composables/useVendasProdutoDia';
 import { formatCents } from '~/utils/financeiro';
@@ -93,6 +92,62 @@ async function aoAbrirProdutos(): Promise<void> {
 function formatarQtd(qtd: number): string {
   return qtd.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
 }
+
+// Relatório em accordion por categoria (pedido do usuário, 21/09/2026, réplica da estrutura do
+// "RELATORIO" da planilha antiga do Pralís: Venda/Transferências/Despesas/Mercadorias/Retiradas/
+// Diferença, cada uma clicável pra expandir o detalhe). A planilha antiga tinha, dentro de
+// Transferências, um mecanismo de ESCOLHER manualmente uma "conta destino" (CT CX1/CT Fluxo
+// Cartões/CT Cofre) por lançamento — isso é um motor de roteamento contábil à parte, não existe
+// nesta versão (decisão confirmada com o usuário: reaproveitar só a estrutura de categorias que
+// JÁ existe no app, sem esse roteamento manual).
+const totalTransferidoEntreCaixasCents = computed(() =>
+  props.draft.transferenciasCaixa.reduce((soma, t) => soma + t.valorCents, 0),
+);
+
+// Mesma soma de draft.pdvEntradas usada em SecaoTransferencias.vue — não repete busca nenhuma,
+// só lê o que "Buscar vendas" já gravou (idempotente, nunca duplica).
+function somaPdv(campo: 'dinheiroCents' | 'creditoCents' | 'debitoCents' | 'pixCents' | 'voucherCents' | 'crediarioCents'): number {
+  return props.draft.pdvEntradas.reduce((soma, p) => soma + p[campo], 0);
+}
+const transferenciasAutomaticas = computed(() => [
+  { rotulo: 'CREDITO', valorCents: somaPdv('creditoCents') },
+  { rotulo: 'DEBITO', valorCents: somaPdv('debitoCents') },
+  { rotulo: 'PIX', valorCents: somaPdv('pixCents') },
+  { rotulo: 'VOUCHER', valorCents: somaPdv('voucherCents') },
+  { rotulo: 'DINHEIRO', valorCents: somaPdv('dinheiroCents') },
+  { rotulo: 'CREDIARIO', valorCents: somaPdv('crediarioCents') },
+]);
+
+// Mesmo filtro de SecaoLancamentos.vue: os 4 ajustes com bloco automático dedicado somem da
+// lista MANUAL (já aparecem no bloco automático abaixo), mas continuam com `tipo: 'despesa'` /
+// `'mercadoria'` de sempre — o motor de cálculo (lancamentosPorTipo acima) não filtra por
+// origemAjusteCreare e continua somando todos eles normalmente.
+const ORIGENS_COM_BLOCO_AUTOMATICO: readonly string[] = ['colaboradores', 'alimentacao', 'sobraPerda', 'rouboFurto'];
+const despesasManuais = computed(() =>
+  props.draft.lancamentos.filter((l) => l.tipo === 'despesa' && !ORIGENS_COM_BLOCO_AUTOMATICO.includes(l.origemAjusteCreare)),
+);
+const mercadoriasManuais = computed(() =>
+  props.draft.lancamentos.filter((l) => l.tipo === 'mercadoria' && !ORIGENS_COM_BLOCO_AUTOMATICO.includes(l.origemAjusteCreare)),
+);
+const retiradas = computed(() => props.draft.lancamentos.filter((l) => l.tipo === 'retirada'));
+
+const despesasAutomaticas = computed(() => [
+  { rotulo: 'COLABORADOR', valorCents: valorPorAjuste('colaboradores') },
+  { rotulo: 'LANCHES', valorCents: valorPorAjuste('alimentacao') },
+]);
+const mercadoriasAutomaticas = computed(() => [
+  { rotulo: 'SOBRA/PERDA', valorCents: valorPorAjuste('sobraPerda') },
+  { rotulo: 'FURTO/ROUBO', valorCents: valorPorAjuste('rouboFurto') },
+]);
+
+const CAT_VARS = {
+  venda: { '--cat': 'var(--cat-venda-base)', '--cat-soft': 'var(--cat-venda-soft)', '--cat-tinta': 'var(--cat-venda-tinta)' },
+  transferencias: { '--cat': 'var(--cat-transferencias-base)', '--cat-soft': 'var(--cat-transferencias-soft)', '--cat-tinta': 'var(--cat-transferencias-tinta)' },
+  despesas: { '--cat': 'var(--cat-despesas-base)', '--cat-soft': 'var(--cat-despesas-soft)', '--cat-tinta': 'var(--cat-despesas-tinta)' },
+  mercadorias: { '--cat': 'var(--cat-mercadorias-base)', '--cat-soft': 'var(--cat-mercadorias-soft)', '--cat-tinta': 'var(--cat-mercadorias-tinta)' },
+  retiradas: { '--cat': 'var(--cat-retiradas-base)', '--cat-soft': 'var(--cat-retiradas-soft)', '--cat-tinta': 'var(--cat-retiradas-tinta)' },
+  resultado: { '--cat': 'var(--cat-resultado-base)', '--cat-soft': 'var(--cat-resultado-soft)', '--cat-tinta': 'var(--cat-resultado-tinta)' },
+} as const;
 </script>
 
 <template>
@@ -125,19 +180,6 @@ function formatarQtd(qtd: number): string {
       </div>
     </v-card>
 
-    <!-- Cockpit por categoria: mesma ideia (e as mesmas 6 cores) da planilha de fechamento do
-         dono — Venda/Transferências/Despesas/Mercadorias/Retiradas/Diferença — e o mesmo padrão
-         visual que o Sistema Inteligente Pralís já usa na tela de Caixa. -->
-    <CockpitCategorias
-      :venda-cents="relatorio.valorTotalFinalCents"
-      :transferencias-entrada-cents="totalEntradaCents"
-      :transferencias-saida-cents="totalSaidaCents"
-      :despesas-cents="lancamentosPorTipo.despesaCents"
-      :mercadorias-cents="lancamentosPorTipo.mercadoriaCents"
-      :retiradas-cents="lancamentosPorTipo.retiradaCents"
-      :resultado-cents="relatorio.diferencaCents"
-    />
-
     <div class="grade-cartoes">
       <CartaoValor rotulo="Cartões" :valor="`R$ ${formatCents(relatorio.cartoesCents)}`" />
       <CartaoValor
@@ -146,136 +188,244 @@ function formatarQtd(qtd: number): string {
       />
     </div>
 
-    <v-divider />
-    <v-expansion-panels variant="accordion">
-      <v-expansion-panel>
-        <v-expansion-panel-title>Vendas</v-expansion-panel-title>
+    <!-- Relatório em categorias clicáveis (pedido do usuário, 21/09/2026) — réplica da estrutura
+         VENDA/TRANSFERÊNCIAS/DESPESAS/MERCADORIAS/RETIRADAS/DIFERENÇA da planilha antiga do
+         Pralís: clicar numa categoria expande o detalhe dela. -->
+    <v-expansion-panels variant="accordion" class="cat-accordion">
+      <v-expansion-panel class="cat-painel" :style="CAT_VARS.venda">
+        <v-expansion-panel-title class="cat-titulo">
+          <span class="flex-grow-1">Venda</span>
+          <strong class="cat-valor">R$ {{ formatCents(relatorio.valorTotalFinalCents) }}</strong>
+        </v-expansion-panel-title>
         <v-expansion-panel-text>
-          <div class="d-flex flex-column ga-2">
+          <div class="d-flex flex-column ga-2 mb-4">
             <div v-for="cat in vendasPorCategoria" :key="cat.rotulo" class="d-flex justify-space-between text-body-2">
               <span class="text-medium-emphasis">{{ cat.rotulo }}</span>
               <strong>R$ {{ formatCents(cat.valorCents) }}</strong>
             </div>
           </div>
+
+          <v-expansion-panels variant="accordion">
+            <v-expansion-panel @group:selected="({ value }) => value && aoAbrirProdutos()">
+              <v-expansion-panel-title>Produtos vendidos no dia</v-expansion-panel-title>
+              <v-expansion-panel-text>
+                <p class="text-caption text-medium-emphasis mb-3">
+                  Loja inteira (não separado por caixa) — a origem dos dados não liga produto a caixa/turno.
+                  Vendas de hoje só aparecem depois que o bot da loja rodar à noite (22h10).
+                </p>
+                <div v-if="carregandoProdutos" class="d-flex justify-center py-4">
+                  <v-progress-circular indeterminate color="primary" size="24" />
+                </div>
+                <v-alert v-else-if="erroProdutos" type="error" variant="tonal" density="comfortable">{{ erroProdutos }}</v-alert>
+                <v-alert v-else-if="produtos.length === 0" type="info" variant="tonal" density="comfortable">
+                  Nenhum produto sincronizado para {{ draft.data }}.
+                </v-alert>
+                <div v-else class="tabela-produtos-wrap">
+                  <table class="tabela-produtos">
+                    <thead>
+                      <tr>
+                        <th>Produto</th>
+                        <th class="text-right">Quant.</th>
+                        <th class="text-right">V. Unit.</th>
+                        <th class="text-right">V. Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="(p, i) in produtos" :key="`${p.produtoCodigo}-${i}`">
+                        <td>{{ p.produto }}</td>
+                        <td class="text-right">{{ formatarQtd(p.quantidade) }}</td>
+                        <td class="text-right">R$ {{ formatCents(p.valorUnitarioCents) }}</td>
+                        <td class="text-right">R$ {{ formatCents(p.totalCents) }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </v-expansion-panel-text>
+            </v-expansion-panel>
+          </v-expansion-panels>
         </v-expansion-panel-text>
       </v-expansion-panel>
 
-      <v-expansion-panel @group:selected="({ value }) => value && aoAbrirProdutos()">
-        <v-expansion-panel-title>Produtos vendidos no dia</v-expansion-panel-title>
+      <v-expansion-panel class="cat-painel" :style="CAT_VARS.transferencias">
+        <v-expansion-panel-title class="cat-titulo">
+          <span class="flex-grow-1">Transferências</span>
+          <strong class="cat-valor">R$ {{ formatCents(totalEntradaCents - totalSaidaCents) }}</strong>
+        </v-expansion-panel-title>
         <v-expansion-panel-text>
-          <p class="text-caption text-medium-emphasis mb-3">
-            Loja inteira (não separado por caixa) — a origem dos dados não liga produto a caixa/turno.
-            Vendas de hoje só aparecem depois que o bot da loja rodar à noite (22h10).
-          </p>
-          <div v-if="carregandoProdutos" class="d-flex justify-center py-4">
-            <v-progress-circular indeterminate color="primary" size="24" />
+          <p class="cat-subgrupo">Manuais</p>
+          <div class="d-flex flex-column ga-2 mb-4">
+            <div class="d-flex justify-space-between text-body-2">
+              <span class="text-medium-emphasis">Total Entrada</span>
+              <strong>R$ {{ formatCents(totalEntradaCents) }}</strong>
+            </div>
+            <div class="d-flex justify-space-between text-body-2">
+              <span class="text-medium-emphasis">Total Saída / Sangria</span>
+              <strong>R$ {{ formatCents(totalSaidaCents) }}</strong>
+            </div>
+            <div class="d-flex justify-space-between text-body-2">
+              <span class="text-medium-emphasis">Total Transferido entre caixas</span>
+              <strong>R$ {{ formatCents(totalTransferidoEntreCaixasCents) }}</strong>
+            </div>
           </div>
-          <v-alert v-else-if="erroProdutos" type="error" variant="tonal" density="comfortable">{{ erroProdutos }}</v-alert>
-          <v-alert v-else-if="produtos.length === 0" type="info" variant="tonal" density="comfortable">
-            Nenhum produto sincronizado para {{ draft.data }}.
-          </v-alert>
-          <div v-else class="tabela-produtos-wrap">
-            <table class="tabela-produtos">
-              <thead>
-                <tr>
-                  <th>Produto</th>
-                  <th class="text-right">Quant.</th>
-                  <th class="text-right">V. Unit.</th>
-                  <th class="text-right">V. Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(p, i) in produtos" :key="`${p.produtoCodigo}-${i}`">
-                  <td>{{ p.produto }}</td>
-                  <td class="text-right">{{ formatarQtd(p.quantidade) }}</td>
-                  <td class="text-right">R$ {{ formatCents(p.valorUnitarioCents) }}</td>
-                  <td class="text-right">R$ {{ formatCents(p.totalCents) }}</td>
-                </tr>
-              </tbody>
-            </table>
+          <p class="cat-subgrupo">Automáticas</p>
+          <div class="d-flex flex-column ga-2">
+            <div v-for="item in transferenciasAutomaticas" :key="item.rotulo" class="d-flex justify-space-between text-body-2">
+              <span class="text-medium-emphasis">{{ item.rotulo }}</span>
+              <strong>R$ {{ formatCents(item.valorCents) }}</strong>
+            </div>
           </div>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+
+      <v-expansion-panel class="cat-painel" :style="CAT_VARS.despesas">
+        <v-expansion-panel-title class="cat-titulo">
+          <span class="flex-grow-1">Despesas</span>
+          <strong class="cat-valor">R$ {{ formatCents(lancamentosPorTipo.despesaCents) }}</strong>
+        </v-expansion-panel-title>
+        <v-expansion-panel-text>
+          <p class="cat-subgrupo">Manuais</p>
+          <div v-if="!despesasManuais.length" class="text-caption text-medium-emphasis mb-4">Nenhuma despesa manual lançada.</div>
+          <div v-else class="d-flex flex-column ga-2 mb-4">
+            <div v-for="d in despesasManuais" :key="d.id" class="d-flex justify-space-between text-body-2">
+              <span class="text-medium-emphasis">{{ d.fornecedor || 'Sem credor' }}</span>
+              <strong>R$ {{ formatCents(d.valorCents + d.valorAcrescimoCents) }}</strong>
+            </div>
+          </div>
+          <p class="cat-subgrupo">Automáticas</p>
+          <div class="d-flex flex-column ga-2">
+            <div v-for="item in despesasAutomaticas" :key="item.rotulo" class="d-flex justify-space-between text-body-2">
+              <span class="text-medium-emphasis">{{ item.rotulo }}</span>
+              <strong>R$ {{ formatCents(item.valorCents) }}</strong>
+            </div>
+          </div>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+
+      <v-expansion-panel class="cat-painel" :style="CAT_VARS.mercadorias">
+        <v-expansion-panel-title class="cat-titulo">
+          <span class="flex-grow-1">Mercadorias</span>
+          <strong class="cat-valor">R$ {{ formatCents(lancamentosPorTipo.mercadoriaCents) }}</strong>
+        </v-expansion-panel-title>
+        <v-expansion-panel-text>
+          <p class="cat-subgrupo">Manuais</p>
+          <div v-if="!mercadoriasManuais.length" class="text-caption text-medium-emphasis mb-4">Nenhuma mercadoria manual lançada.</div>
+          <div v-else class="d-flex flex-column ga-2 mb-4">
+            <div v-for="m in mercadoriasManuais" :key="m.id" class="d-flex justify-space-between text-body-2">
+              <span class="text-medium-emphasis">{{ m.fornecedor || 'Sem credor' }}</span>
+              <strong>R$ {{ formatCents(m.valorCents + m.valorAcrescimoCents) }}</strong>
+            </div>
+          </div>
+          <p class="cat-subgrupo">Automáticas</p>
+          <div class="d-flex flex-column ga-2">
+            <div v-for="item in mercadoriasAutomaticas" :key="item.rotulo" class="d-flex justify-space-between text-body-2">
+              <span class="text-medium-emphasis">{{ item.rotulo }}</span>
+              <strong>R$ {{ formatCents(item.valorCents) }}</strong>
+            </div>
+          </div>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+
+      <v-expansion-panel class="cat-painel" :style="CAT_VARS.retiradas">
+        <v-expansion-panel-title class="cat-titulo">
+          <span class="flex-grow-1">Retiradas</span>
+          <strong class="cat-valor">R$ {{ formatCents(lancamentosPorTipo.retiradaCents) }}</strong>
+        </v-expansion-panel-title>
+        <v-expansion-panel-text>
+          <div v-if="!retiradas.length" class="text-caption text-medium-emphasis">Nenhuma retirada lançada.</div>
+          <div v-else class="d-flex flex-column ga-2">
+            <div v-for="r in retiradas" :key="r.id" class="d-flex justify-space-between text-body-2">
+              <span class="text-medium-emphasis">{{ r.fornecedor || 'Sem credor' }}</span>
+              <strong>R$ {{ formatCents(r.valorCents + r.valorAcrescimoCents) }}</strong>
+            </div>
+          </div>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+
+      <v-expansion-panel class="cat-painel" :style="CAT_VARS.resultado">
+        <v-expansion-panel-title class="cat-titulo">
+          <span class="flex-grow-1">Diferença</span>
+          <strong class="cat-valor">R$ {{ formatCents(relatorio.diferencaCents) }}</strong>
+        </v-expansion-panel-title>
+        <v-expansion-panel-text>
+          <p class="cat-subgrupo">Conferência por forma de pagamento</p>
+          <v-card
+            v-for="forma in ['Crédito', 'Débito', 'Pix', 'Voucher', 'Crediário'] as const"
+            :key="forma"
+            variant="outlined"
+            class="pa-3 mb-2"
+            rounded="lg"
+          >
+            <div class="text-caption text-medium-emphasis mb-1">{{ forma }}</div>
+            <div class="d-flex justify-space-between text-body-2">
+              <span
+                >Final: R$
+                {{
+                  formatCents(
+                    forma === 'Crédito'
+                      ? liqCreditoCents
+                      : forma === 'Débito'
+                        ? liqDebitoCents
+                        : forma === 'Pix'
+                          ? liqPixCents
+                          : forma === 'Voucher'
+                            ? liqVoucherCents
+                            : crediarioTotais.totalCents,
+                  )
+                }}</span
+              >
+              <span
+                >PDV: R$
+                {{
+                  formatCents(
+                    forma === 'Crédito'
+                      ? pdv.creditoCents
+                      : forma === 'Débito'
+                        ? pdv.debitoCents
+                        : forma === 'Pix'
+                          ? pdv.pixCents
+                          : forma === 'Voucher'
+                            ? pdv.voucherCents
+                            : pdv.crediarioCents,
+                  )
+                }}</span
+              >
+            </div>
+            <v-chip
+              size="small"
+              class="mt-1"
+              :color="
+                classeDiff(
+                  forma === 'Crédito'
+                    ? relatorio.diffCreditoCents
+                    : forma === 'Débito'
+                      ? relatorio.diffDebitoCents
+                      : forma === 'Pix'
+                        ? relatorio.diffPixCents
+                        : forma === 'Voucher'
+                          ? relatorio.diffVoucherCents
+                          : relatorio.diffCrediarioCents,
+                )
+              "
+            >
+              Diferença: R$
+              {{
+                formatCents(
+                  forma === 'Crédito'
+                    ? relatorio.diffCreditoCents
+                    : forma === 'Débito'
+                      ? relatorio.diffDebitoCents
+                      : forma === 'Pix'
+                        ? relatorio.diffPixCents
+                        : forma === 'Voucher'
+                          ? relatorio.diffVoucherCents
+                          : relatorio.diffCrediarioCents,
+                )
+              }}
+            </v-chip>
+          </v-card>
         </v-expansion-panel-text>
       </v-expansion-panel>
     </v-expansion-panels>
-
-    <v-divider />
-    <div class="text-subtitle-2">Conferência por forma de pagamento</div>
-
-    <v-card
-      v-for="forma in ['Crédito', 'Débito', 'Pix', 'Voucher', 'Crediário'] as const"
-      :key="forma"
-      variant="outlined"
-      class="pa-3"
-      rounded="lg"
-    >
-      <div class="text-caption text-medium-emphasis mb-1">{{ forma }}</div>
-      <div class="d-flex justify-space-between text-body-2">
-        <span
-          >Final: R$
-          {{
-            formatCents(
-              forma === 'Crédito'
-                ? liqCreditoCents
-                : forma === 'Débito'
-                  ? liqDebitoCents
-                  : forma === 'Pix'
-                    ? liqPixCents
-                    : forma === 'Voucher'
-                      ? liqVoucherCents
-                      : crediarioTotais.totalCents,
-            )
-          }}</span
-        >
-        <span
-          >PDV: R$
-          {{
-            formatCents(
-              forma === 'Crédito'
-                ? pdv.creditoCents
-                : forma === 'Débito'
-                  ? pdv.debitoCents
-                  : forma === 'Pix'
-                    ? pdv.pixCents
-                    : forma === 'Voucher'
-                      ? pdv.voucherCents
-                      : pdv.crediarioCents,
-            )
-          }}</span
-        >
-      </div>
-      <v-chip
-        size="small"
-        class="mt-1"
-        :color="
-          classeDiff(
-            forma === 'Crédito'
-              ? relatorio.diffCreditoCents
-              : forma === 'Débito'
-                ? relatorio.diffDebitoCents
-                : forma === 'Pix'
-                  ? relatorio.diffPixCents
-                  : forma === 'Voucher'
-                    ? relatorio.diffVoucherCents
-                    : relatorio.diffCrediarioCents,
-          )
-        "
-      >
-        Diferença: R$
-        {{
-          formatCents(
-            forma === 'Crédito'
-              ? relatorio.diffCreditoCents
-              : forma === 'Débito'
-                ? relatorio.diffDebitoCents
-                : forma === 'Pix'
-                  ? relatorio.diffPixCents
-                  : forma === 'Voucher'
-                    ? relatorio.diffVoucherCents
-                    : relatorio.diffCrediarioCents,
-          )
-        }}
-      </v-chip>
-    </v-card>
 
     <v-divider />
     <div class="text-subtitle-2">Dinheiro esperado × contado</div>
@@ -306,6 +456,40 @@ function formatarQtd(qtd: number): string {
 </template>
 
 <style scoped>
+/* Accordion por categoria (Venda/Transferências/Despesas/Mercadorias/Retiradas/Diferença) —
+   mesma linguagem visual de cor-como-faixa que o resto do wizard (.lc-faixa em main.css), aqui
+   aplicada ao cabeçalho de cada v-expansion-panel via --cat/--cat-soft/--cat-tinta injetado por
+   painel (CAT_VARS no script). */
+.cat-accordion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cx-sp-3);
+}
+.cat-painel {
+  border: 1px solid var(--cx-line) !important;
+  border-radius: var(--cx-r-lg) !important;
+  overflow: hidden;
+}
+.cat-titulo {
+  background: var(--cat) !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+}
+.cat-titulo :deep(.v-expansion-panel-title__icon .v-icon) {
+  color: #fff;
+}
+.cat-valor {
+  margin-right: var(--cx-sp-2);
+}
+.cat-subgrupo {
+  margin: 0 0 var(--cx-sp-2);
+  color: var(--cx-ink-soft);
+  font-size: var(--cx-fs-micro);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .tabela-produtos-wrap {
   overflow-x: auto;
 }

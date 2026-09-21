@@ -154,10 +154,29 @@ const totalSaidaCents = computed(() =>
 const totalTransferenciasCents = computed(() =>
   props.draft.transferenciasCaixa.reduce((soma, t) => soma + t.valorCents, 0),
 );
+
+// Transferências Automáticas (pedido do usuário, 21/09/2026): soma das formas de pagamento já
+// sincronizadas das vendas (Seção 1 "Buscar vendas" grava em `draft.pdvEntradas`) — só leitura,
+// não editável aqui. Deriva do que JÁ está no draft (não faz uma busca nova): `pdvEntradas` já é
+// preenchido de forma idempotente por `aplicarResumoAoPrimeiroPdv` (sobrescreve, nunca duplica a
+// cada nova busca), então isto nunca soma a mesma venda duas vezes.
+function somaPdv(campo: 'dinheiroCents' | 'creditoCents' | 'debitoCents' | 'pixCents' | 'voucherCents' | 'crediarioCents'): number {
+  return props.draft.pdvEntradas.reduce((soma, p) => soma + p[campo], 0);
+}
+const transferenciasAutomaticas = computed(() => [
+  { rotulo: 'CREDITO', valorCents: somaPdv('creditoCents') },
+  { rotulo: 'DEBITO', valorCents: somaPdv('debitoCents') },
+  { rotulo: 'PIX', valorCents: somaPdv('pixCents') },
+  { rotulo: 'VOUCHER', valorCents: somaPdv('voucherCents') },
+  { rotulo: 'DINHEIRO', valorCents: somaPdv('dinheiroCents') },
+  { rotulo: 'CREDIARIO', valorCents: somaPdv('crediarioCents') },
+]);
 </script>
 
 <template>
   <div class="d-flex flex-column ga-4">
+    <p class="lc-grupo-titulo">Transferências Manuais</p>
+
     <!-- Painel Entradas -->
     <div class="lc-painel" :style="ENTRADA_VARS">
       <div class="lc-faixa">
@@ -272,6 +291,31 @@ const totalTransferenciasCents = computed(() =>
             rotulo="Total Transferido"
             :valor="`R$ ${formatCents(totalTransferenciasCents)}`"
           />
+        </div>
+      </div>
+    </div>
+
+    <div class="lc-bloco-automatico">
+      <p class="lc-grupo-titulo">Transferências Automáticas</p>
+      <p class="text-caption text-medium-emphasis mb-0">
+        Somado automaticamente a partir das vendas já sincronizadas ("Buscar vendas") — sem edição manual aqui.
+      </p>
+      <div class="lc-painel" :style="TRANSFERENCIAS_VARS">
+        <div class="lc-faixa">
+          <div class="lc-head">
+            <span class="lc-ic"><v-icon size="19">mdi-robot-outline</v-icon></span>
+            <span class="lc-titulo">Transferências Automáticas</span>
+          </div>
+        </div>
+        <div class="lc-painel-corpo">
+          <div class="grade-cartoes">
+            <CartaoValor
+              v-for="item in transferenciasAutomaticas"
+              :key="item.rotulo"
+              :rotulo="item.rotulo"
+              :valor="`R$ ${formatCents(item.valorCents)}`"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -435,6 +479,29 @@ const totalTransferenciasCents = computed(() =>
 </template>
 
 <style scoped>
+.lc-grupo-titulo {
+  margin: 0;
+  color: var(--cx-ink-soft);
+  font-size: var(--cx-fs-micro);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Bloco Automático como zona própria (pedido do usuário, 21/09/2026): antes ficava solto na
+   mesma lista dos painéis manuais, sem separação visual clara entre "editável" e "só leitura".
+   Fundo levemente destacado + borda tracejada marcam essa área como um grupo à parte, sem
+   inventar cor nova (continua usando a mesma paleta --cat-* de cada painel dentro dela). */
+.lc-bloco-automatico {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cx-sp-3);
+  margin-top: var(--cx-sp-2);
+  padding: var(--cx-sp-4);
+  border: 1px dashed var(--cx-line);
+  border-radius: var(--cx-r-lg);
+  background: var(--cx-surface-sunken);
+}
 .lc-resumo-item {
   display: flex;
   align-items: center;

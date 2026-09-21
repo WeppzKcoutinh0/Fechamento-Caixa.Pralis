@@ -787,17 +787,8 @@ const crediarioAberto = ref(false);
 </template>
 
 <style scoped>
-.lc-painel {
-  display: flex;
-  flex-direction: column;
-  background: var(--cx-surface);
-  border: 0.5px solid var(--cx-line);
-  border-radius: var(--cx-r-lg);
-  overflow: hidden;
-}
-.lc-painel-corpo {
-  padding: var(--cx-sp-4) var(--cx-sp-5);
-}
+/* .lc-painel / .lc-painel-corpo agora vivem em assets/main.css (eram só daqui, "scoped", e por
+   isso nunca aplicavam nas outras telas que também usam essas classes). */
 .lc-faixa-btn {
   display: block;
   width: 100%;

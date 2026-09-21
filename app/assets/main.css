@@ -279,6 +279,23 @@ body {
   color: #fff;
   text-transform: capitalize;
 }
+
+/* Painel de lista (fora do modal) — cartão com faixa colorida no topo (.lc-faixa acima) e corpo
+   rolável abaixo. Estava faltando aqui (só existia duplicado dentro do <style scoped> de
+   SecaoRelatorios.vue, que por ser "scoped" nunca chegava a SecaoTransferencias.vue nem
+   SecaoLancamentos.vue — os painéis dessas duas telas renderizavam sem borda/raio/padding
+   nenhum). Centralizado aqui pra as 3 telas usarem a mesma definição, sempre. */
+.lc-painel {
+  display: flex;
+  flex-direction: column;
+  background: var(--cx-surface);
+  border: 0.5px solid var(--cx-line);
+  border-radius: var(--cx-r-lg);
+  overflow: hidden;
+}
+.lc-painel-corpo {
+  padding: var(--cx-sp-4) var(--cx-sp-5);
+}
 .lc-x {
   color: #fff;
   cursor: pointer;

@@ -50,10 +50,26 @@ export type GrupoDiscriminacao = (typeof GRUPOS_DISCRIMINACAO)[number];
 export const TIPOS_CREDIARIO = ['cliente', 'colaborador'] as const;
 export type TipoCrediario = (typeof TIPOS_CREDIARIO)[number];
 
+// "Tipo de conta" da Entrada (pedido do usuário, 21/09/2026) — classifica de onde veio o
+// dinheiro: forma de pagamento ou motivo de ajuste do CREARE. Opcional.
+export const TIPOS_CONTA_ENTRADA = [
+  'CREDITO',
+  'DEBITO',
+  'PIX',
+  'VOUCHER',
+  'DINHEIRO',
+  'COLABORADOR',
+  'SOBRA/PERDA',
+  'FURTO/ROUBO',
+  'LANCHES',
+] as const;
+export type TipoContaEntrada = (typeof TIPOS_CONTA_ENTRADA)[number];
+
 export interface EntradaDraft {
   lacre: string;
   valorCents: number;
   descricao: string;
+  tipoConta: TipoContaEntrada | '';
 }
 
 export interface SangriaDraft {

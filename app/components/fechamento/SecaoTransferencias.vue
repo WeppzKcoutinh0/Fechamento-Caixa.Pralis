@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { CAIXAS, type EntradaDraft, type FechamentoDraft, type SangriaDraft, type TransferenciaCaixaDraft } from '~/types/fechamento';
+import { CAIXAS, TIPOS_CONTA_ENTRADA, type EntradaDraft, type FechamentoDraft, type SangriaDraft, type TransferenciaCaixaDraft } from '~/types/fechamento';
 import CartaoValor from '~/components/comum/CartaoValor.vue';
 import { formatCents } from '~/utils/financeiro';
 import { useTransferenciasTesouraria } from '~/composables/useTransferenciasTesouraria';
@@ -40,7 +40,7 @@ const TRANSFERENCIA_VARS = {
 };
 
 function novaEntrada(): EntradaDraft {
-  return { lacre: '', valorCents: 0, descricao: '' };
+  return { lacre: '', valorCents: 0, descricao: '', tipoConta: '' };
 }
 function novaSangria(): SangriaDraft {
   return { descricao: '', lacre: '', valorCents: 0 };
@@ -411,6 +411,16 @@ const totalTransferenciasCents = computed(() =>
                 <input class="lc-input" value="Cofre" readonly />
               </label>
             </div>
+
+            <!-- Tipo de conta da Entrada (pedido do usuário, 21/09/2026) — opcional, classifica de
+                 onde veio o dinheiro. -->
+            <label v-if="tipoModal === 'entrada' && 'tipoConta' in itemAtual" class="lc-campo">
+              <span class="lc-campo-lbl">Tipo de conta</span>
+              <select v-model="itemAtual.tipoConta" class="lc-input">
+                <option value="">Selecione...</option>
+                <option v-for="opcao in TIPOS_CONTA_ENTRADA" :key="opcao" :value="opcao">{{ opcao }}</option>
+              </select>
+            </label>
 
             <label class="lc-campo">
               <span class="lc-campo-lbl">Descrição</span>

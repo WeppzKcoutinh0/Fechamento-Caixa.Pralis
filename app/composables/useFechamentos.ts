@@ -21,6 +21,7 @@ import type {
   LancamentoDraft,
   PdvEntradaDraft,
   SangriaDraft,
+  TipoContaEntrada,
   TransferenciaCaixaDraft,
   Turno,
 } from '~/types/fechamento';
@@ -31,6 +32,7 @@ interface EntradaRow {
   lacre: string;
   valor: string;
   descricao: string;
+  tipo_conta: string | null;
 }
 interface SangriaRow {
   ordem: number;
@@ -201,6 +203,7 @@ function linhaParaDraft(row: FechamentoRow): FechamentoDraft {
       lacre: e.lacre,
       valorCents: toCents(e.valor),
       descricao: e.descricao,
+      tipoConta: (e.tipo_conta ?? '') as TipoContaEntrada | '',
     })),
     sangrias: ordenado(row.sangrias).map((s): SangriaDraft => ({
       descricao: s.descricao,
@@ -412,6 +415,7 @@ export function useFechamentos() {
         lacre: e.lacre,
         valor: cents(e.valorCents),
         descricao: e.descricao,
+        tipoConta: e.tipoConta,
       })),
       sangrias: draft.sangrias.map((s) => ({
         descricao: s.descricao,

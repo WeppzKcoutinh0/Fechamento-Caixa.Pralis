@@ -16,6 +16,14 @@ const TAMANHO_LOTE = 500;
 // há muito tempo e não precisam ser tocadas de novo.
 const JANELA_DIAS = 14;
 
+// Janela BEM mais curta só pra produtos (21/09/2026, achado real): mesmo com os 14 dias da
+// janela acima, VENDAS_PRODUTOS sozinha tem ~850 linhas/dia (11.935 em 14 dias) — muito mais
+// densa que FECHAMENTOS_CAIXAS (uma linha por venda/produto, não por turno) — e isso sozinho já
+// estourava os 60s da Vercel de novo (medido: 96s rodando os dois juntos). Produtos só precisa
+// cobrir o suficiente pra "Vendas" do Relatório Final (que olha só a DATA do próprio fechamento,
+// quase sempre hoje/ontem), então uma janela bem mais curta já basta.
+const JANELA_DIAS_PRODUTOS = 3;
+
 function filtrarPorEmpresa<T extends { EMPRESA?: string }>(linhas: T[], empresa: string): T[] {
   return linhas.filter((linha) => String(linha.EMPRESA ?? '').trim() === empresa);
 }
@@ -82,13 +90,9 @@ export async function sincronizarPlanilhaCreare(): Promise<ResumoSincronizacaoPl
     fechamentoGravadas += gravadas;
   }
 
-  // VENDAS_PRODUTOS desligado por padrão (17/09/2026): a aba não é usada em NENHUM lugar do app
-  // ainda (ver TASKS.md, pendência #4) e, desde que o bot passou a escrever a cada ~1min, já
-  // acumulou 75 mil+ linhas — ler/validar/gravar tudo isso é o que faz o sync inteiro estourar o
-  // limite de execução da Vercel (confirmado: 4min rodando local, bem acima do teto de function
-  // da Vercel). Reativa setando NUXT_SINCRONIZAR_PRODUTOS=true quando essa aba passar a ser usada
-  // de verdade — aí vale a pena resolver a leitura incremental (só linhas novas, não a planilha
-  // inteira) antes de ligar de novo.
+  // VENDAS_PRODUTOS religado (21/09/2026): o Relatório Final do wizard passou a mostrar essa
+  // lista (ver useVendasProdutoDia.ts) — usa `JANELA_DIAS_PRODUTOS` (bem menor que a de
+  // fechamento) por causa da densidade de linhas, ver comentário na constante acima.
   let produtosRecebidas = 0;
   let produtosGravadas = 0;
   let produtosInvalidas = 0;
@@ -100,7 +104,7 @@ export async function sincronizarPlanilhaCreare(): Promise<ResumoSincronizacaoPl
       aba: 'VENDAS_PRODUTOS',
       colunaInicial,
     });
-    const linhasProdutosBrutas = filtrarPorJanelaRecente(filtrarPorEmpresa(todosProdutos, empresa), JANELA_DIAS);
+    const linhasProdutosBrutas = filtrarPorJanelaRecente(filtrarPorEmpresa(todosProdutos, empresa), JANELA_DIAS_PRODUTOS);
     produtosNaPlanilha = linhasProdutosBrutas.length;
     for (const lote of loteEmGrupos(linhasProdutosBrutas)) {
       const parseadas = lote.map((linha) => linhaVendaProdutoDiaSchema.safeParse(linha));

@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { toRef } from 'vue';
+import { computed, ref, toRef } from 'vue';
 import type { FechamentoDraft } from '~/types/fechamento';
 import CampoDinheiro from '~/components/comum/CampoDinheiro.vue';
 import CartaoValor from '~/components/comum/CartaoValor.vue';
 import CockpitCategorias from '~/components/fechamento/CockpitCategorias.vue';
 import { useRelatorioCalculado } from '~/composables/useRelatorioCalculado';
+import { useVendasProdutoDia } from '~/composables/useVendasProdutoDia';
 import { formatCents } from '~/utils/financeiro';
 import { baixarPdfFechamento } from '~/utils/gerarPdfFechamento';
 
@@ -60,6 +61,38 @@ function classeDiff(cents: number): 'success' | 'error' | undefined {
   if (Math.abs(cents) < 1) return undefined;
   return cents > 0 ? 'success' : 'error';
 }
+
+// "Vendas" expandido nas 9 categorias (pedido do usuário, 21/09/2026) — mesmas 9 do "Tipo de
+// conta" da Entrada. As 5 formas de pagamento vêm do PDV (já calculado acima); as outras 4 vêm
+// dos lançamentos automáticos que o CREARE já cria (ver aplicarAjustesComoLancamentos em
+// utils/vendasFechamento.ts) — procurados pelo mesmo `origemAjusteCreare` que os identifica.
+// Lista de PRODUTOS vendidos é uma coisa SEPARADA (não tem ligação com forma de pagamento nem
+// caixa na origem — ver useVendasProdutoDia.ts) — fica ao lado, não dentro de cada categoria.
+function valorPorAjuste(chave: string): number {
+  return props.draft.lancamentos.find((l) => l.origemAjusteCreare === chave)?.valorCents ?? 0;
+}
+const vendasPorCategoria = computed(() => [
+  { rotulo: 'CREDITO', valorCents: pdv.value.creditoCents },
+  { rotulo: 'DEBITO', valorCents: pdv.value.debitoCents },
+  { rotulo: 'PIX', valorCents: pdv.value.pixCents },
+  { rotulo: 'VOUCHER', valorCents: pdv.value.voucherCents },
+  { rotulo: 'DINHEIRO', valorCents: pdv.value.dinheiroCents },
+  { rotulo: 'COLABORADOR', valorCents: valorPorAjuste('colaboradores') },
+  { rotulo: 'SOBRA/PERDA', valorCents: valorPorAjuste('sobraPerda') },
+  { rotulo: 'FURTO/ROUBO', valorCents: valorPorAjuste('rouboFurto') },
+  { rotulo: 'LANCHES', valorCents: valorPorAjuste('alimentacao') },
+]);
+
+const { carregando: carregandoProdutos, erro: erroProdutos, produtos, buscarPorData: buscarProdutos } = useVendasProdutoDia();
+const produtosJaBuscados = ref(false);
+async function aoAbrirProdutos(): Promise<void> {
+  if (produtosJaBuscados.value) return;
+  produtosJaBuscados.value = true;
+  await buscarProdutos(props.draft.data);
+}
+function formatarQtd(qtd: number): string {
+  return qtd.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
+}
 </script>
 
 <template>
@@ -112,6 +145,58 @@ function classeDiff(cents: number): 'success' | 'error' | undefined {
         :valor="`R$ ${formatCents(relatorio.relPdvDiferencaCents)}`"
       />
     </div>
+
+    <v-divider />
+    <v-expansion-panels variant="accordion">
+      <v-expansion-panel>
+        <v-expansion-panel-title>Vendas</v-expansion-panel-title>
+        <v-expansion-panel-text>
+          <div class="d-flex flex-column ga-2">
+            <div v-for="cat in vendasPorCategoria" :key="cat.rotulo" class="d-flex justify-space-between text-body-2">
+              <span class="text-medium-emphasis">{{ cat.rotulo }}</span>
+              <strong>R$ {{ formatCents(cat.valorCents) }}</strong>
+            </div>
+          </div>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+
+      <v-expansion-panel @group:selected="({ value }) => value && aoAbrirProdutos()">
+        <v-expansion-panel-title>Produtos vendidos no dia</v-expansion-panel-title>
+        <v-expansion-panel-text>
+          <p class="text-caption text-medium-emphasis mb-3">
+            Loja inteira (não separado por caixa) — a origem dos dados não liga produto a caixa/turno.
+            Vendas de hoje só aparecem depois que o bot da loja rodar à noite (22h10).
+          </p>
+          <div v-if="carregandoProdutos" class="d-flex justify-center py-4">
+            <v-progress-circular indeterminate color="primary" size="24" />
+          </div>
+          <v-alert v-else-if="erroProdutos" type="error" variant="tonal" density="comfortable">{{ erroProdutos }}</v-alert>
+          <v-alert v-else-if="produtos.length === 0" type="info" variant="tonal" density="comfortable">
+            Nenhum produto sincronizado para {{ draft.data }}.
+          </v-alert>
+          <div v-else class="tabela-produtos-wrap">
+            <table class="tabela-produtos">
+              <thead>
+                <tr>
+                  <th>Produto</th>
+                  <th class="text-right">Quant.</th>
+                  <th class="text-right">V. Unit.</th>
+                  <th class="text-right">V. Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(p, i) in produtos" :key="`${p.produtoCodigo}-${i}`">
+                  <td>{{ p.produto }}</td>
+                  <td class="text-right">{{ formatarQtd(p.quantidade) }}</td>
+                  <td class="text-right">R$ {{ formatCents(p.valorUnitarioCents) }}</td>
+                  <td class="text-right">R$ {{ formatCents(p.totalCents) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+    </v-expansion-panels>
 
     <v-divider />
     <div class="text-subtitle-2">Conferência por forma de pagamento</div>
@@ -219,3 +304,27 @@ function classeDiff(cents: number): 'success' | 'error' | undefined {
     />
   </div>
 </template>
+
+<style scoped>
+.tabela-produtos-wrap {
+  overflow-x: auto;
+}
+.tabela-produtos {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--cx-fs-caption);
+}
+.tabela-produtos th {
+  padding: var(--cx-sp-2) var(--cx-sp-3);
+  color: var(--cx-ink-soft, rgba(0, 0, 0, 0.6));
+  font-weight: 700;
+  text-align: left;
+  border-bottom: 1px solid var(--cx-border, rgba(0, 0, 0, 0.12));
+  white-space: nowrap;
+}
+.tabela-produtos td {
+  padding: var(--cx-sp-2) var(--cx-sp-3);
+  border-bottom: 1px solid var(--cx-border, rgba(0, 0, 0, 0.08));
+  white-space: nowrap;
+}
+</style>

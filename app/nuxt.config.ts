@@ -31,9 +31,11 @@ export default defineNuxtConfig({
     googleSpreadsheetIdSecundario: '',
     empresaPralis: 'TNP CENTRAL',
     planilhaColunaInicial: 'F',
-    // Desligado por padrão — ver comentário em server/utils/sincronizarPlanilha.ts (aba não usada
-    // em lugar nenhum do app ainda, e ficou grande demais pra ler inteira em toda sincronização).
-    sincronizarProdutos: false,
+    // Religado (21/09/2026) — o Relatório Final do wizard passa a usar `vendas_produto_dia`
+    // (lista de produtos vendidos no dia). Seguro de novo porque `sincronizarPlanilha.ts` agora
+    // filtra pela janela de 14 dias antes de processar (não lê mais a planilha inteira a cada
+    // execução, que era o motivo original de ter desligado isto).
+    sincronizarProdutos: true,
     public: {
       supabaseUrl: '',
       supabaseAnonKey: '',

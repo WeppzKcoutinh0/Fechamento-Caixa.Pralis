@@ -179,7 +179,7 @@ const totalTransferenciasCents = computed(() =>
       <div class="lc-faixa">
         <div class="lc-head">
           <span class="lc-ic"><v-icon size="19">mdi-arrow-down-bold-circle-outline</v-icon></span>
-          <span class="lc-titulo">Entradas</span>
+          <span class="lc-titulo">Transferências/Entrada</span>
         </div>
       </div>
       <div class="lc-painel-corpo">
@@ -217,7 +217,7 @@ const totalTransferenciasCents = computed(() =>
       <div class="lc-faixa">
         <div class="lc-head">
           <span class="lc-ic"><v-icon size="19">mdi-cash-remove</v-icon></span>
-          <span class="lc-titulo">Sangrias</span>
+          <span class="lc-titulo">Transferências/Saída/Sangria</span>
         </div>
       </div>
       <div class="lc-painel-corpo">
@@ -256,7 +256,7 @@ const totalTransferenciasCents = computed(() =>
       <div class="lc-faixa">
         <div class="lc-head">
           <span class="lc-ic"><v-icon size="19">mdi-swap-horizontal</v-icon></span>
-          <span class="lc-titulo">Transferência entre caixas</span>
+          <span class="lc-titulo">Transferências/Entrada/Saída/Entre caixas</span>
         </div>
       </div>
       <div class="lc-painel-corpo">
@@ -310,10 +310,10 @@ const totalTransferenciasCents = computed(() =>
             <span class="lc-titulo">
               {{
                 tipoModal === 'entrada'
-                  ? 'Nova entrada'
+                  ? 'Transferências/Entrada'
                   : tipoModal === 'sangria'
-                    ? 'Nova sangria'
-                    : 'Nova transferência'
+                    ? 'Transferências/Saída/Sangria'
+                    : 'Transferências/Entrada/Saída/Entre caixas'
               }}
             </span>
             <v-icon class="lc-x" size="19" @click="modalAberto = false">mdi-close</v-icon>

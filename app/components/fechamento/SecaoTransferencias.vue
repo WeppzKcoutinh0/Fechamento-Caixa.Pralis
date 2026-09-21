@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { CAIXAS, TIPOS_CONTA_ENTRADA, type EntradaDraft, type FechamentoDraft, type SangriaDraft, type TransferenciaCaixaDraft } from '~/types/fechamento';
 import CartaoValor from '~/components/comum/CartaoValor.vue';
 import { formatCents } from '~/utils/financeiro';
 import { useTransferenciasTesouraria } from '~/composables/useTransferenciasTesouraria';
+import { useTransferenciasRecebidas } from '~/composables/useTransferenciasRecebidas';
 
 const props = defineProps<{ draft: FechamentoDraft }>();
 
@@ -163,6 +164,15 @@ const totalTransferenciasCents = computed(() =>
 function somaPdv(campo: 'dinheiroCents' | 'creditoCents' | 'debitoCents' | 'pixCents' | 'voucherCents' | 'crediarioCents'): number {
   return props.draft.pdvEntradas.reduce((soma, p) => soma + p[campo], 0);
 }
+// Transferência recebida de outro caixa (pedido do usuário, 21/09/2026): quando outro caixa
+// registra "Transferência entre caixas" com este caixa como destino, aparece aqui sozinho — sem
+// precisar avisar por fora. Busca via RPC segura (nunca lê o fechamento alheio inteiro, só o
+// agregado — ver useTransferenciasRecebidas.ts).
+const { recebidas: transferenciasRecebidas, buscarPorData: buscarTransferenciasRecebidas } = useTransferenciasRecebidas();
+onMounted(() => {
+  if (props.draft.data) void buscarTransferenciasRecebidas(props.draft.data);
+});
+
 const transferenciasAutomaticas = computed(() => [
   { rotulo: 'CREDITO', valorCents: somaPdv('creditoCents') },
   { rotulo: 'DEBITO', valorCents: somaPdv('debitoCents') },
@@ -170,6 +180,10 @@ const transferenciasAutomaticas = computed(() => [
   { rotulo: 'VOUCHER', valorCents: somaPdv('voucherCents') },
   { rotulo: 'DINHEIRO', valorCents: somaPdv('dinheiroCents') },
   { rotulo: 'CREDIARIO', valorCents: somaPdv('crediarioCents') },
+  ...transferenciasRecebidas.value.map((r) => ({
+    rotulo: r.caixaOrigem.toUpperCase(),
+    valorCents: r.valorCents,
+  })),
 ]);
 </script>
 
@@ -298,7 +312,7 @@ const transferenciasAutomaticas = computed(() => [
     <div class="lc-bloco-automatico">
       <p class="lc-grupo-titulo">Transferências Automáticas</p>
       <p class="text-caption text-medium-emphasis mb-0">
-        Somado automaticamente a partir das vendas já sincronizadas ("Buscar vendas") — sem edição manual aqui.
+        Somado automaticamente a partir das vendas já sincronizadas ("Buscar vendas") e das transferências que outros caixas já registraram tendo este como destino — sem edição manual aqui.
       </p>
       <div class="lc-painel" :style="TRANSFERENCIAS_VARS">
         <div class="lc-faixa">

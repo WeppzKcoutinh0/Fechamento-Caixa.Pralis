@@ -306,6 +306,22 @@ export function useFechamentos() {
     const totalEntradaCents = sumValores(draft.entradas);
     const totalSaidaCents = sumValores(draft.sangrias);
 
+    // Transferência entre caixas com confirmação automática (pedido do usuário, 21/09/2026) —
+    // mesma regra de useRelatorioCalculado.ts, mas buscada de novo aqui (não reaproveitada dali)
+    // porque o valor PERSISTIDO em `diferenca`/`saldo_fisico_esperado` precisa ser o mais fresco
+    // possível no exato momento do Salvar, não um snapshot que a tela já tinha carregado antes.
+    const transferenciaSaidaCents = draft.transferenciasCaixa
+      .filter((t) => t.caixaOrigem === draft.caixa)
+      .reduce((s, t) => s + t.valorCents, 0);
+    const { data: transferenciasRecebidasRows, error: erroTransferenciasRecebidas } = await supabase.rpc(
+      'transferencias_caixa_recebidas',
+      { p_data: draft.data },
+    );
+    if (erroTransferenciasRecebidas) throw erroTransferenciasRecebidas;
+    const transferenciaEntradaCents = (
+      (transferenciasRecebidasRows as { valor_total_cents: number }[] | null) ?? []
+    ).reduce((s, r) => s + Number(r.valor_total_cents), 0);
+
     const pdv = calculatePdvEntradas(
       draft.pdvEntradas.map((e) => ({
         nrClientes: e.nrClientes,
@@ -342,6 +358,8 @@ export function useFechamentos() {
       despesasCents: lancamentosPorTipo.despesaCents,
       mercadoriaCents: lancamentosPorTipo.mercadoriaCents,
       retiradasCents: lancamentosPorTipo.retiradaCents,
+      transferenciaSaidaCents,
+      transferenciaEntradaCents,
       totalPdvCents: pdv.totalCents,
       liqCreditoCents,
       liqDebitoCents,
@@ -363,6 +381,8 @@ export function useFechamentos() {
       expensesCents: lancamentosPorTipo.despesaCents,
       merchandiseCents: lancamentosPorTipo.mercadoriaCents,
       withdrawalsCents: lancamentosPorTipo.retiradaCents,
+      transferOutCents: transferenciaSaidaCents,
+      transferInCents: transferenciaEntradaCents,
       countedCents: draft.dinheiroContadoCents,
     });
 

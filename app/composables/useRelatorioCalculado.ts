@@ -1,5 +1,6 @@
-import { computed, type Ref } from 'vue';
+import { computed, type Ref, watch } from 'vue';
 import type { FechamentoDraft } from '~/types/fechamento';
+import { useTransferenciasRecebidas } from './useTransferenciasRecebidas';
 import {
   calculateCardNet,
   calculateCrediarioTotais,
@@ -21,6 +22,19 @@ export function useRelatorioCalculado(draft: Ref<FechamentoDraft>) {
   const totalSaidaCents = computed(() =>
     draft.value.sangrias.reduce((s, sa) => s + sa.valorCents, 0),
   );
+
+  // Transferência entre caixas com confirmação automática (pedido do usuário, 21/09/2026): saída
+  // = soma do que ESTE caixa registrou como origem (dinheiro que realmente saiu da gaveta dele);
+  // entrada = o que outros caixas registraram tendo este como destino, buscado via RPC segura
+  // (ver useTransferenciasRecebidas.ts — nunca confia num "meu caixa" vindo do cliente).
+  const transferenciaSaidaCents = computed(() =>
+    draft.value.transferenciasCaixa
+      .filter((t) => t.caixaOrigem === draft.value.caixa)
+      .reduce((s, t) => s + t.valorCents, 0),
+  );
+  const { recebidas: transferenciasRecebidas, totalCents: transferenciaEntradaCents, buscarPorData: buscarTransferenciasRecebidas } =
+    useTransferenciasRecebidas();
+  watch(() => draft.value.data, (data) => { if (data) void buscarTransferenciasRecebidas(data); }, { immediate: true });
 
   const pdv = computed(() =>
     calculatePdvEntradas(
@@ -72,6 +86,8 @@ export function useRelatorioCalculado(draft: Ref<FechamentoDraft>) {
       despesasCents: lancamentosPorTipo.value.despesaCents,
       mercadoriaCents: lancamentosPorTipo.value.mercadoriaCents,
       retiradasCents: lancamentosPorTipo.value.retiradaCents,
+      transferenciaSaidaCents: transferenciaSaidaCents.value,
+      transferenciaEntradaCents: transferenciaEntradaCents.value,
       totalPdvCents: pdv.value.totalCents,
       liqCreditoCents: liqCreditoCents.value,
       liqDebitoCents: liqDebitoCents.value,
@@ -94,6 +110,8 @@ export function useRelatorioCalculado(draft: Ref<FechamentoDraft>) {
       expensesCents: lancamentosPorTipo.value.despesaCents,
       merchandiseCents: lancamentosPorTipo.value.mercadoriaCents,
       withdrawalsCents: lancamentosPorTipo.value.retiradaCents,
+      transferOutCents: transferenciaSaidaCents.value,
+      transferInCents: transferenciaEntradaCents.value,
       countedCents: draft.value.dinheiroContadoCents,
     }),
   );
@@ -108,6 +126,9 @@ export function useRelatorioCalculado(draft: Ref<FechamentoDraft>) {
     liqVoucherCents,
     crediarioTotais,
     lancamentosPorTipo,
+    transferenciaSaidaCents,
+    transferenciaEntradaCents,
+    transferenciasRecebidas,
     relatorio,
     fisico,
   };

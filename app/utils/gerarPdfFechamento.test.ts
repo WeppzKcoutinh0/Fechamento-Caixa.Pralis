@@ -10,6 +10,8 @@ function dadosVazios(): DadosRelatorioParaPdf {
     despesasCents: 0,
     mercadoriaCents: 0,
     retiradasCents: 0,
+    transferenciaSaidaCents: 0,
+    transferenciaEntradaCents: 0,
     totalPdvCents: 0,
     liqCreditoCents: 0,
     liqDebitoCents: 0,
@@ -29,6 +31,8 @@ function dadosVazios(): DadosRelatorioParaPdf {
     expensesCents: 0,
     merchandiseCents: 0,
     withdrawalsCents: 0,
+    transferOutCents: 0,
+    transferInCents: 0,
     countedCents: 0,
   });
   return {

@@ -204,6 +204,8 @@ describe('calculateRelatorioFinal — fórmula principal do fechamento', () => {
       despesasCents: 0,
       mercadoriaCents: 0,
       retiradasCents: 0, // lançamentos tipo "retirada" — não deve somar a sangria de novo
+      transferenciaSaidaCents: 0,
+      transferenciaEntradaCents: 0,
       totalPdvCents: 10000,
       liqCreditoCents: 0,
       liqDebitoCents: 0,
@@ -229,6 +231,8 @@ describe('calculateRelatorioFinal — fórmula principal do fechamento', () => {
       despesasCents: 5000,
       mercadoriaCents: 3000,
       retiradasCents: 2000,
+      transferenciaSaidaCents: 0,
+      transferenciaEntradaCents: 0,
       totalPdvCents: 100000,
       liqCreditoCents: 1500,
       liqDebitoCents: -300,
@@ -261,6 +265,8 @@ describe('calculateRelatorioFinal — fórmula principal do fechamento', () => {
       despesasCents: 0,
       mercadoriaCents: 0,
       retiradasCents: 0,
+      transferenciaSaidaCents: 0,
+      transferenciaEntradaCents: 0,
       liqCreditoCents: 0,
       liqDebitoCents: 0,
       liqPixCents: 0,
@@ -276,6 +282,35 @@ describe('calculateRelatorioFinal — fórmula principal do fechamento', () => {
     expect(calculateRelatorioFinal({ ...base, totalPdvCents: 0 }).status).toBe('zero');
     expect(calculateRelatorioFinal({ ...base, totalPdvCents: -100 }).status).toBe('falta');
   });
+
+  it('transferência entre caixas: saída reduz a diferença de quem envia, entrada aumenta a de quem recebe', () => {
+    const base = {
+      totalEntradaCents: 0,
+      totalSaidaCents: 0,
+      despesasCents: 0,
+      mercadoriaCents: 0,
+      retiradasCents: 0,
+      totalPdvCents: 0,
+      liqCreditoCents: 0,
+      liqDebitoCents: 0,
+      liqPixCents: 0,
+      liqVoucherCents: 0,
+      totalCrediarioCents: 0,
+      pdvCreditoCents: 0,
+      pdvDebitoCents: 0,
+      pdvPixCents: 0,
+      pdvVoucherCents: 0,
+      pdvCrediarioCents: 0,
+    };
+
+    const origem = calculateRelatorioFinal({ ...base, transferenciaSaidaCents: 50000, transferenciaEntradaCents: 0 });
+    expect(origem.diferencaCents).toBe(-50000);
+    expect(origem.status).toBe('falta');
+
+    const destino = calculateRelatorioFinal({ ...base, transferenciaSaidaCents: 0, transferenciaEntradaCents: 50000 });
+    expect(destino.diferencaCents).toBe(50000);
+    expect(destino.status).toBe('sobra');
+  });
 });
 
 describe('calculatePhysicalClosing — card aditivo esperado × contado', () => {
@@ -288,6 +323,8 @@ describe('calculatePhysicalClosing — card aditivo esperado × contado', () => 
         expensesCents: 5000,
         merchandiseCents: 3000,
         withdrawalsCents: 2000,
+        transferOutCents: 0,
+        transferInCents: 0,
         countedCents: 80501,
       }),
     ).toEqual({ expectedCents: 80000, countedCents: 80501, differenceCents: 501 });
@@ -301,10 +338,42 @@ describe('calculatePhysicalClosing — card aditivo esperado × contado', () => 
       expensesCents: 0,
       merchandiseCents: 0,
       withdrawalsCents: 0,
+      transferOutCents: 0,
+      transferInCents: 0,
       countedCents: 7500,
     });
 
     expect(result.expectedCents).toBe(7500);
     expect(result.differenceCents).toBe(0);
+  });
+
+  it('transferência entre caixas reduz o esperado de quem envia e aumenta o de quem recebe', () => {
+    const origem = calculatePhysicalClosing({
+      pdvCashCents: 10000,
+      entriesCents: 0,
+      cashDropsCents: 0,
+      expensesCents: 0,
+      merchandiseCents: 0,
+      withdrawalsCents: 0,
+      transferOutCents: 5000,
+      transferInCents: 0,
+      countedCents: 5000,
+    });
+    expect(origem.expectedCents).toBe(5000);
+    expect(origem.differenceCents).toBe(0);
+
+    const destino = calculatePhysicalClosing({
+      pdvCashCents: 10000,
+      entriesCents: 0,
+      cashDropsCents: 0,
+      expensesCents: 0,
+      merchandiseCents: 0,
+      withdrawalsCents: 0,
+      transferOutCents: 0,
+      transferInCents: 5000,
+      countedCents: 15000,
+    });
+    expect(destino.expectedCents).toBe(15000);
+    expect(destino.differenceCents).toBe(0);
   });
 });

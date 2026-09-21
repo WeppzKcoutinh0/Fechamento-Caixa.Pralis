@@ -319,6 +319,12 @@ export const relatorioFinalInputSchema = z.object({
   despesasCents: centsSchema,
   mercadoriaCents: centsSchema,
   retiradasCents: centsSchema,
+  // Transferência entre caixas COM confirmação automática do lado de quem recebe (pedido do
+  // usuário, 21/09/2026) — sai da Diferença de quem é origem (como uma sangria), entra na de quem
+  // é destino (como uma entrada). `.default(0)`: nem todo fechamento tem transferência, e nem
+  // toda tela que já chama esta função precisa saber disso.
+  transferenciaSaidaCents: centsSchema.default(0),
+  transferenciaEntradaCents: centsSchema.default(0),
   totalPdvCents: centsSchema,
   liqCreditoCents: centsSchema,
   liqDebitoCents: centsSchema,
@@ -357,10 +363,15 @@ export function calculateRelatorioFinal(input: RelatorioFinalInput): RelatorioFi
   const data = relatorioFinalInputSchema.parse(input);
 
   const totalSaidasCents =
-    data.totalSaidaCents + data.despesasCents + data.mercadoriaCents + data.retiradasCents;
+    data.totalSaidaCents +
+    data.despesasCents +
+    data.mercadoriaCents +
+    data.retiradasCents +
+    data.transferenciaSaidaCents;
   const cartoesCents =
     data.liqCreditoCents + data.liqDebitoCents + data.liqPixCents + data.liqVoucherCents;
-  const valorTotalFinalCents = data.totalPdvCents + data.totalEntradaCents;
+  const valorTotalFinalCents =
+    data.totalPdvCents + data.totalEntradaCents + data.transferenciaEntradaCents;
   const diferencaCents =
     valorTotalFinalCents - totalSaidasCents - cartoesCents - data.totalCrediarioCents;
   const relPdvDiferencaCents = data.totalPdvCents - (totalSaidasCents - data.totalEntradaCents);
@@ -392,6 +403,8 @@ export const physicalClosingInputSchema = z.object({
   expensesCents: centsSchema,
   merchandiseCents: centsSchema,
   withdrawalsCents: centsSchema,
+  transferOutCents: centsSchema.default(0),
+  transferInCents: centsSchema.default(0),
   countedCents: centsSchema,
 });
 export type PhysicalClosingInput = z.infer<typeof physicalClosingInputSchema>;
@@ -405,11 +418,13 @@ export function calculatePhysicalClosing(input: PhysicalClosingInput): {
 
   const expectedCents =
     data.pdvCashCents +
-    data.entriesCents -
+    data.entriesCents +
+    data.transferInCents -
     data.cashDropsCents -
     data.expensesCents -
     data.merchandiseCents -
-    data.withdrawalsCents;
+    data.withdrawalsCents -
+    data.transferOutCents;
 
   return {
     expectedCents,

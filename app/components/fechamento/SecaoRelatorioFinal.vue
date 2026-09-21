@@ -20,6 +20,9 @@ const {
   liqVoucherCents,
   crediarioTotais,
   lancamentosPorTipo,
+  transferenciaSaidaCents,
+  transferenciaEntradaCents,
+  transferenciasRecebidas,
   relatorio,
   fisico,
 } = useRelatorioCalculado(toRef(props, 'draft'));
@@ -116,6 +119,10 @@ const transferenciasAutomaticas = computed(() => [
   { rotulo: 'VOUCHER', valorCents: somaPdv('voucherCents') },
   { rotulo: 'DINHEIRO', valorCents: somaPdv('dinheiroCents') },
   { rotulo: 'CREDIARIO', valorCents: somaPdv('crediarioCents') },
+  ...transferenciasRecebidas.value.map((r) => ({
+    rotulo: r.caixaOrigem.toUpperCase(),
+    valorCents: r.valorCents,
+  })),
 ]);
 
 // Mesmo filtro de SecaoLancamentos.vue: os 4 ajustes com bloco automático dedicado somem da
@@ -249,7 +256,7 @@ const CAT_VARS = {
       <v-expansion-panel class="cat-painel" :style="CAT_VARS.transferencias">
         <v-expansion-panel-title class="cat-titulo">
           <span class="flex-grow-1">Transferências</span>
-          <strong class="cat-valor">R$ {{ formatCents(totalEntradaCents - totalSaidaCents) }}</strong>
+          <strong class="cat-valor">R$ {{ formatCents(totalEntradaCents - totalSaidaCents + transferenciaEntradaCents - transferenciaSaidaCents) }}</strong>
         </v-expansion-panel-title>
         <v-expansion-panel-text>
           <p class="cat-subgrupo">Manuais</p>
@@ -265,6 +272,10 @@ const CAT_VARS = {
             <div class="d-flex justify-space-between text-body-2">
               <span class="text-medium-emphasis">Total Transferido entre caixas</span>
               <strong>R$ {{ formatCents(totalTransferidoEntreCaixasCents) }}</strong>
+            </div>
+            <div class="d-flex justify-space-between text-body-2">
+              <span class="text-medium-emphasis">↳ Saída confirmada deste caixa (conta na Diferença)</span>
+              <strong>R$ {{ formatCents(transferenciaSaidaCents) }}</strong>
             </div>
           </div>
           <p class="cat-subgrupo">Automáticas</p>

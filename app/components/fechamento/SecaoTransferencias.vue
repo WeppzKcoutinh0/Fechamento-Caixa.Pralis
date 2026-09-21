@@ -398,6 +398,20 @@ const totalTransferenciasCents = computed(() =>
             <p v-if="tipoModal === 'entrada' && lacreEncontradoMsg" class="lc-erro-campo" style="color: var(--cx-positive)">
               {{ lacreEncontradoMsg }}
             </p>
+
+            <!-- Sangria sempre sai DESTE caixa e vai pro Cofre — não é uma escolha, é informativo
+                 (pedido do usuário, 21/09/2026). -->
+            <div v-if="tipoModal === 'sangria'" class="lc-dois">
+              <label class="lc-campo">
+                <span class="lc-campo-lbl">Conta de origem fixa</span>
+                <input class="lc-input" :value="draft.caixa || '—'" readonly />
+              </label>
+              <label class="lc-campo">
+                <span class="lc-campo-lbl">Conta de destino fixa</span>
+                <input class="lc-input" value="Cofre" readonly />
+              </label>
+            </div>
+
             <label class="lc-campo">
               <span class="lc-campo-lbl">Descrição</span>
               <input

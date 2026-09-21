@@ -29,6 +29,11 @@ export default defineNuxtConfig({
     googleServiceAccountJson: '',
     googleSpreadsheetId: '',
     googleSpreadsheetIdSecundario: '',
+    // Leitura opcional de relatórios de maquininha por visão computacional. Server-only:
+    // nunca exponha a chave no navegador.
+    aiVisionApiKey: '',
+    aiVisionBaseUrl: 'https://api.openai.com/v1',
+    aiVisionModel: '',
     empresaPralis: 'TNP CENTRAL',
     planilhaColunaInicial: 'F',
     // Religado (21/09/2026) — o Relatório Final do wizard passa a usar `vendas_produto_dia`

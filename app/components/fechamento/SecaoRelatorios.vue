@@ -4,6 +4,7 @@ import type { CrediarioItemDraft, FechamentoDraft, PdvEntradaDraft, TipoCrediari
 import CampoFoto from '~/components/comum/CampoFoto.vue';
 import CartaoValor from '~/components/comum/CartaoValor.vue';
 import { useVendasFechamento } from '~/composables/useVendasFechamento';
+import { useLeituraMaquininha } from '~/composables/useLeituraMaquininha';
 import { calculatePdvEntradas, formatCents, toCents } from '~/utils/financeiro';
 import {
   aplicarAjustesComoLancamentos,
@@ -162,6 +163,34 @@ const liqPixCents = computed(() => props.draft.pixTardeCents - props.draft.pixMa
 const liqVoucherCents = computed(
   () => props.draft.voucherTardeCents - props.draft.voucherManhaCents,
 );
+
+const { ler: lerRelatorioMaquininha } = useLeituraMaquininha();
+const lendoMaquininha = ref<'manha' | 'tarde' | null>(null);
+const erroLeituraMaquininha = ref('');
+const avisoLeituraMaquininha = ref('');
+
+async function lerFotoMaquininha(turno: 'manha' | 'tarde', path: string | null): Promise<void> {
+  if (!path) return;
+  lendoMaquininha.value = turno;
+  erroLeituraMaquininha.value = '';
+  avisoLeituraMaquininha.value = '';
+  try {
+    const resultado = await lerRelatorioMaquininha(path, turno);
+    const campos = resultado.campos as Record<string, unknown>;
+    for (const [chave, valor] of Object.entries(campos)) {
+      if (valor !== null && valor !== undefined && chave in props.draft) {
+        (props.draft as unknown as Record<string, unknown>)[chave] = valor;
+      }
+    }
+    const percentual = resultado.confianca === null ? '' : ` Confiança estimada: ${Math.round(resultado.confianca * 100)}%.`;
+    avisoLeituraMaquininha.value = `Campos preenchidos pela leitura. Confira os valores antes de salvar.${percentual}`;
+    if (resultado.avisos.length) avisoLeituraMaquininha.value += ` ${resultado.avisos.join(' ')}`;
+  } catch (erro) {
+    erroLeituraMaquininha.value = erro instanceof Error ? erro.message : 'Não foi possível ler a foto.';
+  } finally {
+    lendoMaquininha.value = null;
+  }
+}
 
 // toggleCrediario + adicionarCredItem/removerCredItem atuais
 const tipoCrediarioAtivo = ref<TipoCrediario>('cliente');
@@ -563,6 +592,19 @@ const crediarioAberto = ref(false);
             campo="img-manha"
             label="Imagem Manhã"
           />
+          <v-btn
+            v-if="draft.imgManhaPath"
+            class="mt-2"
+            size="small"
+            variant="tonal"
+            color="primary"
+            prepend-icon="mdi-auto-fix"
+            :loading="lendoMaquininha === 'manha'"
+            :disabled="lendoMaquininha !== null"
+            @click="lerFotoMaquininha('manha', draft.imgManhaPath)"
+          >
+            Ler com IA
+          </v-btn>
         </div>
 
         <div
@@ -641,7 +683,39 @@ const crediarioAberto = ref(false);
             campo="img-tarde"
             label="Imagem Tarde"
           />
+          <v-btn
+            v-if="draft.imgTardePath"
+            class="mt-2"
+            size="small"
+            variant="tonal"
+            color="primary"
+            prepend-icon="mdi-auto-fix"
+            :loading="lendoMaquininha === 'tarde'"
+            :disabled="lendoMaquininha !== null"
+            @click="lerFotoMaquininha('tarde', draft.imgTardePath)"
+          >
+            Ler com IA
+          </v-btn>
         </div>
+
+        <v-alert
+          v-if="erroLeituraMaquininha"
+          class="mt-3"
+          type="error"
+          variant="tonal"
+          density="comfortable"
+        >
+          {{ erroLeituraMaquininha }}
+        </v-alert>
+        <v-alert
+          v-if="avisoLeituraMaquininha"
+          class="mt-3"
+          type="info"
+          variant="tonal"
+          density="comfortable"
+        >
+          {{ avisoLeituraMaquininha }}
+        </v-alert>
 
         <div
           class="lc-campo-lbl lc-mt"

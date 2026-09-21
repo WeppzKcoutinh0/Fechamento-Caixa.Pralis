@@ -7,37 +7,21 @@ import { useTransferenciasTesouraria } from '~/composables/useTransferenciasTeso
 
 const props = defineProps<{ draft: FechamentoDraft }>();
 
-// Mesmo padrão visual do Sistema Inteligente Pralís pros painéis "Entradas"/"Transferências" do
-// menu: Entradas usa a cor "entradas" (amarelo) e Sangria usa "transferências" (laranja) — no
-// próprio Pralís a saída de transferência é exibida como "TRANSF. SAÍDA" dentro do laranja, então
-// a divisão de cor bate exatamente com o que já existia aqui (entrada = dinheiro entrando,
-// sangria = saída pro cofre). Campos preservados 1:1 (Lacre, Valor, Descrição).
-//
-// "Transferência entre caixas" (painel novo, cor "retiradas"/azul): versão simplificada, por
-// decisão do usuário, da Transferência do Pralís — lá é um sistema de contas com múltiplos
-// destinos candidatos e confirmação por outra pessoa (modal `OperacaoTransferenciaModal.vue`
-// daquele projeto); aqui é só um registro de que dinheiro mudou de um caixa físico para outro,
-// preenchido e salvo junto com o resto do fechamento, sem cadastro de contas nem conferência.
+// Os três painéis desta seção são "Transferências/Entrada", "Transferências/Saída/Sangria" e
+// "Transferências/Entrada/Saída/Entre caixas" (renomeados em 18/09/2026) — pedido do usuário
+// (21/09/2026): as três usam a MESMA cor laranja ("transferências", `--cat-transferencias-*`),
+// já que as três agora são a mesma família visualmente, não telas separadas por cor própria.
 type TipoModal = 'entrada' | 'sangria' | 'transferencia';
 
-const ENTRADA_VARS = {
-  '--cat': 'var(--cat-venda-base)',
-  '--cat-soft': 'var(--cat-venda-soft)',
-  '--cat-faixa': 'var(--cat-venda-faixa)',
-  '--cat-tinta': 'var(--cat-venda-tinta)',
-};
-const SANGRIA_VARS = {
+const TRANSFERENCIAS_VARS = {
   '--cat': 'var(--cat-transferencias-base)',
   '--cat-soft': 'var(--cat-transferencias-soft)',
   '--cat-faixa': 'var(--cat-transferencias-faixa)',
   '--cat-tinta': 'var(--cat-transferencias-tinta)',
 };
-const TRANSFERENCIA_VARS = {
-  '--cat': 'var(--cat-retiradas-base)',
-  '--cat-soft': 'var(--cat-retiradas-soft)',
-  '--cat-faixa': 'var(--cat-retiradas-faixa)',
-  '--cat-tinta': 'var(--cat-retiradas-tinta)',
-};
+const ENTRADA_VARS = TRANSFERENCIAS_VARS;
+const SANGRIA_VARS = TRANSFERENCIAS_VARS;
+const TRANSFERENCIA_VARS = TRANSFERENCIAS_VARS;
 
 function novaEntrada(): EntradaDraft {
   return { lacre: '', valorCents: 0, descricao: '', tipoConta: '' };

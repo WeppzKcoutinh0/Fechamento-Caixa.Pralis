@@ -16,6 +16,7 @@ import {
 import CampoFoto from '~/components/comum/CampoFoto.vue';
 import CartaoValor from '~/components/comum/CartaoValor.vue';
 import GravadorAudio from '~/components/comum/GravadorAudio.vue';
+import { useLeituraNotaFiscal } from '~/composables/useLeituraNotaFiscal';
 import {
   calculateDiscrimination,
   calculateValorTotalLancamento,
@@ -260,6 +261,67 @@ function adicionarItemDiscriminacao(): void {
 function removerItemDiscriminacao(item: DiscriminacaoDraft): void {
   const indice = props.draft.discriminacoes.indexOf(item);
   if (indice !== -1) props.draft.discriminacoes.splice(indice, 1);
+}
+
+// Leitura por IA dos itens da nota/boleto (pedido do usuário, 22/09/2026): só preenche
+// qtd/produto/valor unitário — nunca o "grupo" (categoria), decisão explícita do usuário de
+// preferir revisar manualmente a arriscar uma classificação errada. Não sobrescreve itens já
+// discriminados: sempre ADICIONA à lista, revisável antes de salvar como o resto da leitura por IA.
+const { ler: lerNotaFiscal, lerArquivo: lerArquivoNotaFiscal } = useLeituraNotaFiscal();
+const lendoNotaFiscal = ref(false);
+const erroLeituraNotaFiscal = ref('');
+const avisoLeituraNotaFiscal = ref('');
+
+function temFotoNotaParaLer(): boolean {
+  if (!lancamentoAtual.value) return false;
+  const chave = chaveArquivoLancamento(lancamentoAtual.value.id, 'foto-nota');
+  return Boolean(lancamentoAtual.value.fotoNotaPath) || Boolean(props.draft.arquivosPendentes?.[chave]);
+}
+
+async function lerItensNota(): Promise<void> {
+  const lancamento = lancamentoAtual.value;
+  if (!lancamento) return;
+  const chave = chaveArquivoLancamento(lancamento.id, 'foto-nota');
+  const arquivoPendente = props.draft.arquivosPendentes?.[chave];
+  if (!lancamento.fotoNotaPath && !arquivoPendente) return;
+
+  lendoNotaFiscal.value = true;
+  erroLeituraNotaFiscal.value = '';
+  avisoLeituraNotaFiscal.value = '';
+  try {
+    const resultado = arquivoPendente
+      ? await lerArquivoNotaFiscal(arquivoPendente)
+      : await lerNotaFiscal(lancamento.fotoNotaPath as string);
+
+    if (resultado.fornecedor && !lancamento.fornecedor.trim()) {
+      lancamento.fornecedor = resultado.fornecedor;
+    }
+    for (const item of resultado.itens) {
+      props.draft.discriminacoes.push({
+        lancamentoId: lancamento.id,
+        tipo: lancamento.tipo,
+        qtd: item.qtd,
+        produto: item.produto,
+        grupo: '',
+        valUnitCents: item.valUnitCents,
+        descontoValCents: 0,
+        descontoPct: 0,
+      });
+    }
+    discriminando.value = true;
+
+    const percentual = resultado.confianca === null ? '' : ` Confiança estimada: ${Math.round(resultado.confianca * 100)}%.`;
+    avisoLeituraNotaFiscal.value = resultado.itens.length
+      ? `${resultado.itens.length} ${resultado.itens.length === 1 ? 'item adicionado' : 'itens adicionados'} à discriminação. Confira o grupo e os valores antes de salvar.${percentual}`
+      : `Nenhum item foi lido com segurança nesta imagem.${percentual}`;
+    if (resultado.avisos.length) avisoLeituraNotaFiscal.value += ` ${resultado.avisos.join(' ')}`;
+  } catch (erro) {
+    const mensagemServidor = (erro as { data?: { statusMessage?: string } })?.data?.statusMessage;
+    erroLeituraNotaFiscal.value =
+      mensagemServidor || (erro instanceof Error ? erro.message : 'Não foi possível ler a nota.');
+  } finally {
+    lendoNotaFiscal.value = false;
+  }
 }
 const itensDiscriminacao = computed(() =>
   lancamentoAtual.value
@@ -729,6 +791,37 @@ const totalGeralDiscriminacao = computed(() =>
               @arquivo-selecionado="registrarFotoLancamento(lancamentoAtual.id, 'foto-nota', $event)"
               @arquivo-removido="removerFotoLancamento(lancamentoAtual.id, 'foto-nota')"
             />
+            <v-btn
+              v-if="temFotoNotaParaLer()"
+              class="mt-2"
+              size="small"
+              variant="tonal"
+              color="primary"
+              prepend-icon="mdi-auto-fix"
+              :loading="lendoNotaFiscal"
+              :disabled="lendoNotaFiscal"
+              @click="lerItensNota"
+            >
+              Ler itens com IA
+            </v-btn>
+            <v-alert
+              v-if="erroLeituraNotaFiscal"
+              class="mt-3"
+              type="error"
+              variant="tonal"
+              density="comfortable"
+            >
+              {{ erroLeituraNotaFiscal }}
+            </v-alert>
+            <v-alert
+              v-if="avisoLeituraNotaFiscal"
+              class="mt-3"
+              type="info"
+              variant="tonal"
+              density="comfortable"
+            >
+              {{ avisoLeituraNotaFiscal }}
+            </v-alert>
           </div>
         </div>
 

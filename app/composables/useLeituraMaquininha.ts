@@ -1,5 +1,6 @@
 import { useSupabase } from './useSupabase';
 import type { FechamentoDraft } from '~/types/fechamento';
+import { blobParaBase64 } from '~/utils/blobParaBase64';
 
 type Turno = 'manha' | 'tarde';
 
@@ -8,19 +9,6 @@ interface ResultadoLeitura {
   campos: Partial<FechamentoDraft>;
   confianca: number | null;
   avisos: string[];
-}
-
-function blobParaBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const leitor = new FileReader();
-    leitor.onload = () => {
-      const resultado = String(leitor.result ?? '');
-      const separador = resultado.indexOf(',');
-      resolve(separador >= 0 ? resultado.slice(separador + 1) : resultado);
-    };
-    leitor.onerror = () => reject(leitor.error ?? new Error('Não foi possível ler a imagem.'));
-    leitor.readAsDataURL(blob);
-  });
 }
 
 /** Leitura assistida: baixa o anexo respeitando a RLS do usuário e pede apenas um patch revisável. */

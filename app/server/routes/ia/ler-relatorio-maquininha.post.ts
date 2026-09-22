@@ -103,38 +103,59 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  const resposta = await $fetch<unknown>(`${baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
-    body: {
-      model,
-      temperature: 0,
-      response_format: { type: 'json_object' },
-      messages: [
-        {
-          role: 'system',
-          content:
-            'Você é um extrator de relatórios de maquininha no Brasil. Leia apenas o que estiver legível na imagem. Nunca invente, estime ou faça conta para preencher um campo ausente. Valores devem ser números em reais, sem símbolo. Retorne JSON puro com as chaves: numeroMaquininha, inicial, final, credito, debito, pix, voucher, confianca (0 a 1) e avisos (array de strings). Use null quando não houver certeza. Ignore textos de produtos e mantenha os rótulos de pagamento compatíveis com crédito, débito, pix e voucher.',
-        },
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: `Esta imagem é o relatório do turno ${corpo.turno}. Extraia somente os valores das formas de pagamento e os campos de início/fim visíveis. Não confunda total bruto com total líquido; se houver dúvida, deixe null e explique em avisos.`,
-            },
-            {
-              type: 'image_url',
-              image_url: { url: `data:${corpo.mimeType};base64,${corpo.imageBase64}` },
-            },
-          ],
-        },
-      ],
-    },
-  }).catch((erro: unknown) => {
-    const mensagem = erro instanceof Error ? erro.message : 'Falha ao consultar o provedor de IA.';
+  const corpoRequisicaoIa = {
+    model,
+    temperature: 0,
+    response_format: { type: 'json_object' },
+    messages: [
+      {
+        role: 'system',
+        content:
+          'Você é um extrator de relatórios de maquininha no Brasil. Leia apenas o que estiver legível na imagem. Nunca invente, estime ou faça conta para preencher um campo ausente. Valores devem ser números em reais, sem símbolo. Retorne JSON puro com as chaves: numeroMaquininha, inicial, final, credito, debito, pix, voucher, confianca (0 a 1) e avisos (array de strings). Use null quando não houver certeza. Ignore textos de produtos e mantenha os rótulos de pagamento compatíveis com crédito, débito, pix e voucher.',
+      },
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'text',
+            text: `Esta imagem é o relatório do turno ${corpo.turno}. Extraia somente os valores das formas de pagamento e os campos de início/fim visíveis. Não confunda total bruto com total líquido; se houver dúvida, deixe null e explique em avisos.`,
+          },
+          {
+            type: 'image_url',
+            image_url: { url: `data:${corpo.mimeType};base64,${corpo.imageBase64}` },
+          },
+        ],
+      },
+    ],
+  };
+
+  // O tier gratuito de modelos Flash/Flash-Lite ocasionalmente responde 503 (sobrecarga
+  // momentânea do provedor) — poucas tentativas com backoff curto resolvem sem custo extra
+  // perceptível, evitando expor esse erro transiente direto pro usuário.
+  const TENTATIVAS = 3;
+  let resposta: unknown;
+  let ultimoErro: unknown;
+  for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa += 1) {
+    try {
+      resposta = await $fetch<unknown>(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+        body: corpoRequisicaoIa,
+      });
+      ultimoErro = null;
+      break;
+    } catch (erro: unknown) {
+      ultimoErro = erro;
+      const status = (erro as { response?: { status?: number } })?.response?.status;
+      const podeTentarDeNovo = status === 503 || status === 429;
+      if (!podeTentarDeNovo || tentativa === TENTATIVAS) break;
+      await new Promise((resolve) => setTimeout(resolve, 600 * tentativa));
+    }
+  }
+  if (ultimoErro) {
+    const mensagem = ultimoErro instanceof Error ? ultimoErro.message : 'Falha ao consultar o provedor de IA.';
     throw createError({ statusCode: 502, statusMessage: mensagem });
-  });
+  }
 
   const modelo = lerModelo(extrairConteudo(resposta));
   const patch = {

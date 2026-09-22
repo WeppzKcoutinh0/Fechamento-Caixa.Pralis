@@ -38,6 +38,25 @@ function centavos(valor: unknown): number | null {
   return numero === null ? null : Math.round(numero * 100);
 }
 
+// Guarda de sanidade: já vimos a IA "alucinar" um valor absurdo (ex.: confundir número de série
+// ou código do comprovante com um valor monetário) em vez de devolver null como instruído. Um
+// valor de turno de padaria acima disso é implausível — melhor descartar e avisar do que deixar
+// passar um número claramente errado pro formulário.
+const TETO_PLAUSIVEL_CENTAVOS = 200_000_00; // R$ 200.000,00
+function centavosPlausiveis(valor: unknown, nomeCampo: string, avisosExtras: string[]): number | null {
+  const numero = centavos(valor);
+  if (numero !== null && Math.abs(numero) > TETO_PLAUSIVEL_CENTAVOS) {
+    avisosExtras.push(
+      `Valor de "${nomeCampo}" descartado por parecer implausível (${formatarReais(numero)}) — confira manualmente.`,
+    );
+    return null;
+  }
+  return numero;
+}
+function formatarReais(centavos: number): string {
+  return `R$ ${(centavos / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 function textoOuNulo(valor: unknown): string | null {
   if (typeof valor !== 'string') return null;
   const texto = valor.trim();
@@ -128,14 +147,14 @@ export default defineEventHandler(async (event) => {
       {
         role: 'system',
         content:
-          'Você é um extrator de relatórios de maquininha no Brasil. Leia apenas o que estiver legível na imagem. Nunca invente, estime ou faça conta para preencher um campo ausente. Valores devem ser números em reais, sem símbolo. Retorne JSON puro com as chaves: numeroMaquininha, inicial, final, credito, debito, pix, voucher, confianca (0 a 1) e avisos (array de strings). Use null quando não houver certeza. Ignore textos de produtos e mantenha os rótulos de pagamento compatíveis com crédito, débito, pix e voucher.',
+          'Você é um extrator de relatórios de maquininha no Brasil. Leia apenas o que estiver legível na imagem. Nunca invente, estime ou faça conta para preencher um campo ausente — isso é uma regra crítica, não uma sugestão. Valores devem ser números em reais, sem símbolo. Retorne JSON puro com as chaves: numeroMaquininha, inicial, final, credito, debito, pix, voucher, confianca (0 a 1) e avisos (array de strings). Use null quando não houver certeza.\n\nATENÇÃO especial aos campos "inicial" e "final": eles só existem em relatórios que têm uma leitura de contador/totalizador explicitamente rotulada como "INICIAL" ou "FINAL" (ou equivalente). Muitos comprovantes (ex.: "Relatório Resumido" do PagBank, com totais por bandeira) NÃO têm esse campo — nesse caso, "inicial" e "final" DEVEM ser null. NUNCA preencha "inicial" ou "final" com número de série, código de operação/transação, data, hora ou qualquer total de bandeira/pagamento — esses não são a mesma coisa e usar um deles é um erro grave. Na dúvida, é sempre preferível null do que um palpite.\n\nIgnore textos de produtos e mantenha os rótulos de pagamento compatíveis com crédito, débito, pix e voucher.',
       },
       {
         role: 'user',
         content: [
           {
             type: 'text',
-            text: `Esta imagem é o relatório do turno ${corpo.turno}. Extraia somente os valores das formas de pagamento e os campos de início/fim visíveis. Não confunda total bruto com total líquido; se houver dúvida, deixe null e explique em avisos.`,
+            text: `Esta imagem é o relatório do turno ${corpo.turno}. Extraia somente os valores das formas de pagamento e os campos de início/fim visíveis (se e somente se estiverem explicitamente rotulados como tal na imagem). Não confunda total bruto com total líquido, nem número de série/código/data com valor monetário; se houver dúvida, deixe null e explique em avisos.`,
           },
           {
             type: 'image_url',
@@ -178,22 +197,23 @@ export default defineEventHandler(async (event) => {
   }
 
   const modelo = lerModelo(extrairConteudo(resposta));
+  const avisosExtras: string[] = [];
   const patch = {
     nrMaquininha: textoOuNulo(modelo.numeroMaquininha),
     ...(corpo.turno === 'manha'
       ? {
-          manhaInicialCents: centavos(modelo.inicial),
-          creditoManhaCents: centavos(modelo.credito),
-          debitoManhaCents: centavos(modelo.debito),
-          pixManhaCents: centavos(modelo.pix),
-          voucherManhaCents: centavos(modelo.voucher),
+          manhaInicialCents: centavosPlausiveis(modelo.inicial, 'Manhã Inicial', avisosExtras),
+          creditoManhaCents: centavosPlausiveis(modelo.credito, 'Crédito Manhã', avisosExtras),
+          debitoManhaCents: centavosPlausiveis(modelo.debito, 'Débito Manhã', avisosExtras),
+          pixManhaCents: centavosPlausiveis(modelo.pix, 'Pix Manhã', avisosExtras),
+          voucherManhaCents: centavosPlausiveis(modelo.voucher, 'Voucher Manhã', avisosExtras),
         }
       : {
-          tardeFinalCents: centavos(modelo.final),
-          creditoTardeCents: centavos(modelo.credito),
-          debitoTardeCents: centavos(modelo.debito),
-          pixTardeCents: centavos(modelo.pix),
-          voucherTardeCents: centavos(modelo.voucher),
+          tardeFinalCents: centavosPlausiveis(modelo.final, 'Tarde Final', avisosExtras),
+          creditoTardeCents: centavosPlausiveis(modelo.credito, 'Crédito Tarde', avisosExtras),
+          debitoTardeCents: centavosPlausiveis(modelo.debito, 'Débito Tarde', avisosExtras),
+          pixTardeCents: centavosPlausiveis(modelo.pix, 'Pix Tarde', avisosExtras),
+          voucherTardeCents: centavosPlausiveis(modelo.voucher, 'Voucher Tarde', avisosExtras),
         }),
   };
 
@@ -202,6 +222,6 @@ export default defineEventHandler(async (event) => {
     turno: corpo.turno,
     campos: patch,
     confianca: confianca === null ? null : Math.min(1, Math.max(0, confianca)),
-    avisos: listaAvisos(modelo.avisos),
+    avisos: [...avisosExtras, ...listaAvisos(modelo.avisos)],
   };
 });

@@ -272,26 +272,41 @@ const lendoNotaFiscal = ref(false);
 const erroLeituraNotaFiscal = ref('');
 const avisoLeituraNotaFiscal = ref('');
 
+// O usuário pode anexar a foto da nota tanto no campo "Foto" quanto em "Foto Nota / Boleto" —
+// a leitura por IA funciona com qualquer um dos dois, preferindo "Foto Nota / Boleto" quando
+// ambos existirem (é o campo com esse propósito mais específico).
+function fonteFotoParaDiscriminar(
+  lancamento: LancamentoDraft,
+): { tipo: 'pendente'; arquivo: File } | { tipo: 'path'; path: string } | null {
+  const chaveNota = chaveArquivoLancamento(lancamento.id, 'foto-nota');
+  const chaveFoto = chaveArquivoLancamento(lancamento.id, 'foto');
+  const pendenteNota = props.draft.arquivosPendentes?.[chaveNota];
+  const pendenteFoto = props.draft.arquivosPendentes?.[chaveFoto];
+
+  if (pendenteNota) return { tipo: 'pendente', arquivo: pendenteNota };
+  if (lancamento.fotoNotaPath) return { tipo: 'path', path: lancamento.fotoNotaPath };
+  if (pendenteFoto) return { tipo: 'pendente', arquivo: pendenteFoto };
+  if (lancamento.fotoPath) return { tipo: 'path', path: lancamento.fotoPath };
+  return null;
+}
+
 function temFotoNotaParaLer(): boolean {
   if (!lancamentoAtual.value) return false;
-  const chave = chaveArquivoLancamento(lancamentoAtual.value.id, 'foto-nota');
-  return Boolean(lancamentoAtual.value.fotoNotaPath) || Boolean(props.draft.arquivosPendentes?.[chave]);
+  return fonteFotoParaDiscriminar(lancamentoAtual.value) !== null;
 }
 
 async function lerItensNota(): Promise<void> {
   const lancamento = lancamentoAtual.value;
   if (!lancamento) return;
-  const chave = chaveArquivoLancamento(lancamento.id, 'foto-nota');
-  const arquivoPendente = props.draft.arquivosPendentes?.[chave];
-  if (!lancamento.fotoNotaPath && !arquivoPendente) return;
+  const fonte = fonteFotoParaDiscriminar(lancamento);
+  if (!fonte) return;
 
   lendoNotaFiscal.value = true;
   erroLeituraNotaFiscal.value = '';
   avisoLeituraNotaFiscal.value = '';
   try {
-    const resultado = arquivoPendente
-      ? await lerArquivoNotaFiscal(arquivoPendente)
-      : await lerNotaFiscal(lancamento.fotoNotaPath as string);
+    const resultado =
+      fonte.tipo === 'pendente' ? await lerArquivoNotaFiscal(fonte.arquivo) : await lerNotaFiscal(fonte.path);
 
     if (resultado.fornecedor && !lancamento.fornecedor.trim()) {
       lancamento.fornecedor = resultado.fornecedor;
@@ -698,9 +713,41 @@ const totalGeralDiscriminacao = computed(() =>
                 </tfoot>
               </table>
             </div>
-            <button type="button" class="lc-add mt-2" @click="adicionarItemDiscriminacao">
-              <v-icon size="15">mdi-plus</v-icon> Adicionar item
-            </button>
+            <div class="d-flex flex-wrap ga-2 mt-2">
+              <button type="button" class="lc-add" @click="adicionarItemDiscriminacao">
+                <v-icon size="15">mdi-plus</v-icon> Adicionar item
+              </button>
+              <v-btn
+                v-if="temFotoNotaParaLer()"
+                size="small"
+                variant="tonal"
+                color="primary"
+                prepend-icon="mdi-auto-fix"
+                :loading="lendoNotaFiscal"
+                :disabled="lendoNotaFiscal"
+                @click="lerItensNota"
+              >
+                Ler itens com IA
+              </v-btn>
+            </div>
+            <v-alert
+              v-if="erroLeituraNotaFiscal"
+              class="mt-3"
+              type="error"
+              variant="tonal"
+              density="comfortable"
+            >
+              {{ erroLeituraNotaFiscal }}
+            </v-alert>
+            <v-alert
+              v-if="avisoLeituraNotaFiscal"
+              class="mt-3"
+              type="info"
+              variant="tonal"
+              density="comfortable"
+            >
+              {{ avisoLeituraNotaFiscal }}
+            </v-alert>
           </div>
 
           <!-- Observação (texto ou áudio) -->
@@ -791,37 +838,6 @@ const totalGeralDiscriminacao = computed(() =>
               @arquivo-selecionado="registrarFotoLancamento(lancamentoAtual.id, 'foto-nota', $event)"
               @arquivo-removido="removerFotoLancamento(lancamentoAtual.id, 'foto-nota')"
             />
-            <v-btn
-              v-if="temFotoNotaParaLer()"
-              class="mt-2"
-              size="small"
-              variant="tonal"
-              color="primary"
-              prepend-icon="mdi-auto-fix"
-              :loading="lendoNotaFiscal"
-              :disabled="lendoNotaFiscal"
-              @click="lerItensNota"
-            >
-              Ler itens com IA
-            </v-btn>
-            <v-alert
-              v-if="erroLeituraNotaFiscal"
-              class="mt-3"
-              type="error"
-              variant="tonal"
-              density="comfortable"
-            >
-              {{ erroLeituraNotaFiscal }}
-            </v-alert>
-            <v-alert
-              v-if="avisoLeituraNotaFiscal"
-              class="mt-3"
-              type="info"
-              variant="tonal"
-              density="comfortable"
-            >
-              {{ avisoLeituraNotaFiscal }}
-            </v-alert>
           </div>
         </div>
 

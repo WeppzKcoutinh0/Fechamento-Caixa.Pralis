@@ -2,7 +2,7 @@ export default defineNuxtConfig({
   compatibilityDate: '2026-01-01',
   ssr: false,
   devtools: { enabled: true },
-  modules: ['vuetify-nuxt-module', '@nuxt/eslint'],
+  modules: ['vuetify-nuxt-module', '@nuxt/eslint', '@vite-pwa/nuxt'],
   css: ['@mdi/font/css/materialdesignicons.css', '~/assets/main.css'],
   typescript: {
     strict: true,
@@ -29,6 +29,11 @@ export default defineNuxtConfig({
     googleServiceAccountJson: '',
     googleSpreadsheetId: '',
     googleSpreadsheetIdSecundario: '',
+    // Leitura opcional de relatórios de maquininha por visão computacional. Server-only:
+    // nunca exponha a chave no navegador.
+    aiVisionApiKey: '',
+    aiVisionBaseUrl: 'https://api.openai.com/v1',
+    aiVisionModel: '',
     empresaPralis: 'TNP CENTRAL',
     planilhaColunaInicial: 'F',
     // Religado (21/09/2026) — o Relatório Final do wizard passa a usar `vendas_produto_dia`
@@ -39,6 +44,45 @@ export default defineNuxtConfig({
     public: {
       supabaseUrl: '',
       supabaseAnonKey: '',
+    },
+  },
+  pwa: {
+    registerType: 'autoUpdate',
+    registerWebManifestInRouteRules: true,
+    manifest: {
+      name: 'Cicluz | Fechamento de Caixa',
+      short_name: 'Caixa Cicluz',
+      description: 'Fechamento, conferência e organização do caixa Cicluz.',
+      lang: 'pt-BR',
+      theme_color: '#6515dd',
+      background_color: '#f4f6fa',
+      display: 'standalone',
+      start_url: '/',
+      scope: '/',
+      icons: [
+        {
+          src: '/marca/pwa-192.png',
+          sizes: '192x192',
+          type: 'image/png',
+          purpose: 'any',
+        },
+        {
+          src: '/marca/pwa-512.png',
+          sizes: '512x512',
+          type: 'image/png',
+          purpose: 'any maskable',
+        },
+      ],
+    },
+    // O app instala e mantém a interface estática disponível, mas operações financeiras
+    // continuam online. Não armazenamos respostas do Supabase para evitar fechamento com
+    // dados desatualizados ou gravação financeira offline.
+    workbox: {
+      globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff2}'],
+    },
+    client: {
+      installPrompt: true,
+      periodicSyncForUpdates: 3600,
     },
   },
   vuetify: {

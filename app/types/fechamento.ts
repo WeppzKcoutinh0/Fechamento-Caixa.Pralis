@@ -198,6 +198,7 @@ export interface FechamentoDraft {
 
   // Seção 4 — Maquininhas
   nrMaquininha: string;
+  nrMaquininhaTarde: string;
   manhaInicialCents: number;
   tardeFinalCents: number;
   creditoManhaCents: number;
@@ -233,9 +234,12 @@ export interface FechamentoDraft {
   // aqui de novo.
   lacreAbertura: string;
 
-  // Arquivos escolhidos para os campos de maquininha antes do primeiro salvamento. Eles ficam
-  // apenas em memória: o Storage só aceita o upload depois que o fechamento existe no banco.
-  arquivosPendentes?: Partial<Record<'img-manha' | 'img-tarde', File>>;
+  // Arquivos escolhidos (maquininha, foto/nota de lançamento) antes do primeiro salvamento. Eles
+  // ficam apenas em memória: o Storage só aceita o upload depois que o fechamento existe no banco
+  // (ver WizardFechamento.vue onSalvar). Chaves fixas 'img-manha'/'img-tarde' pra maquininha;
+  // `lancamento-foto-${lancamentoId}`/`lancamento-foto-nota-${lancamentoId}` pra cada lançamento,
+  // já que pode haver vários (despesa/mercadoria/retirada) no mesmo fechamento.
+  arquivosPendentes?: Record<string, File>;
 }
 
 /**
@@ -309,6 +313,7 @@ export function criarFechamentoVazio(contexto?: ContextoSessaoCaixa): Fechamento
     pdvEntradas: [],
     imgPdvPath: null,
     nrMaquininha: '',
+    nrMaquininhaTarde: '',
     manhaInicialCents: 0,
     tardeFinalCents: 0,
     creditoManhaCents: 0,

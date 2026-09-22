@@ -59,12 +59,28 @@ async function onSalvar() {
       'img-tarde': 'imgTardePath',
     };
     let houveUploadPendente = false;
-    for (const [campo, arquivo] of Object.entries(arquivosPendentes) as [
-      'img-manha' | 'img-tarde',
-      File
-    ][]) {
-      draft.value[camposCaminho[campo]] = await enviarAnexo(fechamentoId, campo, arquivo);
-      Reflect.deleteProperty(arquivosPendentes, campo);
+    for (const [chave, arquivo] of Object.entries(arquivosPendentes) as [string, File][]) {
+      const path = await enviarAnexo(fechamentoId, chave, arquivo);
+      // Chaves fixas (maquininha) vão direto pro draft; chaves de lançamento
+      // (`lancamento-foto[-nota]-{id}`, ver SecaoLancamentos.vue) precisam achar o lançamento certo
+      // na lista, já que pode haver vários no mesmo fechamento.
+      if (chave === 'img-manha' || chave === 'img-tarde') {
+        draft.value[camposCaminho[chave]] = path;
+      } else {
+        const semSufixoNota = chave.startsWith('lancamento-foto-nota-');
+        const semSufixoFoto = !semSufixoNota && chave.startsWith('lancamento-foto-');
+        if (semSufixoNota || semSufixoFoto) {
+          const lancamentoId = chave.slice(
+            semSufixoNota ? 'lancamento-foto-nota-'.length : 'lancamento-foto-'.length,
+          );
+          const lancamento = draft.value.lancamentos.find((l) => l.id === lancamentoId);
+          if (lancamento) {
+            if (semSufixoNota) lancamento.fotoNotaPath = path;
+            else lancamento.fotoPath = path;
+          }
+        }
+      }
+      Reflect.deleteProperty(arquivosPendentes, chave);
       houveUploadPendente = true;
     }
     if (houveUploadPendente) await salvar(draft.value);

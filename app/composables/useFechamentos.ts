@@ -110,6 +110,7 @@ interface FechamentoRow {
   relatorio_pdv: string;
   img_pdv_path: string | null;
   nr_maquininha: string;
+  nr_maquininha_tarde: string;
   manha_inicial: string;
   tarde_final: string;
   credito_manha: string;
@@ -265,6 +266,7 @@ function linhaParaDraft(row: FechamentoRow): FechamentoDraft {
     })),
     imgPdvPath: row.img_pdv_path,
     nrMaquininha: row.nr_maquininha,
+    nrMaquininhaTarde: row.nr_maquininha_tarde ?? '',
     manhaInicialCents: toCents(row.manha_inicial),
     tardeFinalCents: toCents(row.tarde_final),
     creditoManhaCents: toCents(row.credito_manha),
@@ -455,6 +457,7 @@ export function useFechamentos() {
         ticket_medio: cents(pdv.averageTicketCents),
         img_pdv_path: draft.imgPdvPath,
         nr_maquininha: draft.nrMaquininha,
+        nr_maquininha_tarde: draft.nrMaquininhaTarde,
         manha_inicial: cents(draft.manhaInicialCents),
         tarde_final: cents(draft.tardeFinalCents),
         credito_manha: cents(draft.creditoManhaCents),

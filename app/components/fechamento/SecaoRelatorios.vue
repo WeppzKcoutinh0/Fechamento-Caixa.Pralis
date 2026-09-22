@@ -37,10 +37,10 @@ function removerFotoMaquininha(campo: 'img-manha' | 'img-tarde'): void {
 // uma das 6 categorias reais do Pralís, então ficam no roxo neutro da marca em vez de inventar
 // cores sem correspondência real.
 const PDV_VARS = {
-  '--cat': 'var(--cat-venda-base)',
-  '--cat-soft': 'var(--cat-venda-soft)',
-  '--cat-faixa': 'var(--cat-venda-faixa)',
-  '--cat-tinta': 'var(--cat-venda-tinta)',
+  '--cat': 'var(--cx-brand)',
+  '--cat-soft': 'var(--cx-brand-wash)',
+  '--cat-faixa': 'var(--cx-brand)',
+  '--cat-tinta': 'var(--cx-brand-text)',
 };
 const NEUTRO_VARS = {
   '--cat': 'var(--cx-brand)',
@@ -212,7 +212,10 @@ async function lerFotoMaquininha(
         (props.draft as unknown as Record<string, unknown>)[chave] = valor;
       }
     }
-    const percentual = resultado.confianca === null ? '' : ` Confiança estimada: ${Math.round(resultado.confianca * 100)}%.`;
+    const percentual =
+      resultado.confianca === null
+        ? ''
+        : ` Confiança estimada: ${Math.round(resultado.confianca * 100)}%.`;
     avisoLeituraMaquininha.value = `Campos preenchidos pela leitura. Confira os valores antes de salvar.${percentual}`;
     if (resultado.avisos.length) avisoLeituraMaquininha.value += ` ${resultado.avisos.join(' ')}`;
   } catch (erro) {
@@ -277,7 +280,17 @@ const totalCrediarioCents = computed(
 // grandes na tela ao mesmo tempo — clicar na faixa colorida abre/fecha só aquele painel.
 const pdvAberto = ref(false);
 const maquininhasAberto = ref(false);
+const maquininhaTurnoAberto = ref<'manha' | 'tarde' | null>(null);
 const crediarioAberto = ref(false);
+
+function alternarMaquininhas(): void {
+  maquininhasAberto.value = !maquininhasAberto.value;
+  maquininhaTurnoAberto.value = maquininhasAberto.value ? 'manha' : null;
+}
+
+function alternarTurnoMaquininha(turno: 'manha' | 'tarde'): void {
+  maquininhaTurnoAberto.value = maquininhaTurnoAberto.value === turno ? null : turno;
+}
 </script>
 
 <template>
@@ -537,7 +550,7 @@ const crediarioAberto = ref(false);
         type="button"
         class="lc-faixa lc-faixa-btn"
         :aria-expanded="maquininhasAberto"
-        @click="maquininhasAberto = !maquininhasAberto"
+        @click="alternarMaquininhas"
       >
         <div class="lc-head">
           <span class="lc-ic"><v-icon size="19">mdi-credit-card-outline</v-icon></span>
@@ -549,214 +562,262 @@ const crediarioAberto = ref(false);
       </button>
       <v-expand-transition>
         <div v-if="maquininhasAberto" class="lc-painel-corpo">
-          <label class="lc-campo">
-            <span class="lc-campo-lbl">Nº Maquininha</span>
-            <input
-              :value="draft.nrMaquininha"
-              class="lc-input"
-              inputmode="numeric"
-              placeholder="Número da maquininha"
-              @input="
-                draft.nrMaquininha = aoDigitarNumeros(($event.target as HTMLInputElement).value)
-              "
-            />
-          </label>
-
-          <div
-            class="lc-campo-lbl lc-mt"
-            style="text-transform: none; font-size: var(--cx-fs-caption)"
+          <button
+            type="button"
+            class="lc-subacordeao-titulo"
+            :aria-expanded="maquininhaTurnoAberto === 'manha'"
+            @click="alternarTurnoMaquininha('manha')"
           >
-            Turno da Manhã
-          </div>
-          <div class="lc-dois">
-            <label class="lc-campo">
-              <span class="lc-campo-lbl">Manhã Inicial</span>
-              <input
-                :value="formatCents(draft.manhaInicialCents)"
-                class="lc-input"
-                inputmode="decimal"
-                @input="
-                  draft.manhaInicialCents = aoDigitarCentavos(
-                    ($event.target as HTMLInputElement).value,
-                  )
-                "
-              />
-            </label>
-            <label class="lc-campo">
-              <span class="lc-campo-lbl">Crédito Manhã</span>
-              <input
-                :value="formatCents(draft.creditoManhaCents)"
-                class="lc-input"
-                inputmode="decimal"
-                @input="
-                  draft.creditoManhaCents = aoDigitarCentavos(
-                    ($event.target as HTMLInputElement).value,
-                  )
-                "
-              />
-            </label>
-          </div>
-          <div class="lc-dois">
-            <label class="lc-campo">
-              <span class="lc-campo-lbl">Débito Manhã</span>
-              <input
-                :value="formatCents(draft.debitoManhaCents)"
-                class="lc-input"
-                inputmode="decimal"
-                @input="
-                  draft.debitoManhaCents = aoDigitarCentavos(
-                    ($event.target as HTMLInputElement).value,
-                  )
-                "
-              />
-            </label>
-            <label class="lc-campo">
-              <span class="lc-campo-lbl">Pix Manhã</span>
-              <input
-                :value="formatCents(draft.pixManhaCents)"
-                class="lc-input"
-                inputmode="decimal"
-                @input="
-                  draft.pixManhaCents = aoDigitarCentavos(($event.target as HTMLInputElement).value)
-                "
-              />
-            </label>
-          </div>
-          <label class="lc-campo">
-            <span class="lc-campo-lbl">Voucher Manhã</span>
-            <input
-              :value="formatCents(draft.voucherManhaCents)"
-              class="lc-input"
-              inputmode="decimal"
-              @input="
-                draft.voucherManhaCents = aoDigitarCentavos(
-                  ($event.target as HTMLInputElement).value,
-                )
-              "
-            />
-          </label>
-          <div class="lc-campo">
-            <CampoFoto
-              v-model="draft.imgManhaPath"
-              :fechamento-id="draft.id"
-              campo="img-manha"
-              label="Imagem Manhã"
-              upload-adiado
-              @arquivo-selecionado="registrarFotoMaquininha('img-manha', $event)"
-              @arquivo-removido="removerFotoMaquininha('img-manha')"
-            />
-            <v-btn
-              v-if="temFotoParaLer('img-manha', draft.imgManhaPath)"
-              class="mt-2"
-              size="small"
-              variant="tonal"
-              color="primary"
-              prepend-icon="mdi-auto-fix"
-              :loading="lendoMaquininha === 'manha'"
-              :disabled="lendoMaquininha !== null"
-              @click="lerFotoMaquininha('manha', 'img-manha', draft.imgManhaPath)"
-            >
-              Ler com IA
-            </v-btn>
-          </div>
+            <span>Relatório da Manhã</span>
+            <v-icon size="20">
+              {{ maquininhaTurnoAberto === 'manha' ? 'mdi-chevron-up' : 'mdi-chevron-down' }}
+            </v-icon>
+          </button>
+          <v-expand-transition>
+            <div v-if="maquininhaTurnoAberto === 'manha'">
+              <label class="lc-campo">
+                <span class="lc-campo-lbl">Nº Maquininha</span>
+                <input
+                  :value="draft.nrMaquininha"
+                  class="lc-input"
+                  inputmode="numeric"
+                  placeholder="Número da maquininha"
+                  @input="
+                    draft.nrMaquininha = aoDigitarNumeros(($event.target as HTMLInputElement).value)
+                  "
+                />
+              </label>
+              <div
+                class="lc-campo-lbl lc-mt"
+                style="text-transform: none; font-size: var(--cx-fs-caption)"
+              >
+                Turno da Manhã
+              </div>
+              <div class="lc-dois">
+                <label class="lc-campo">
+                  <span class="lc-campo-lbl">Manhã Inicial</span>
+                  <input
+                    :value="formatCents(draft.manhaInicialCents)"
+                    class="lc-input"
+                    inputmode="decimal"
+                    @input="
+                      draft.manhaInicialCents = aoDigitarCentavos(
+                        ($event.target as HTMLInputElement).value,
+                      )
+                    "
+                  />
+                </label>
+                <label class="lc-campo">
+                  <span class="lc-campo-lbl">Crédito Manhã</span>
+                  <input
+                    :value="formatCents(draft.creditoManhaCents)"
+                    class="lc-input"
+                    inputmode="decimal"
+                    @input="
+                      draft.creditoManhaCents = aoDigitarCentavos(
+                        ($event.target as HTMLInputElement).value,
+                      )
+                    "
+                  />
+                </label>
+              </div>
+              <div class="lc-dois">
+                <label class="lc-campo">
+                  <span class="lc-campo-lbl">Débito Manhã</span>
+                  <input
+                    :value="formatCents(draft.debitoManhaCents)"
+                    class="lc-input"
+                    inputmode="decimal"
+                    @input="
+                      draft.debitoManhaCents = aoDigitarCentavos(
+                        ($event.target as HTMLInputElement).value,
+                      )
+                    "
+                  />
+                </label>
+                <label class="lc-campo">
+                  <span class="lc-campo-lbl">Pix Manhã</span>
+                  <input
+                    :value="formatCents(draft.pixManhaCents)"
+                    class="lc-input"
+                    inputmode="decimal"
+                    @input="
+                      draft.pixManhaCents = aoDigitarCentavos(
+                        ($event.target as HTMLInputElement).value,
+                      )
+                    "
+                  />
+                </label>
+              </div>
+              <label class="lc-campo">
+                <span class="lc-campo-lbl">Voucher Manhã</span>
+                <input
+                  :value="formatCents(draft.voucherManhaCents)"
+                  class="lc-input"
+                  inputmode="decimal"
+                  @input="
+                    draft.voucherManhaCents = aoDigitarCentavos(
+                      ($event.target as HTMLInputElement).value,
+                    )
+                  "
+                />
+              </label>
+              <div class="lc-campo">
+                <CampoFoto
+                  v-model="draft.imgManhaPath"
+                  :fechamento-id="draft.id"
+                  campo="img-manha"
+                  label="Imagem Manhã"
+                  upload-adiado
+                  @arquivo-selecionado="registrarFotoMaquininha('img-manha', $event)"
+                  @arquivo-removido="removerFotoMaquininha('img-manha')"
+                />
+                <v-btn
+                  v-if="temFotoParaLer('img-manha', draft.imgManhaPath)"
+                  class="mt-2"
+                  size="small"
+                  variant="tonal"
+                  color="primary"
+                  prepend-icon="mdi-auto-fix"
+                  :loading="lendoMaquininha === 'manha'"
+                  :disabled="lendoMaquininha !== null"
+                  @click="lerFotoMaquininha('manha', 'img-manha', draft.imgManhaPath)"
+                >
+                  Ler com IA
+                </v-btn>
+              </div>
+            </div>
+          </v-expand-transition>
 
-          <div
-            class="lc-campo-lbl lc-mt"
-            style="text-transform: none; font-size: var(--cx-fs-caption)"
+          <button
+            type="button"
+            class="lc-subacordeao-titulo"
+            :aria-expanded="maquininhaTurnoAberto === 'tarde'"
+            @click="alternarTurnoMaquininha('tarde')"
           >
-            Turno da Tarde
-          </div>
-          <div class="lc-dois">
-            <label class="lc-campo">
-              <span class="lc-campo-lbl">Tarde Final</span>
-              <input
-                :value="formatCents(draft.tardeFinalCents)"
-                class="lc-input"
-                inputmode="decimal"
-                @input="
-                  draft.tardeFinalCents = aoDigitarCentavos(
-                    ($event.target as HTMLInputElement).value,
-                  )
-                "
-              />
-            </label>
-            <label class="lc-campo">
-              <span class="lc-campo-lbl">Crédito Tarde</span>
-              <input
-                :value="formatCents(draft.creditoTardeCents)"
-                class="lc-input"
-                inputmode="decimal"
-                @input="
-                  draft.creditoTardeCents = aoDigitarCentavos(
-                    ($event.target as HTMLInputElement).value,
-                  )
-                "
-              />
-            </label>
-          </div>
-          <div class="lc-dois">
-            <label class="lc-campo">
-              <span class="lc-campo-lbl">Débito Tarde</span>
-              <input
-                :value="formatCents(draft.debitoTardeCents)"
-                class="lc-input"
-                inputmode="decimal"
-                @input="
-                  draft.debitoTardeCents = aoDigitarCentavos(
-                    ($event.target as HTMLInputElement).value,
-                  )
-                "
-              />
-            </label>
-            <label class="lc-campo">
-              <span class="lc-campo-lbl">Pix Tarde</span>
-              <input
-                :value="formatCents(draft.pixTardeCents)"
-                class="lc-input"
-                inputmode="decimal"
-                @input="
-                  draft.pixTardeCents = aoDigitarCentavos(($event.target as HTMLInputElement).value)
-                "
-              />
-            </label>
-          </div>
-          <label class="lc-campo">
-            <span class="lc-campo-lbl">Voucher Tarde</span>
-            <input
-              :value="formatCents(draft.voucherTardeCents)"
-              class="lc-input"
-              inputmode="decimal"
-              @input="
-                draft.voucherTardeCents = aoDigitarCentavos(
-                  ($event.target as HTMLInputElement).value,
-                )
-              "
-            />
-          </label>
-          <div class="lc-campo">
-            <CampoFoto
-              v-model="draft.imgTardePath"
-              :fechamento-id="draft.id"
-              campo="img-tarde"
-              label="Imagem Tarde"
-              upload-adiado
-              @arquivo-selecionado="registrarFotoMaquininha('img-tarde', $event)"
-              @arquivo-removido="removerFotoMaquininha('img-tarde')"
-            />
-            <v-btn
-              v-if="temFotoParaLer('img-tarde', draft.imgTardePath)"
-              class="mt-2"
-              size="small"
-              variant="tonal"
-              color="primary"
-              prepend-icon="mdi-auto-fix"
-              :loading="lendoMaquininha === 'tarde'"
-              :disabled="lendoMaquininha !== null"
-              @click="lerFotoMaquininha('tarde', 'img-tarde', draft.imgTardePath)"
-            >
-              Ler com IA
-            </v-btn>
-          </div>
+            <span>Relatório da Tarde</span>
+            <v-icon size="20">
+              {{ maquininhaTurnoAberto === 'tarde' ? 'mdi-chevron-up' : 'mdi-chevron-down' }}
+            </v-icon>
+          </button>
+          <v-expand-transition>
+            <div v-if="maquininhaTurnoAberto === 'tarde'">
+              <label class="lc-campo">
+                <span class="lc-campo-lbl">Nº Maquininha</span>
+                <input
+                  :value="draft.nrMaquininhaTarde"
+                  class="lc-input"
+                  inputmode="numeric"
+                  placeholder="Número da maquininha"
+                  @input="
+                    draft.nrMaquininhaTarde = aoDigitarNumeros(
+                      ($event.target as HTMLInputElement).value,
+                    )
+                  "
+                />
+              </label>
+
+              <div
+                class="lc-campo-lbl lc-mt"
+                style="text-transform: none; font-size: var(--cx-fs-caption)"
+              >
+                Turno da Tarde
+              </div>
+              <div class="lc-dois">
+                <label class="lc-campo">
+                  <span class="lc-campo-lbl">Tarde Final</span>
+                  <input
+                    :value="formatCents(draft.tardeFinalCents)"
+                    class="lc-input"
+                    inputmode="decimal"
+                    @input="
+                      draft.tardeFinalCents = aoDigitarCentavos(
+                        ($event.target as HTMLInputElement).value,
+                      )
+                    "
+                  />
+                </label>
+                <label class="lc-campo">
+                  <span class="lc-campo-lbl">Crédito Tarde</span>
+                  <input
+                    :value="formatCents(draft.creditoTardeCents)"
+                    class="lc-input"
+                    inputmode="decimal"
+                    @input="
+                      draft.creditoTardeCents = aoDigitarCentavos(
+                        ($event.target as HTMLInputElement).value,
+                      )
+                    "
+                  />
+                </label>
+              </div>
+              <div class="lc-dois">
+                <label class="lc-campo">
+                  <span class="lc-campo-lbl">Débito Tarde</span>
+                  <input
+                    :value="formatCents(draft.debitoTardeCents)"
+                    class="lc-input"
+                    inputmode="decimal"
+                    @input="
+                      draft.debitoTardeCents = aoDigitarCentavos(
+                        ($event.target as HTMLInputElement).value,
+                      )
+                    "
+                  />
+                </label>
+                <label class="lc-campo">
+                  <span class="lc-campo-lbl">Pix Tarde</span>
+                  <input
+                    :value="formatCents(draft.pixTardeCents)"
+                    class="lc-input"
+                    inputmode="decimal"
+                    @input="
+                      draft.pixTardeCents = aoDigitarCentavos(
+                        ($event.target as HTMLInputElement).value,
+                      )
+                    "
+                  />
+                </label>
+              </div>
+              <label class="lc-campo">
+                <span class="lc-campo-lbl">Voucher Tarde</span>
+                <input
+                  :value="formatCents(draft.voucherTardeCents)"
+                  class="lc-input"
+                  inputmode="decimal"
+                  @input="
+                    draft.voucherTardeCents = aoDigitarCentavos(
+                      ($event.target as HTMLInputElement).value,
+                    )
+                  "
+                />
+              </label>
+              <div class="lc-campo">
+                <CampoFoto
+                  v-model="draft.imgTardePath"
+                  :fechamento-id="draft.id"
+                  campo="img-tarde"
+                  label="Imagem Tarde"
+                  upload-adiado
+                  @arquivo-selecionado="registrarFotoMaquininha('img-tarde', $event)"
+                  @arquivo-removido="removerFotoMaquininha('img-tarde')"
+                />
+                <v-btn
+                  v-if="temFotoParaLer('img-tarde', draft.imgTardePath)"
+                  class="mt-2"
+                  size="small"
+                  variant="tonal"
+                  color="primary"
+                  prepend-icon="mdi-auto-fix"
+                  :loading="lendoMaquininha === 'tarde'"
+                  :disabled="lendoMaquininha !== null"
+                  @click="lerFotoMaquininha('tarde', 'img-tarde', draft.imgTardePath)"
+                >
+                  Ler com IA
+                </v-btn>
+              </div>
+            </div>
+          </v-expand-transition>
 
           <v-alert
             v-if="erroLeituraMaquininha"
@@ -945,6 +1006,27 @@ const crediarioAberto = ref(false);
   font: inherit;
   text-align: left;
   cursor: pointer;
+}
+.lc-subacordeao-titulo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 42px;
+  margin: 0 0 var(--cx-sp-3);
+  padding: 0 var(--cx-sp-3);
+  border: 1px solid var(--cx-line);
+  border-radius: var(--cx-r-md);
+  background: var(--cx-surface-sunken);
+  color: var(--cx-ink);
+  font: inherit;
+  font-size: var(--cx-fs-caption);
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.lc-subacordeao-titulo:hover {
+  background: var(--cx-hover);
 }
 .lc-resumo-item {
   display: flex;

@@ -24,6 +24,22 @@ import {
 
 const props = defineProps<{ draft: FechamentoDraft }>();
 
+// A foto do lançamento só pode ir pro Storage depois que o fechamento existir no banco (RLS de
+// `anexos_insert` exige `fechamento_editavel`, que checa a linha em `fechamentos` — ver migration
+// 20260918100800) — por isso usa o mesmo padrão de upload adiado do Maquininhas
+// (SecaoRelatorios.vue), com uma chave por lançamento+campo já que pode haver vários lançamentos.
+function chaveArquivoLancamento(lancamentoId: string, campo: 'foto' | 'foto-nota'): string {
+  return `lancamento-${campo}-${lancamentoId}`;
+}
+function registrarFotoLancamento(lancamentoId: string, campo: 'foto' | 'foto-nota', arquivo: File): void {
+  props.draft.arquivosPendentes ??= {};
+  props.draft.arquivosPendentes[chaveArquivoLancamento(lancamentoId, campo)] = arquivo;
+}
+function removerFotoLancamento(lancamentoId: string, campo: 'foto' | 'foto-nota'): void {
+  if (props.draft.arquivosPendentes)
+    Reflect.deleteProperty(props.draft.arquivosPendentes, chaveArquivoLancamento(lancamentoId, campo));
+}
+
 // Mesmo padrão visual do modal de Despesa/Mercadoria/Retirada do Sistema Inteligente Pralís
 // (faixa colorida por categoria, ícone, abas de tipo) — campos existentes preservados 1:1, mais
 // Juros/Tipo de credor/Data pagamento (extensão aditiva, ver types/fechamento.ts).
@@ -666,6 +682,9 @@ const totalGeralDiscriminacao = computed(() =>
               :fechamento-id="draft.id"
               campo="lancamento-foto"
               label="Foto"
+              upload-adiado
+              @arquivo-selecionado="registrarFotoLancamento(lancamentoAtual.id, 'foto', $event)"
+              @arquivo-removido="removerFotoLancamento(lancamentoAtual.id, 'foto')"
             />
           </div>
 
@@ -706,6 +725,9 @@ const totalGeralDiscriminacao = computed(() =>
               :fechamento-id="draft.id"
               campo="lancamento-foto-nota"
               label="Foto Nota / Boleto"
+              upload-adiado
+              @arquivo-selecionado="registrarFotoLancamento(lancamentoAtual.id, 'foto-nota', $event)"
+              @arquivo-removido="removerFotoLancamento(lancamentoAtual.id, 'foto-nota')"
             />
           </div>
         </div>

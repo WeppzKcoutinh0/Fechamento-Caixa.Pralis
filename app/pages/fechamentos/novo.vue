@@ -18,6 +18,7 @@ function contextoDe(sessao: SessaoCaixa): ContextoSessaoCaixa {
     caixa: sessao.caixa,
     turno: sessao.turno,
     businessDate: sessao.businessDate,
+    lacreAbertura: sessao.lacreAbertura,
   };
 }
 

@@ -1,6 +1,7 @@
-import { computed, type Ref, watch } from 'vue';
+import { computed, ref, type Ref, watch } from 'vue';
 import type { FechamentoDraft } from '~/types/fechamento';
 import { useTransferenciasRecebidas } from './useTransferenciasRecebidas';
+import { useTransferenciasTesouraria } from './useTransferenciasTesouraria';
 import {
   calculateCardNet,
   calculateCrediarioTotais,
@@ -43,6 +44,26 @@ export function useRelatorioCalculado(draft: Ref<FechamentoDraft>) {
       if (data) void buscarTransferenciasRecebidas(data);
     },
     { immediate: true },
+  );
+
+  // Lacre de abertura (pedido do usuário, 22/09/2026): o valor que a Tesouraria já cadastrou
+  // pra esse lacre (mesmo lookup que já preenchia a Entrada manual quando alguém redigitava o
+  // mesmo número) agora entra sozinho como Transferência Automática — sem precisar que o caixa
+  // crie uma Entrada e redigite um lacre que ele já informou na abertura.
+  const { buscarPorLacre } = useTransferenciasTesouraria();
+  const lacreAberturaValorCents = ref(0);
+  watch(
+    () => draft.value.lacreAbertura,
+    async (lacre) => {
+      lacreAberturaValorCents.value = 0;
+      if (!lacre) return;
+      const resultado = await buscarPorLacre(lacre).catch(() => null);
+      lacreAberturaValorCents.value = resultado?.valorCents ?? 0;
+    },
+    { immediate: true },
+  );
+  const transferenciaEntradaTotalCents = computed(
+    () => transferenciaEntradaCents.value + lacreAberturaValorCents.value,
   );
 
   const pdv = computed(() =>
@@ -96,7 +117,7 @@ export function useRelatorioCalculado(draft: Ref<FechamentoDraft>) {
       mercadoriaCents: lancamentosPorTipo.value.mercadoriaCents,
       retiradasCents: lancamentosPorTipo.value.retiradaCents,
       transferenciaSaidaCents: transferenciaSaidaCents.value,
-      transferenciaEntradaCents: transferenciaEntradaCents.value,
+      transferenciaEntradaCents: transferenciaEntradaTotalCents.value,
       totalPdvCents: pdv.value.totalCents,
       liqCreditoCents: liqCreditoCents.value,
       liqDebitoCents: liqDebitoCents.value,
@@ -120,7 +141,7 @@ export function useRelatorioCalculado(draft: Ref<FechamentoDraft>) {
       merchandiseCents: lancamentosPorTipo.value.mercadoriaCents,
       withdrawalsCents: lancamentosPorTipo.value.retiradaCents,
       transferOutCents: transferenciaSaidaCents.value,
-      transferInCents: transferenciaEntradaCents.value,
+      transferInCents: transferenciaEntradaTotalCents.value,
       countedCents: draft.value.dinheiroContadoCents,
     }),
   );
@@ -138,6 +159,7 @@ export function useRelatorioCalculado(draft: Ref<FechamentoDraft>) {
     transferenciaSaidaCents,
     transferenciaEntradaCents,
     transferenciasRecebidas,
+    lacreAberturaValorCents,
     relatorio,
     fisico,
   };

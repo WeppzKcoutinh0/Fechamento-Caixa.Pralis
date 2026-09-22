@@ -23,6 +23,7 @@ const {
   transferenciaSaidaCents,
   transferenciaEntradaCents,
   transferenciasRecebidas,
+  lacreAberturaValorCents,
   relatorio,
   fisico,
 } = useRelatorioCalculado(toRef(props, 'draft'));
@@ -114,27 +115,35 @@ const totalTransferidoEntreCaixasCents = computed(() =>
 
 // Mesma soma de draft.pdvEntradas usada em SecaoTransferencias.vue — não repete busca nenhuma,
 // só lê o que "Buscar vendas" já gravou (idempotente, nunca duplica).
-function somaPdv(
-  campo:
-    | 'dinheiroCents'
-    | 'creditoCents'
-    | 'debitoCents'
-    | 'pixCents'
-    | 'voucherCents'
-    | 'crediarioCents',
-): number {
+type CampoPdv = 'dinheiroCents' | 'creditoCents' | 'debitoCents' | 'pixCents' | 'voucherCents' | 'crediarioCents';
+function somaPdv(campo: CampoPdv): number {
   return props.draft.pdvEntradas.reduce((soma, p) => soma + p[campo], 0);
 }
+// Detalhe por PDV (pedido do usuário, 22/09/2026) — mesma ideia de SecaoTransferencias.vue:
+// clicar num card individual expande mostrando quanto cada PDV da Seção 1 contribuiu.
+function detalhesPorPdv(campo: CampoPdv): { rotulo: string; valorCents: number }[] {
+  return props.draft.pdvEntradas.map((p, i) => ({ rotulo: `PDV ${i + 1}`, valorCents: p[campo] }));
+}
 const transferenciasAutomaticas = computed(() => [
-  { rotulo: 'CREDITO', valorCents: somaPdv('creditoCents') },
-  { rotulo: 'DEBITO', valorCents: somaPdv('debitoCents') },
-  { rotulo: 'PIX', valorCents: somaPdv('pixCents') },
-  { rotulo: 'VOUCHER', valorCents: somaPdv('voucherCents') },
-  { rotulo: 'DINHEIRO', valorCents: somaPdv('dinheiroCents') },
-  { rotulo: 'CREDIARIO', valorCents: somaPdv('crediarioCents') },
+  { rotulo: 'CREDITO', valorCents: somaPdv('creditoCents'), detalhes: detalhesPorPdv('creditoCents') },
+  { rotulo: 'DEBITO', valorCents: somaPdv('debitoCents'), detalhes: detalhesPorPdv('debitoCents') },
+  { rotulo: 'PIX', valorCents: somaPdv('pixCents'), detalhes: detalhesPorPdv('pixCents') },
+  { rotulo: 'VOUCHER', valorCents: somaPdv('voucherCents'), detalhes: detalhesPorPdv('voucherCents') },
+  { rotulo: 'DINHEIRO', valorCents: somaPdv('dinheiroCents'), detalhes: detalhesPorPdv('dinheiroCents') },
+  { rotulo: 'CREDIARIO', valorCents: somaPdv('crediarioCents'), detalhes: detalhesPorPdv('crediarioCents') },
+  ...(lacreAberturaValorCents.value > 0
+    ? [
+        {
+          rotulo: 'TRANSFERÊNCIAS DE ENTRADA',
+          valorCents: lacreAberturaValorCents.value,
+          detalhes: [{ rotulo: `Lacre ${props.draft.lacreAbertura}`, valorCents: lacreAberturaValorCents.value }],
+        },
+      ]
+    : []),
   ...transferenciasRecebidas.value.map((r) => ({
     rotulo: r.caixaOrigem.toUpperCase(),
     valorCents: r.valorCents,
+    detalhes: [{ rotulo: `Recebido de ${r.caixaOrigem}`, valorCents: r.valorCents }],
   })),
 ]);
 
@@ -160,13 +169,23 @@ const mercadoriasManuais = computed(() =>
 );
 const retiradas = computed(() => props.draft.lancamentos.filter((l) => l.tipo === 'retirada'));
 
+// Detalhe ao expandir (pedido do usuário, 22/09/2026): diferente das formas de pagamento
+// (draft.pdvEntradas guarda um valor por PDV), os ajustes do CREARE já chegam SOMADOS num único
+// lançamento por categoria (aplicarAjustesComoLancamentos, ver utils/vendasFechamento.ts) — não
+// existe "por PDV" pra detalhar aqui. O que existe de verdade é o `obsTexto` que essa função já
+// grava em cada lançamento pra auditoria ("valor original: ±R$X"), incluindo o sinal (sobra é
+// diferente de perda) que o card em cima não mostra. Expandir revela essa nota.
+function observacaoPorAjuste(chave: string): string {
+  const lancamento = props.draft.lancamentos.find((l) => l.origemAjusteCreare === chave);
+  return lancamento?.obsTexto || 'Nenhum ajuste sincronizado ainda para esta categoria.';
+}
 const despesasAutomaticas = computed(() => [
-  { rotulo: 'COLABORADOR', valorCents: valorPorAjuste('colaboradores') },
-  { rotulo: 'LANCHES', valorCents: valorPorAjuste('alimentacao') },
+  { rotulo: 'COLABORADOR', valorCents: valorPorAjuste('colaboradores'), observacao: observacaoPorAjuste('colaboradores') },
+  { rotulo: 'LANCHES', valorCents: valorPorAjuste('alimentacao'), observacao: observacaoPorAjuste('alimentacao') },
 ]);
 const mercadoriasAutomaticas = computed(() => [
-  { rotulo: 'SOBRA/PERDA', valorCents: valorPorAjuste('sobraPerda') },
-  { rotulo: 'FURTO/ROUBO', valorCents: valorPorAjuste('rouboFurto') },
+  { rotulo: 'SOBRA/PERDA', valorCents: valorPorAjuste('sobraPerda'), observacao: observacaoPorAjuste('sobraPerda') },
+  { rotulo: 'FURTO/ROUBO', valorCents: valorPorAjuste('rouboFurto'), observacao: observacaoPorAjuste('rouboFurto') },
 ]);
 
 const CAT_VARS = {
@@ -324,7 +343,8 @@ const CAT_VARS = {
               formatCents(
                 totalEntradaCents -
                   totalSaidaCents +
-                  transferenciaEntradaCents -
+                  transferenciaEntradaCents +
+                  lacreAberturaValorCents -
                   transferenciaSaidaCents,
               )
             }}</strong
@@ -353,16 +373,28 @@ const CAT_VARS = {
             </div>
           </div>
           <p class="cat-subgrupo">Automáticas</p>
-          <div class="d-flex flex-column ga-2">
-            <div
-              v-for="item in transferenciasAutomaticas"
-              :key="item.rotulo"
-              class="d-flex justify-space-between text-body-2"
-            >
-              <span class="text-medium-emphasis">{{ item.rotulo }}</span>
-              <strong>R$ {{ formatCents(item.valorCents) }}</strong>
-            </div>
-          </div>
+          <v-expansion-panels variant="accordion" class="cat-subacordeao">
+            <v-expansion-panel v-for="item in transferenciasAutomaticas" :key="item.rotulo" class="cat-subitem">
+              <v-expansion-panel-title class="cat-subitem-titulo">
+                <span class="d-flex flex-column">
+                  <span class="cat-subitem-rotulo">{{ item.rotulo }}</span>
+                  <strong class="cat-subitem-valor">R$ {{ formatCents(item.valorCents) }}</strong>
+                </span>
+              </v-expansion-panel-title>
+              <v-expansion-panel-text>
+                <div class="d-flex flex-column ga-1">
+                  <div
+                    v-for="d in item.detalhes"
+                    :key="d.rotulo"
+                    class="d-flex justify-space-between text-body-2"
+                  >
+                    <span class="text-medium-emphasis">{{ d.rotulo }}</span>
+                    <strong>R$ {{ formatCents(d.valorCents) }}</strong>
+                  </div>
+                </div>
+              </v-expansion-panel-text>
+            </v-expansion-panel>
+          </v-expansion-panels>
         </v-expansion-panel-text>
       </v-expansion-panel>
 
@@ -387,16 +419,19 @@ const CAT_VARS = {
             </div>
           </div>
           <p class="cat-subgrupo">Automáticas</p>
-          <div class="d-flex flex-column ga-2">
-            <div
-              v-for="item in despesasAutomaticas"
-              :key="item.rotulo"
-              class="d-flex justify-space-between text-body-2"
-            >
-              <span class="text-medium-emphasis">{{ item.rotulo }}</span>
-              <strong>R$ {{ formatCents(item.valorCents) }}</strong>
-            </div>
-          </div>
+          <v-expansion-panels variant="accordion" class="cat-subacordeao">
+            <v-expansion-panel v-for="item in despesasAutomaticas" :key="item.rotulo" class="cat-subitem">
+              <v-expansion-panel-title class="cat-subitem-titulo">
+                <span class="d-flex flex-column">
+                  <span class="cat-subitem-rotulo">{{ item.rotulo }}</span>
+                  <strong class="cat-subitem-valor">R$ {{ formatCents(item.valorCents) }}</strong>
+                </span>
+              </v-expansion-panel-title>
+              <v-expansion-panel-text>
+                <p class="text-body-2 text-medium-emphasis mb-0">{{ item.observacao }}</p>
+              </v-expansion-panel-text>
+            </v-expansion-panel>
+          </v-expansion-panels>
         </v-expansion-panel-text>
       </v-expansion-panel>
 
@@ -423,16 +458,19 @@ const CAT_VARS = {
             </div>
           </div>
           <p class="cat-subgrupo">Automáticas</p>
-          <div class="d-flex flex-column ga-2">
-            <div
-              v-for="item in mercadoriasAutomaticas"
-              :key="item.rotulo"
-              class="d-flex justify-space-between text-body-2"
-            >
-              <span class="text-medium-emphasis">{{ item.rotulo }}</span>
-              <strong>R$ {{ formatCents(item.valorCents) }}</strong>
-            </div>
-          </div>
+          <v-expansion-panels variant="accordion" class="cat-subacordeao">
+            <v-expansion-panel v-for="item in mercadoriasAutomaticas" :key="item.rotulo" class="cat-subitem">
+              <v-expansion-panel-title class="cat-subitem-titulo">
+                <span class="d-flex flex-column">
+                  <span class="cat-subitem-rotulo">{{ item.rotulo }}</span>
+                  <strong class="cat-subitem-valor">R$ {{ formatCents(item.valorCents) }}</strong>
+                </span>
+              </v-expansion-panel-title>
+              <v-expansion-panel-text>
+                <p class="text-body-2 text-medium-emphasis mb-0">{{ item.observacao }}</p>
+              </v-expansion-panel-text>
+            </v-expansion-panel>
+          </v-expansion-panels>
         </v-expansion-panel-text>
       </v-expansion-panel>
 
@@ -574,39 +612,9 @@ const CAT_VARS = {
 </template>
 
 <style scoped>
-/* Accordion por categoria (Venda/Transferências/Despesas/Mercadorias/Retiradas/Diferença) —
-   mesma linguagem visual de cor-como-faixa que o resto do wizard (.lc-faixa em main.css), aqui
-   aplicada ao cabeçalho de cada v-expansion-panel via --cat/--cat-soft/--cat-tinta injetado por
-   painel (CAT_VARS no script). */
-.cat-accordion {
-  display: flex;
-  flex-direction: column;
-  gap: var(--cx-sp-3);
-}
-.cat-painel {
-  border: 1px solid var(--cx-line) !important;
-  border-radius: var(--cx-r-lg) !important;
-  overflow: hidden;
-}
-.cat-titulo {
-  background: var(--cat) !important;
-  color: #fff !important;
-  font-weight: 700 !important;
-}
-.cat-titulo :deep(.v-expansion-panel-title__icon .v-icon) {
-  color: #fff;
-}
-.cat-valor {
-  margin-right: var(--cx-sp-2);
-}
-.cat-subgrupo {
-  margin: 0 0 var(--cx-sp-2);
-  color: var(--cx-ink-soft);
-  font-size: var(--cx-fs-micro);
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
+/* .cat-* (accordion por categoria colorida) agora vive em assets/main.css — era só daqui
+   ("scoped"), então nunca aplicava nos accordions equivalentes de outras telas (mesmo bug já
+   corrigido uma vez com .lc-painel/.lc-painel-corpo). */
 
 .tabela-produtos-wrap {
   overflow-x: auto;

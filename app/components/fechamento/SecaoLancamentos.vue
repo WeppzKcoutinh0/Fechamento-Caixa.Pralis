@@ -135,14 +135,29 @@ function valorPorOrigem(origem: string): number {
   const lancamento = props.draft.lancamentos.find((l) => l.origemAjusteCreare === origem);
   return lancamento ? lancamento.valorCents + lancamento.valorAcrescimoCents : 0;
 }
+// Detalhe ao expandir (pedido do usuário, 22/09/2026): os ajustes do CREARE chegam SOMADOS num
+// único lançamento por categoria — não existe "por PDV" pra detalhar aqui (diferente das formas
+// de pagamento, que vêm de draft.pdvEntradas). O que existe de verdade é o `obsTexto` que já é
+// gravado em cada lançamento pra auditoria ("valor original: ±R$X"), com o sinal que o card em
+// cima não mostra. Expandir revela essa nota.
+function observacaoPorOrigem(origem: string): string {
+  const lancamento = props.draft.lancamentos.find((l) => l.origemAjusteCreare === origem);
+  return lancamento?.obsTexto || 'Nenhum ajuste sincronizado ainda para esta categoria.';
+}
 const despesasAutomaticas = computed(() => [
-  { rotulo: 'COLABORADOR', valorCents: valorPorOrigem('colaboradores') },
-  { rotulo: 'LANCHES', valorCents: valorPorOrigem('alimentacao') },
+  { rotulo: 'COLABORADOR', valorCents: valorPorOrigem('colaboradores'), observacao: observacaoPorOrigem('colaboradores') },
+  { rotulo: 'LANCHES', valorCents: valorPorOrigem('alimentacao'), observacao: observacaoPorOrigem('alimentacao') },
 ]);
 const mercadoriasAutomaticas = computed(() => [
-  { rotulo: 'SOBRA/PERDA', valorCents: valorPorOrigem('sobraPerda') },
-  { rotulo: 'FURTO/ROUBO', valorCents: valorPorOrigem('rouboFurto') },
+  { rotulo: 'SOBRA/PERDA', valorCents: valorPorOrigem('sobraPerda'), observacao: observacaoPorOrigem('sobraPerda') },
+  { rotulo: 'FURTO/ROUBO', valorCents: valorPorOrigem('rouboFurto'), observacao: observacaoPorOrigem('rouboFurto') },
 ]);
+const totalDespesasAutomaticasCents = computed(() =>
+  despesasAutomaticas.value.reduce((soma, item) => soma + item.valorCents, 0),
+);
+const totalMercadoriasAutomaticasCents = computed(() =>
+  mercadoriasAutomaticas.value.reduce((soma, item) => soma + item.valorCents, 0),
+);
 
 const modalAberto = ref(false);
 const indiceEditando = ref<number | null>(null);
@@ -252,57 +267,55 @@ const totalGeralDiscriminacao = computed(() =>
   <div class="d-flex flex-column ga-4">
     <p class="lc-grupo-titulo">Lançamentos Manuais</p>
 
-    <div
-      v-for="tipo in TIPOS_LANCAMENTO"
-      :key="tipo"
-      class="lc-painel"
-      :style="{
-        '--cat': `var(--cat-${CAT_TOKEN[tipo]}-base)`,
-        '--cat-soft': `var(--cat-${CAT_TOKEN[tipo]}-soft)`,
-        '--cat-faixa': `var(--cat-${CAT_TOKEN[tipo]}-faixa)`,
-        '--cat-tinta': `var(--cat-${CAT_TOKEN[tipo]}-tinta)`,
-      }"
-    >
-      <div class="lc-faixa">
-        <div class="lc-head">
-          <span class="lc-ic"
-            ><v-icon size="19">{{ ICONES_TIPO[tipo] }}</v-icon></span
+    <v-expansion-panels variant="accordion" class="cat-accordion">
+      <v-expansion-panel
+        v-for="tipo in TIPOS_LANCAMENTO"
+        :key="tipo"
+        class="cat-painel"
+        :style="{
+          '--cat': `var(--cat-${CAT_TOKEN[tipo]}-base)`,
+          '--cat-soft': `var(--cat-${CAT_TOKEN[tipo]}-soft)`,
+          '--cat-tinta': `var(--cat-${CAT_TOKEN[tipo]}-tinta)`,
+        }"
+      >
+        <v-expansion-panel-title class="cat-titulo">
+          <v-icon size="18" class="mr-2">{{ ICONES_TIPO[tipo] }}</v-icon>
+          <span class="flex-grow-1 cat-titulo-rotulo">{{ ROTULOS_TIPO[tipo] }}s</span>
+          <strong class="cat-valor">R$ {{ formatCents(totalPorTipo(tipo)) }}</strong>
+        </v-expansion-panel-title>
+        <v-expansion-panel-text>
+          <button type="button" class="lc-add mb-3" @click="abrirNovo(tipo)">
+            <v-icon size="14">mdi-plus</v-icon> Adicionar {{ ROTULOS_TIPO[tipo].toLowerCase() }}
+          </button>
+
+          <button
+            v-for="lancamento in lancamentosPorTipo(tipo)"
+            :key="lancamento.id"
+            type="button"
+            class="lc-resumo-item mb-2"
+            @click="abrirExistente(lancamento)"
           >
-          <span class="lc-titulo">{{ ROTULOS_TIPO[tipo] }}s</span>
-        </div>
-      </div>
-      <div class="lc-painel-corpo">
-        <button type="button" class="lc-add mb-3" @click="abrirNovo(tipo)">
-          <v-icon size="14">mdi-plus</v-icon> Adicionar {{ ROTULOS_TIPO[tipo].toLowerCase() }}
-        </button>
-
-        <button
-          v-for="lancamento in lancamentosPorTipo(tipo)"
-          :key="lancamento.id"
-          type="button"
-          class="lc-resumo-item mb-2"
-          @click="abrirExistente(lancamento)"
-        >
-          <span class="lc-resumo-ic"><v-icon :icon="ICONES_TIPO[tipo]" size="18" /></span>
-          <span class="lc-resumo-corpo">
-            <span class="lc-resumo-titulo">{{ lancamento.fornecedor || 'Sem credor' }}</span>
-            <span class="lc-resumo-valor">
-              R$ {{ formatCents(lancamento.valorCents + lancamento.valorAcrescimoCents) }}
+            <span class="lc-resumo-ic"><v-icon :icon="ICONES_TIPO[tipo]" size="18" /></span>
+            <span class="lc-resumo-corpo">
+              <span class="lc-resumo-titulo">{{ lancamento.fornecedor || 'Sem credor' }}</span>
+              <span class="lc-resumo-valor">
+                R$ {{ formatCents(lancamento.valorCents + lancamento.valorAcrescimoCents) }}
+              </span>
             </span>
-          </span>
-        </button>
+          </button>
 
-        <p v-if="!lancamentosPorTipo(tipo).length" class="text-caption text-medium-emphasis mb-0">
-          Nenhuma {{ ROTULOS_TIPO[tipo].toLowerCase() }} lançada ainda.
-        </p>
-        <div v-else class="grade-cartoes lc-mt">
-          <CartaoValor
-            :rotulo="`Total ${ROTULOS_TIPO[tipo]}`"
-            :valor="`R$ ${formatCents(totalPorTipo(tipo))}`"
-          />
-        </div>
-      </div>
-    </div>
+          <p v-if="!lancamentosPorTipo(tipo).length" class="text-caption text-medium-emphasis mb-0">
+            Nenhuma {{ ROTULOS_TIPO[tipo].toLowerCase() }} lançada ainda.
+          </p>
+          <div v-else class="grade-cartoes lc-mt">
+            <CartaoValor
+              :rotulo="`Total ${ROTULOS_TIPO[tipo]}`"
+              :valor="`R$ ${formatCents(totalPorTipo(tipo))}`"
+            />
+          </div>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+    </v-expansion-panels>
 
     <div class="lc-bloco-automatico">
       <p class="lc-grupo-titulo">Lançamentos Automáticos</p>
@@ -311,59 +324,65 @@ const totalGeralDiscriminacao = computed(() =>
         edição manual aqui.
       </p>
 
-      <div
-        class="lc-painel"
-        :style="{
-          '--cat': 'var(--cat-despesas-base)',
-          '--cat-soft': 'var(--cat-despesas-soft)',
-          '--cat-faixa': 'var(--cat-despesas-faixa)',
-          '--cat-tinta': 'var(--cat-despesas-tinta)',
-        }"
-      >
-        <div class="lc-faixa">
-          <div class="lc-head">
-            <span class="lc-ic"><v-icon size="19">mdi-robot-outline</v-icon></span>
-            <span class="lc-titulo">Despesas Automáticas</span>
-          </div>
-        </div>
-        <div class="lc-painel-corpo">
-          <div class="grade-cartoes">
-            <CartaoValor
-              v-for="item in despesasAutomaticas"
-              :key="item.rotulo"
-              :rotulo="item.rotulo"
-              :valor="`R$ ${formatCents(item.valorCents)}`"
-            />
-          </div>
-        </div>
-      </div>
+      <v-expansion-panels variant="accordion" class="cat-accordion">
+        <v-expansion-panel
+          class="cat-painel"
+          :style="{
+            '--cat': 'var(--cat-despesas-base)',
+            '--cat-soft': 'var(--cat-despesas-soft)',
+            '--cat-tinta': 'var(--cat-despesas-tinta)',
+          }"
+        >
+          <v-expansion-panel-title class="cat-titulo">
+            <span class="flex-grow-1">Despesas Automáticas</span>
+            <strong class="cat-valor">R$ {{ formatCents(totalDespesasAutomaticasCents) }}</strong>
+          </v-expansion-panel-title>
+          <v-expansion-panel-text>
+            <v-expansion-panels variant="accordion" class="cat-subacordeao">
+              <v-expansion-panel v-for="item in despesasAutomaticas" :key="item.rotulo" class="cat-subitem">
+                <v-expansion-panel-title class="cat-subitem-titulo">
+                  <span class="d-flex flex-column">
+                    <span class="cat-subitem-rotulo">{{ item.rotulo }}</span>
+                    <strong class="cat-subitem-valor">R$ {{ formatCents(item.valorCents) }}</strong>
+                  </span>
+                </v-expansion-panel-title>
+                <v-expansion-panel-text>
+                  <p class="text-body-2 text-medium-emphasis mb-0">{{ item.observacao }}</p>
+                </v-expansion-panel-text>
+              </v-expansion-panel>
+            </v-expansion-panels>
+          </v-expansion-panel-text>
+        </v-expansion-panel>
 
-      <div
-        class="lc-painel"
-        :style="{
-          '--cat': 'var(--cat-mercadorias-base)',
-          '--cat-soft': 'var(--cat-mercadorias-soft)',
-          '--cat-faixa': 'var(--cat-mercadorias-faixa)',
-          '--cat-tinta': 'var(--cat-mercadorias-tinta)',
-        }"
-      >
-        <div class="lc-faixa">
-          <div class="lc-head">
-            <span class="lc-ic"><v-icon size="19">mdi-robot-outline</v-icon></span>
-            <span class="lc-titulo">Mercadorias Automáticas</span>
-          </div>
-        </div>
-        <div class="lc-painel-corpo">
-          <div class="grade-cartoes">
-            <CartaoValor
-              v-for="item in mercadoriasAutomaticas"
-              :key="item.rotulo"
-              :rotulo="item.rotulo"
-              :valor="`R$ ${formatCents(item.valorCents)}`"
-            />
-          </div>
-        </div>
-      </div>
+        <v-expansion-panel
+          class="cat-painel"
+          :style="{
+            '--cat': 'var(--cat-mercadorias-base)',
+            '--cat-soft': 'var(--cat-mercadorias-soft)',
+            '--cat-tinta': 'var(--cat-mercadorias-tinta)',
+          }"
+        >
+          <v-expansion-panel-title class="cat-titulo">
+            <span class="flex-grow-1">Mercadorias Automáticas</span>
+            <strong class="cat-valor">R$ {{ formatCents(totalMercadoriasAutomaticasCents) }}</strong>
+          </v-expansion-panel-title>
+          <v-expansion-panel-text>
+            <v-expansion-panels variant="accordion" class="cat-subacordeao">
+              <v-expansion-panel v-for="item in mercadoriasAutomaticas" :key="item.rotulo" class="cat-subitem">
+                <v-expansion-panel-title class="cat-subitem-titulo">
+                  <span class="d-flex flex-column">
+                    <span class="cat-subitem-rotulo">{{ item.rotulo }}</span>
+                    <strong class="cat-subitem-valor">R$ {{ formatCents(item.valorCents) }}</strong>
+                  </span>
+                </v-expansion-panel-title>
+                <v-expansion-panel-text>
+                  <p class="text-body-2 text-medium-emphasis mb-0">{{ item.observacao }}</p>
+                </v-expansion-panel-text>
+              </v-expansion-panel>
+            </v-expansion-panels>
+          </v-expansion-panel-text>
+        </v-expansion-panel>
+      </v-expansion-panels>
     </div>
 
     <v-dialog v-model="modalAberto" max-width="560">

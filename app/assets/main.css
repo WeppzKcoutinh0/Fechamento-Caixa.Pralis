@@ -296,6 +296,81 @@ body {
 .lc-painel-corpo {
   padding: var(--cx-sp-4) var(--cx-sp-5);
 }
+
+/* Accordion por categoria colorida (pedido do usuário, 21-22/09/2026) — cabeçalho clicável com
+   faixa cheia da cor da categoria + valor + seta (v-expansion-panel do Vuetify), usado no
+   Relatório Final e, pelo mesmo padrão visual, nos blocos "Automáticos" de Transferências e
+   Lançamentos. --cat/--cat-soft/--cat-tinta são injetados por painel via :style. */
+.cat-accordion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cx-sp-3);
+}
+.cat-painel {
+  border: 1px solid var(--cx-line) !important;
+  border-radius: var(--cx-r-lg) !important;
+  overflow: hidden;
+}
+.cat-titulo {
+  background: var(--cat) !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+  gap: var(--cx-sp-3);
+}
+.cat-titulo .v-expansion-panel-title__icon .v-icon {
+  color: #fff;
+}
+/* Rótulo com ícone (painéis manuais) — precisa de min-width:0 pro texto quebrar linha em vez de
+   estourar a largura do flex e empurrar valor/seta pra fora do card (bug clássico de flexbox). */
+.cat-titulo-rotulo {
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+.cat-valor {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  margin-right: var(--cx-sp-2);
+}
+.cat-subgrupo {
+  margin: 0 0 var(--cx-sp-2);
+  color: var(--cx-ink-soft);
+  font-size: var(--cx-fs-micro);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Sub-accordion dentro de um card de categoria (pedido do usuário, 22/09/2026): cada item
+   (CREDITO, VOUCHER etc.) vira ele mesmo clicável, expandindo o detalhe por PDV — mesma família
+   visual do .cartao-valor (fundo -sunken, sem borda colorida forte), só que agora interativo. */
+.cat-subacordeao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cx-sp-2);
+}
+.cat-subitem {
+  border: none !important;
+  border-radius: var(--cx-r-md) !important;
+  background: var(--cx-surface-sunken) !important;
+  overflow: hidden;
+}
+.cat-subitem-titulo {
+  min-height: 0 !important;
+  padding: var(--cx-sp-3) var(--cx-sp-4) !important;
+}
+.cat-subitem-rotulo {
+  overflow: hidden;
+  color: var(--cx-ink-soft);
+  font-size: var(--cx-fs-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cat-subitem-valor {
+  color: var(--cx-ink);
+  font-size: var(--cx-fs-lead);
+  font-weight: 600;
+}
+
 .lc-x {
   color: #fff;
   cursor: pointer;

@@ -185,16 +185,16 @@ const totalTransferenciasCents = computed(() =>
 // não editável aqui. Deriva do que JÁ está no draft (não faz uma busca nova): `pdvEntradas` já é
 // preenchido de forma idempotente por `aplicarResumoAoPrimeiroPdv` (sobrescreve, nunca duplica a
 // cada nova busca), então isto nunca soma a mesma venda duas vezes.
-function somaPdv(
-  campo:
-    | 'dinheiroCents'
-    | 'creditoCents'
-    | 'debitoCents'
-    | 'pixCents'
-    | 'voucherCents'
-    | 'crediarioCents',
-): number {
+type CampoPdv = 'dinheiroCents' | 'creditoCents' | 'debitoCents' | 'pixCents' | 'voucherCents' | 'crediarioCents';
+function somaPdv(campo: CampoPdv): number {
   return props.draft.pdvEntradas.reduce((soma, p) => soma + p[campo], 0);
+}
+// Detalhe por PDV (pedido do usuário, 22/09/2026): clicar num card individual (ex.: VOUCHER)
+// expande mostrando quanto cada PDV lançado na Seção 1 contribuiu pro total — mesmo rótulo
+// "PDV N" já usado na lista de PDVs (SecaoRelatorios.vue). Com um PDV só (caso mais comum),
+// mostra uma linha só, igual ao total do card.
+function detalhesPorPdv(campo: CampoPdv): { rotulo: string; valorCents: number }[] {
+  return props.draft.pdvEntradas.map((p, i) => ({ rotulo: `PDV ${i + 1}`, valorCents: p[campo] }));
 }
 // Transferência recebida de outro caixa (pedido do usuário, 21/09/2026): quando outro caixa
 // registra "Transferência entre caixas" com este caixa como destino, aparece aqui sozinho — sem
@@ -206,141 +206,165 @@ onMounted(() => {
   if (props.draft.data) void buscarTransferenciasRecebidas(props.draft.data);
 });
 
+// Lacre de abertura (pedido do usuário, 22/09/2026): o mesmo lookup de Tesouraria que já
+// preenchia a Entrada manual quando alguém redigitava o número — buscado sozinho aqui, sem
+// precisar que o caixa crie uma Entrada e redigite o lacre que ele já informou ao abrir o caixa.
+const valorLacreAbertura = ref(0);
+onMounted(async () => {
+  if (!props.draft.lacreAbertura) return;
+  const resultado = await buscarPorLacre(props.draft.lacreAbertura).catch(() => null);
+  valorLacreAbertura.value = resultado?.valorCents ?? 0;
+});
+
 const transferenciasAutomaticas = computed(() => [
-  { rotulo: 'CREDITO', valorCents: somaPdv('creditoCents') },
-  { rotulo: 'DEBITO', valorCents: somaPdv('debitoCents') },
-  { rotulo: 'PIX', valorCents: somaPdv('pixCents') },
-  { rotulo: 'VOUCHER', valorCents: somaPdv('voucherCents') },
-  { rotulo: 'DINHEIRO', valorCents: somaPdv('dinheiroCents') },
-  { rotulo: 'CREDIARIO', valorCents: somaPdv('crediarioCents') },
+  { rotulo: 'CREDITO', valorCents: somaPdv('creditoCents'), detalhes: detalhesPorPdv('creditoCents') },
+  { rotulo: 'DEBITO', valorCents: somaPdv('debitoCents'), detalhes: detalhesPorPdv('debitoCents') },
+  { rotulo: 'PIX', valorCents: somaPdv('pixCents'), detalhes: detalhesPorPdv('pixCents') },
+  { rotulo: 'VOUCHER', valorCents: somaPdv('voucherCents'), detalhes: detalhesPorPdv('voucherCents') },
+  { rotulo: 'DINHEIRO', valorCents: somaPdv('dinheiroCents'), detalhes: detalhesPorPdv('dinheiroCents') },
+  { rotulo: 'CREDIARIO', valorCents: somaPdv('crediarioCents'), detalhes: detalhesPorPdv('crediarioCents') },
+  ...(valorLacreAbertura.value > 0
+    ? [
+        {
+          rotulo: 'TRANSFERÊNCIAS DE ENTRADA',
+          valorCents: valorLacreAbertura.value,
+          detalhes: [{ rotulo: `Lacre ${props.draft.lacreAbertura}`, valorCents: valorLacreAbertura.value }],
+        },
+      ]
+    : []),
   ...transferenciasRecebidas.value.map((r) => ({
     rotulo: r.caixaOrigem.toUpperCase(),
     valorCents: r.valorCents,
+    detalhes: [{ rotulo: `Recebido de ${r.caixaOrigem}`, valorCents: r.valorCents }],
   })),
 ]);
+const totalTransferenciasAutomaticasCents = computed(() =>
+  transferenciasAutomaticas.value.reduce((soma, item) => soma + item.valorCents, 0),
+);
 </script>
 
 <template>
   <div class="d-flex flex-column ga-4">
     <p class="lc-grupo-titulo">Transferências Manuais</p>
 
-    <!-- Painel Entradas -->
-    <div class="lc-painel" :style="ENTRADA_VARS">
-      <div class="lc-faixa">
-        <div class="lc-head">
-          <span class="lc-ic"><v-icon size="19">mdi-arrow-down-bold-circle-outline</v-icon></span>
-          <span class="lc-titulo">Transferências/Entrada</span>
-        </div>
-      </div>
-      <div class="lc-painel-corpo">
-        <button type="button" class="lc-add mb-3" @click="abrirNovaEntrada">
-          <v-icon size="14">mdi-plus</v-icon> Adicionar entrada
-        </button>
+    <v-expansion-panels variant="accordion" class="cat-accordion">
+      <!-- Painel Entradas -->
+      <v-expansion-panel class="cat-painel" :style="ENTRADA_VARS">
+        <v-expansion-panel-title class="cat-titulo">
+          <v-icon size="18" class="mr-2">mdi-arrow-down-bold-circle-outline</v-icon>
+          <span class="flex-grow-1 cat-titulo-rotulo">Transferências/<wbr />Entrada</span>
+          <strong class="cat-valor">R$ {{ formatCents(totalEntradaCents) }}</strong>
+        </v-expansion-panel-title>
+        <v-expansion-panel-text>
+          <button type="button" class="lc-add mb-3" @click="abrirNovaEntrada">
+            <v-icon size="14">mdi-plus</v-icon> Adicionar entrada
+          </button>
 
-        <button
-          v-for="(entrada, idx) in draft.entradas"
-          :key="idx"
-          type="button"
-          class="lc-resumo-item mb-2"
-          @click="abrirEntrada(idx)"
-        >
-          <span class="lc-resumo-ic">
-            <v-icon icon="mdi-arrow-down-bold-circle-outline" size="18" />
-          </span>
-          <span class="lc-resumo-corpo">
-            <span class="lc-resumo-titulo">{{ entrada.descricao || 'Sem descrição' }}</span>
-            <span class="lc-resumo-valor">R$ {{ formatCents(entrada.valorCents) }}</span>
-          </span>
-        </button>
-
-        <p v-if="!draft.entradas.length" class="text-caption text-medium-emphasis mb-0">
-          Nenhuma entrada lançada ainda.
-        </p>
-        <div v-else class="grade-cartoes lc-mt">
-          <CartaoValor rotulo="Total Entrada" :valor="`R$ ${formatCents(totalEntradaCents)}`" />
-        </div>
-      </div>
-    </div>
-
-    <!-- Painel Sangrias -->
-    <div class="lc-painel" :style="SANGRIA_VARS">
-      <div class="lc-faixa">
-        <div class="lc-head">
-          <span class="lc-ic"><v-icon size="19">mdi-cash-remove</v-icon></span>
-          <span class="lc-titulo">Transferências/Saída/Sangria</span>
-        </div>
-      </div>
-      <div class="lc-painel-corpo">
-        <button type="button" class="lc-add mb-3" @click="abrirNovaSangria">
-          <v-icon size="14">mdi-plus</v-icon> Adicionar sangria
-        </button>
-
-        <button
-          v-for="(sangria, idx) in draft.sangrias"
-          :key="idx"
-          type="button"
-          class="lc-resumo-item mb-2"
-          @click="abrirSangria(idx)"
-        >
-          <span class="lc-resumo-ic"><v-icon icon="mdi-cash-remove" size="18" /></span>
-          <span class="lc-resumo-corpo">
-            <span class="lc-resumo-titulo">{{ sangria.descricao || 'Sem descrição' }}</span>
-            <span class="lc-resumo-valor">R$ {{ formatCents(sangria.valorCents) }}</span>
-          </span>
-        </button>
-
-        <p v-if="!draft.sangrias.length" class="text-caption text-medium-emphasis mb-0">
-          Nenhuma sangria lançada ainda.
-        </p>
-        <div v-else class="grade-cartoes lc-mt">
-          <CartaoValor
-            rotulo="Total Saída / Sangria"
-            :valor="`R$ ${formatCents(totalSaidaCents)}`"
-          />
-        </div>
-      </div>
-    </div>
-
-    <!-- Painel Transferência entre caixas -->
-    <div class="lc-painel" :style="TRANSFERENCIA_VARS">
-      <div class="lc-faixa">
-        <div class="lc-head">
-          <span class="lc-ic"><v-icon size="19">mdi-swap-horizontal</v-icon></span>
-          <span class="lc-titulo">Transferências/Entrada/Saída/Entre caixas</span>
-        </div>
-      </div>
-      <div class="lc-painel-corpo">
-        <button type="button" class="lc-add mb-3" @click="abrirNovaTransferencia">
-          <v-icon size="14">mdi-plus</v-icon> Adicionar transferência
-        </button>
-
-        <button
-          v-for="(transferencia, idx) in draft.transferenciasCaixa"
-          :key="idx"
-          type="button"
-          class="lc-resumo-item mb-2"
-          @click="abrirTransferencia(idx)"
-        >
-          <span class="lc-resumo-ic"><v-icon icon="mdi-swap-horizontal" size="18" /></span>
-          <span class="lc-resumo-corpo">
-            <span class="lc-resumo-titulo">
-              {{ transferencia.caixaOrigem || '—' }} → {{ transferencia.caixaDestino || '—' }}
+          <button
+            v-for="(entrada, idx) in draft.entradas"
+            :key="idx"
+            type="button"
+            class="lc-resumo-item mb-2"
+            @click="abrirEntrada(idx)"
+          >
+            <span class="lc-resumo-ic">
+              <v-icon icon="mdi-arrow-down-bold-circle-outline" size="18" />
             </span>
-            <span class="lc-resumo-valor">R$ {{ formatCents(transferencia.valorCents) }}</span>
-          </span>
-        </button>
+            <span class="lc-resumo-corpo">
+              <span class="lc-resumo-titulo">{{ entrada.descricao || 'Sem descrição' }}</span>
+              <span class="lc-resumo-valor">R$ {{ formatCents(entrada.valorCents) }}</span>
+            </span>
+          </button>
 
-        <p v-if="!draft.transferenciasCaixa.length" class="text-caption text-medium-emphasis mb-0">
-          Nenhuma transferência entre caixas lançada ainda.
-        </p>
-        <div v-else class="grade-cartoes lc-mt">
-          <CartaoValor
-            rotulo="Total Transferido"
-            :valor="`R$ ${formatCents(totalTransferenciasCents)}`"
-          />
-        </div>
-      </div>
-    </div>
+          <p v-if="!draft.entradas.length" class="text-caption text-medium-emphasis mb-0">
+            Nenhuma entrada lançada ainda.
+          </p>
+          <div v-else class="grade-cartoes lc-mt">
+            <CartaoValor rotulo="Total Entrada" :valor="`R$ ${formatCents(totalEntradaCents)}`" />
+          </div>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+
+      <!-- Painel Sangrias -->
+      <v-expansion-panel class="cat-painel" :style="SANGRIA_VARS">
+        <v-expansion-panel-title class="cat-titulo">
+          <v-icon size="18" class="mr-2">mdi-cash-remove</v-icon>
+          <span class="flex-grow-1 cat-titulo-rotulo">Transferências/<wbr />Saída/<wbr />Sangria</span>
+          <strong class="cat-valor">R$ {{ formatCents(totalSaidaCents) }}</strong>
+        </v-expansion-panel-title>
+        <v-expansion-panel-text>
+          <button type="button" class="lc-add mb-3" @click="abrirNovaSangria">
+            <v-icon size="14">mdi-plus</v-icon> Adicionar sangria
+          </button>
+
+          <button
+            v-for="(sangria, idx) in draft.sangrias"
+            :key="idx"
+            type="button"
+            class="lc-resumo-item mb-2"
+            @click="abrirSangria(idx)"
+          >
+            <span class="lc-resumo-ic"><v-icon icon="mdi-cash-remove" size="18" /></span>
+            <span class="lc-resumo-corpo">
+              <span class="lc-resumo-titulo">{{ sangria.descricao || 'Sem descrição' }}</span>
+              <span class="lc-resumo-valor">R$ {{ formatCents(sangria.valorCents) }}</span>
+            </span>
+          </button>
+
+          <p v-if="!draft.sangrias.length" class="text-caption text-medium-emphasis mb-0">
+            Nenhuma sangria lançada ainda.
+          </p>
+          <div v-else class="grade-cartoes lc-mt">
+            <CartaoValor
+              rotulo="Total Saída / Sangria"
+              :valor="`R$ ${formatCents(totalSaidaCents)}`"
+            />
+          </div>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+
+      <!-- Painel Transferência entre caixas -->
+      <v-expansion-panel class="cat-painel" :style="TRANSFERENCIA_VARS">
+        <v-expansion-panel-title class="cat-titulo">
+          <v-icon size="18" class="mr-2">mdi-swap-horizontal</v-icon>
+          <span class="flex-grow-1 cat-titulo-rotulo"
+            >Transferências/<wbr />Entrada/<wbr />Saída/<wbr />Entre caixas</span
+          >
+          <strong class="cat-valor">R$ {{ formatCents(totalTransferenciasCents) }}</strong>
+        </v-expansion-panel-title>
+        <v-expansion-panel-text>
+          <button type="button" class="lc-add mb-3" @click="abrirNovaTransferencia">
+            <v-icon size="14">mdi-plus</v-icon> Adicionar transferência
+          </button>
+
+          <button
+            v-for="(transferencia, idx) in draft.transferenciasCaixa"
+            :key="idx"
+            type="button"
+            class="lc-resumo-item mb-2"
+            @click="abrirTransferencia(idx)"
+          >
+            <span class="lc-resumo-ic"><v-icon icon="mdi-swap-horizontal" size="18" /></span>
+            <span class="lc-resumo-corpo">
+              <span class="lc-resumo-titulo">
+                {{ transferencia.caixaOrigem || '—' }} → {{ transferencia.caixaDestino || '—' }}
+              </span>
+              <span class="lc-resumo-valor">R$ {{ formatCents(transferencia.valorCents) }}</span>
+            </span>
+          </button>
+
+          <p v-if="!draft.transferenciasCaixa.length" class="text-caption text-medium-emphasis mb-0">
+            Nenhuma transferência entre caixas lançada ainda.
+          </p>
+          <div v-else class="grade-cartoes lc-mt">
+            <CartaoValor
+              rotulo="Total Transferido"
+              :valor="`R$ ${formatCents(totalTransferenciasCents)}`"
+            />
+          </div>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+    </v-expansion-panels>
 
     <div class="lc-bloco-automatico">
       <p class="lc-grupo-titulo">Transferências Automáticas</p>
@@ -349,24 +373,38 @@ const transferenciasAutomaticas = computed(() => [
         transferências que outros caixas já registraram tendo este como destino — sem edição manual
         aqui.
       </p>
-      <div class="lc-painel" :style="TRANSFERENCIAS_VARS">
-        <div class="lc-faixa">
-          <div class="lc-head">
-            <span class="lc-ic"><v-icon size="19">mdi-robot-outline</v-icon></span>
-            <span class="lc-titulo">Transferências Automáticas</span>
-          </div>
-        </div>
-        <div class="lc-painel-corpo">
-          <div class="grade-cartoes">
-            <CartaoValor
-              v-for="item in transferenciasAutomaticas"
-              :key="item.rotulo"
-              :rotulo="item.rotulo"
-              :valor="`R$ ${formatCents(item.valorCents)}`"
-            />
-          </div>
-        </div>
-      </div>
+      <v-expansion-panels variant="accordion" class="cat-accordion">
+        <v-expansion-panel class="cat-painel" :style="TRANSFERENCIAS_VARS">
+          <v-expansion-panel-title class="cat-titulo">
+            <span class="flex-grow-1">Transferências Automáticas</span>
+            <strong class="cat-valor">R$ {{ formatCents(totalTransferenciasAutomaticasCents) }}</strong>
+          </v-expansion-panel-title>
+          <v-expansion-panel-text>
+            <v-expansion-panels variant="accordion" class="cat-subacordeao">
+              <v-expansion-panel v-for="item in transferenciasAutomaticas" :key="item.rotulo" class="cat-subitem">
+                <v-expansion-panel-title class="cat-subitem-titulo">
+                  <span class="d-flex flex-column">
+                    <span class="cat-subitem-rotulo">{{ item.rotulo }}</span>
+                    <strong class="cat-subitem-valor">R$ {{ formatCents(item.valorCents) }}</strong>
+                  </span>
+                </v-expansion-panel-title>
+                <v-expansion-panel-text>
+                  <div class="d-flex flex-column ga-1">
+                    <div
+                      v-for="d in item.detalhes"
+                      :key="d.rotulo"
+                      class="d-flex justify-space-between text-body-2"
+                    >
+                      <span class="text-medium-emphasis">{{ d.rotulo }}</span>
+                      <strong>R$ {{ formatCents(d.valorCents) }}</strong>
+                    </div>
+                  </div>
+                </v-expansion-panel-text>
+              </v-expansion-panel>
+            </v-expansion-panels>
+          </v-expansion-panel-text>
+        </v-expansion-panel>
+      </v-expansion-panels>
     </div>
 
     <v-dialog v-model="modalAberto" max-width="480">

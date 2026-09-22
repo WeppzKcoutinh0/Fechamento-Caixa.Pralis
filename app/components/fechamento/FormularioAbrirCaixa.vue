@@ -93,7 +93,7 @@ async function confirmar(): Promise<void> {
         <v-text-field
           v-model="lacreAbertura"
           label="Transf. Entrada / N° Lacre"
-          hint="Identifica o lacre do malote que trouxe o fundo ao caixa. Não é o lacre usado no fechamento."
+          hint="Identifica o lacre do malote que trouxe o fundo ao caixa — se já estiver cadastrado na Tesouraria, o valor aparece sozinho em Transferências Automáticas. Não é o lacre usado no fechamento."
           persistent-hint
         />
         <v-select

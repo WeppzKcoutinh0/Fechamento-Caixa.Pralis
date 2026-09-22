@@ -227,6 +227,12 @@ export interface FechamentoDraft {
   // WizardFechamento.vue).
   cashSessionId: string | null;
 
+  // Lacre digitado na abertura do caixa (pedido do usuário, 22/09/2026): identifica o malote do
+  // fundo de caixa que a Tesouraria já cadastrou com valor — usado só pra buscar esse valor
+  // automaticamente em Transferências Automáticas (ver SecaoTransferencias.vue), nunca editado
+  // aqui de novo.
+  lacreAbertura: string;
+
   // Arquivos escolhidos para os campos de maquininha antes do primeiro salvamento. Eles ficam
   // apenas em memória: o Storage só aceita o upload depois que o fechamento existe no banco.
   arquivosPendentes?: Partial<Record<'img-manha' | 'img-tarde', File>>;
@@ -281,6 +287,7 @@ export interface ContextoSessaoCaixa {
   caixa: Caixa;
   turno: Turno;
   businessDate: string;
+  lacreAbertura: string;
 }
 
 /** Estado inicial de um fechamento novo — mesma lógica de `novoFechamento()`/`resetarFormulario()`. */
@@ -318,6 +325,7 @@ export function criarFechamentoVazio(contexto?: ContextoSessaoCaixa): Fechamento
     discriminacoes: [],
     dinheiroContadoCents: 0,
     cashSessionId: contexto?.id ?? null,
+    lacreAbertura: contexto?.lacreAbertura ?? '',
     arquivosPendentes: {},
   };
 }

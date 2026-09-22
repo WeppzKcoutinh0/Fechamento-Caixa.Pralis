@@ -295,6 +295,10 @@ function linhaParaDraft(row: FechamentoRow): FechamentoDraft {
     })),
     dinheiroContadoCents: toCents(row.dinheiro_contado ?? 0),
     cashSessionId: row.cash_session_id,
+    // Só existe pro fluxo de abertura (ver criarFechamentoVazio) — reabrir um fechamento já
+    // salvo pra edição não deve disparar o lookup de novo com um valor de Tesouraria que já
+    // pode ter mudado; o que foi somado na Diferença na hora do Salvar já está gravado.
+    lacreAbertura: '',
   };
 }
 
@@ -350,11 +354,27 @@ export function useFechamentos() {
         '[fechamento] RPC de transferências recebidas ainda não disponível; usando zero.',
         erroTransferenciasRecebidas,
       );
-    const transferenciaEntradaCents = (
+    let transferenciaEntradaCents = (
       (erroTransferenciasRecebidas
         ? []
         : (transferenciasRecebidasRows as { valor_total_cents: number }[] | null)) ?? []
     ).reduce((s, r) => s + Number(r.valor_total_cents), 0);
+
+    // Lacre de abertura (pedido do usuário, 22/09/2026) — mesmo lookup de Tesouraria de sempre,
+    // buscado de novo aqui pelo mesmo motivo do bloco acima: precisa ser o valor mais fresco no
+    // exato momento do Salvar. Soma no mesmo total de "Transferências Automáticas" (entram na
+    // Diferença Geral igual a uma transferência entre caixas recebida).
+    if (draft.lacreAbertura.trim()) {
+      const { data: linhaLacre, error: erroLacre } = await supabase.rpc(
+        'buscar_transferencia_tesouraria_por_lacre',
+        { p_lacre: draft.lacreAbertura.trim() },
+      );
+      if (erroLacre) throw erroLacre;
+      const valorLacreCents = Math.round(
+        Number((linhaLacre as { valor: string }[] | null)?.[0]?.valor ?? 0) * 100,
+      );
+      transferenciaEntradaCents += valorLacreCents;
+    }
 
     const pdv = calculatePdvEntradas(
       draft.pdvEntradas.map((e) => ({

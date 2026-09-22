@@ -10,6 +10,7 @@ export interface SessaoCaixa {
   businessDate: string;
   openedAt: string;
   status: 'ABERTO' | 'FECHADO';
+  lacreAbertura: string;
 }
 
 interface SessaoRow {
@@ -19,6 +20,7 @@ interface SessaoRow {
   business_date: string;
   opened_at: string;
   status: 'ABERTO' | 'FECHADO';
+  lacre_abertura: string | null;
 }
 
 function linhaParaSessao(l: SessaoRow): SessaoCaixa {
@@ -29,8 +31,11 @@ function linhaParaSessao(l: SessaoRow): SessaoCaixa {
     businessDate: l.business_date,
     openedAt: l.opened_at,
     status: l.status,
+    lacreAbertura: l.lacre_abertura ?? '',
   };
 }
+
+const SELECT_SESSAO = 'id, caixa, turno, business_date, opened_at, status, lacre_abertura';
 
 /**
  * Fluxo de Caixa (18/09/2026): a sessão de caixa ABERTA do usuário logado (no máximo uma —
@@ -56,7 +61,7 @@ export function useSessaoCaixa() {
     try {
       const { data, error: erroSupabase } = await supabase
         .from('cash_sessions')
-        .select('id, caixa, turno, business_date, opened_at, status')
+        .select(SELECT_SESSAO)
         .eq('opened_by', session.value.user.id)
         .eq('status', 'ABERTO')
         .maybeSingle();
@@ -90,7 +95,7 @@ export function useSessaoCaixa() {
         lacre_abertura: dados.lacreAbertura,
         maquininha_abertura: dados.maquininhaAbertura,
       })
-      .select('id, caixa, turno, business_date, opened_at, status')
+      .select(SELECT_SESSAO)
       .single();
 
     if (erroSupabase) {

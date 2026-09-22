@@ -31,6 +31,7 @@ async function entrar() {
     <v-row align="center" justify="center">
       <v-col cols="12" sm="8" md="5" lg="4">
         <v-card class="pa-6 cartao-login" elevation="0">
+          <img class="logo-login" src="/marca/logo-cicluz.png" alt="Cicluz Gestão Profissional" />
           <v-card-title class="text-h5 mb-2">Fechamento de Caixa</v-card-title>
           <v-card-subtitle class="mb-4">Entre com sua conta para continuar</v-card-subtitle>
 
@@ -72,5 +73,12 @@ async function entrar() {
 .cartao-login {
   border-radius: var(--cx-r-xl) !important;
   box-shadow: var(--cx-e-3) !important;
+}
+
+.logo-login {
+  display: block;
+  width: min(100%, 180px);
+  height: auto;
+  margin: 0 auto var(--cx-sp-5);
 }
 </style>

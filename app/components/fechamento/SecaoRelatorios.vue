@@ -180,18 +180,32 @@ const liqVoucherCents = computed(
   () => props.draft.voucherTardeCents - props.draft.voucherManhaCents,
 );
 
-const { ler: lerRelatorioMaquininha } = useLeituraMaquininha();
+const { ler: lerRelatorioMaquininha, lerArquivo: lerArquivoMaquininha } = useLeituraMaquininha();
 const lendoMaquininha = ref<'manha' | 'tarde' | null>(null);
 const erroLeituraMaquininha = ref('');
 const avisoLeituraMaquininha = ref('');
 
-async function lerFotoMaquininha(turno: 'manha' | 'tarde', path: string | null): Promise<void> {
-  if (!path) return;
+// A foto pode ainda não ter sido enviada pro Storage (upload adiado até o primeiro "Salvar")
+// — nesse caso não existe path ainda, mas o arquivo já está em memória em arquivosPendentes,
+// e dá pra ler direto dele sem esperar o usuário salvar o fechamento primeiro.
+function temFotoParaLer(campo: 'img-manha' | 'img-tarde', path: string | null): boolean {
+  return Boolean(path) || Boolean(props.draft.arquivosPendentes?.[campo]);
+}
+
+async function lerFotoMaquininha(
+  turno: 'manha' | 'tarde',
+  campo: 'img-manha' | 'img-tarde',
+  path: string | null,
+): Promise<void> {
+  const arquivoPendente = props.draft.arquivosPendentes?.[campo];
+  if (!path && !arquivoPendente) return;
   lendoMaquininha.value = turno;
   erroLeituraMaquininha.value = '';
   avisoLeituraMaquininha.value = '';
   try {
-    const resultado = await lerRelatorioMaquininha(path, turno);
+    const resultado = arquivoPendente
+      ? await lerArquivoMaquininha(arquivoPendente, turno)
+      : await lerRelatorioMaquininha(path as string, turno);
     const campos = resultado.campos as Record<string, unknown>;
     for (const [chave, valor] of Object.entries(campos)) {
       if (valor !== null && valor !== undefined && chave in props.draft) {
@@ -202,7 +216,11 @@ async function lerFotoMaquininha(turno: 'manha' | 'tarde', path: string | null):
     avisoLeituraMaquininha.value = `Campos preenchidos pela leitura. Confira os valores antes de salvar.${percentual}`;
     if (resultado.avisos.length) avisoLeituraMaquininha.value += ` ${resultado.avisos.join(' ')}`;
   } catch (erro) {
-    erroLeituraMaquininha.value = erro instanceof Error ? erro.message : 'Não foi possível ler a foto.';
+    // $fetch embrulha a mensagem amigável que a rota manda (createError statusMessage) dentro de
+    // um texto técnico verboso ("[POST] ... 502 ..."); erro.data.statusMessage é o texto limpo.
+    const mensagemServidor = (erro as { data?: { statusMessage?: string } })?.data?.statusMessage;
+    erroLeituraMaquininha.value =
+      mensagemServidor || (erro instanceof Error ? erro.message : 'Não foi possível ler a foto.');
   } finally {
     lendoMaquininha.value = null;
   }
@@ -628,7 +646,7 @@ const crediarioAberto = ref(false);
               @arquivo-removido="removerFotoMaquininha('img-manha')"
             />
             <v-btn
-              v-if="draft.imgManhaPath"
+              v-if="temFotoParaLer('img-manha', draft.imgManhaPath)"
               class="mt-2"
               size="small"
               variant="tonal"
@@ -636,7 +654,7 @@ const crediarioAberto = ref(false);
               prepend-icon="mdi-auto-fix"
               :loading="lendoMaquininha === 'manha'"
               :disabled="lendoMaquininha !== null"
-              @click="lerFotoMaquininha('manha', draft.imgManhaPath)"
+              @click="lerFotoMaquininha('manha', 'img-manha', draft.imgManhaPath)"
             >
               Ler com IA
             </v-btn>
@@ -726,7 +744,7 @@ const crediarioAberto = ref(false);
               @arquivo-removido="removerFotoMaquininha('img-tarde')"
             />
             <v-btn
-              v-if="draft.imgTardePath"
+              v-if="temFotoParaLer('img-tarde', draft.imgTardePath)"
               class="mt-2"
               size="small"
               variant="tonal"
@@ -734,7 +752,7 @@ const crediarioAberto = ref(false);
               prepend-icon="mdi-auto-fix"
               :loading="lendoMaquininha === 'tarde'"
               :disabled="lendoMaquininha !== null"
-              @click="lerFotoMaquininha('tarde', draft.imgTardePath)"
+              @click="lerFotoMaquininha('tarde', 'img-tarde', draft.imgTardePath)"
             >
               Ler com IA
             </v-btn>

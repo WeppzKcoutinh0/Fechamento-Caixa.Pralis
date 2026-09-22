@@ -27,12 +27,7 @@ function blobParaBase64(blob: Blob): Promise<string> {
 export function useLeituraMaquininha() {
   const supabase = useSupabase();
 
-  async function ler(path: string, turno: Turno): Promise<ResultadoLeitura> {
-    const { data: arquivo, error: erroDownload } = await supabase.storage
-      .from('anexos')
-      .download(path);
-    if (erroDownload || !arquivo) throw erroDownload ?? new Error('Foto não encontrada.');
-
+  async function enviarParaLeitura(arquivo: Blob, turno: Turno): Promise<ResultadoLeitura> {
     const { data: sessao } = await supabase.auth.getSession();
     const token = sessao.session?.access_token;
     if (!token) throw new Error('Sessão expirada — faça login novamente.');
@@ -48,5 +43,20 @@ export function useLeituraMaquininha() {
     });
   }
 
-  return { ler };
+  async function ler(path: string, turno: Turno): Promise<ResultadoLeitura> {
+    const { data: arquivo, error: erroDownload } = await supabase.storage
+      .from('anexos')
+      .download(path);
+    if (erroDownload || !arquivo) throw erroDownload ?? new Error('Foto não encontrada.');
+    return enviarParaLeitura(arquivo, turno);
+  }
+
+  // Foto acabou de ser tirada mas ainda não foi enviada pro Storage (upload adiado até o
+  // primeiro "Salvar", ver CampoFoto.vue) — lê o arquivo direto da memória do navegador,
+  // sem depender de já ter sido persistido.
+  async function lerArquivo(arquivo: File, turno: Turno): Promise<ResultadoLeitura> {
+    return enviarParaLeitura(arquivo, turno);
+  }
+
+  return { ler, lerArquivo };
 }

@@ -67,6 +67,23 @@ function lerModelo(texto: string): LeituraModelo {
   }
 }
 
+// A forma exata do erro lançado pelo $fetch (nome/status) varia conforme a causa (timeout via
+// AbortController, resposta HTTP com erro, falha de rede) — checar só `.name`/`.response.status`
+// deixou passar casos reais em teste, então também olhamos o texto da mensagem como reforço.
+function textoErro(erro: unknown): string {
+  if (erro instanceof Error) return `${erro.name ?? ''} ${erro.message ?? ''}`.toLowerCase();
+  return String(erro).toLowerCase();
+}
+function ehTimeout(erro: unknown): boolean {
+  return /timeout|aborted/.test(textoErro(erro));
+}
+function ehErroTransitorio(erro: unknown): boolean {
+  const status = (erro as { response?: { status?: number }; statusCode?: number })?.response?.status
+    ?? (erro as { statusCode?: number })?.statusCode;
+  if (status === 503 || status === 429) return true;
+  return ehTimeout(erro);
+}
+
 function listaAvisos(valor: unknown): string[] {
   if (!Array.isArray(valor)) return [];
   return valor.filter((item): item is string => typeof item === 'string').slice(0, 10);
@@ -130,9 +147,11 @@ export default defineEventHandler(async (event) => {
   };
 
   // O tier gratuito de modelos Flash/Flash-Lite ocasionalmente responde 503 (sobrecarga
-  // momentânea do provedor) — poucas tentativas com backoff curto resolvem sem custo extra
-  // perceptível, evitando expor esse erro transiente direto pro usuário.
+  // momentânea do provedor) ou simplesmente trava a conexão sem nunca responder — sem um
+  // timeout explícito, o $fetch fica pendurado pra sempre e a tela nunca mostra erro nenhum.
+  // Poucas tentativas com timeout + backoff curto resolvem sem custo extra perceptível.
   const TENTATIVAS = 3;
+  const TIMEOUT_MS = 25_000;
   let resposta: unknown;
   let ultimoErro: unknown;
   for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa += 1) {
@@ -141,19 +160,20 @@ export default defineEventHandler(async (event) => {
         method: 'POST',
         headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
         body: corpoRequisicaoIa,
+        timeout: TIMEOUT_MS,
       });
       ultimoErro = null;
       break;
     } catch (erro: unknown) {
       ultimoErro = erro;
-      const status = (erro as { response?: { status?: number } })?.response?.status;
-      const podeTentarDeNovo = status === 503 || status === 429;
-      if (!podeTentarDeNovo || tentativa === TENTATIVAS) break;
+      if (!ehErroTransitorio(erro) || tentativa === TENTATIVAS) break;
       await new Promise((resolve) => setTimeout(resolve, 600 * tentativa));
     }
   }
   if (ultimoErro) {
-    const mensagem = ultimoErro instanceof Error ? ultimoErro.message : 'Falha ao consultar o provedor de IA.';
+    const mensagem = ehTimeout(ultimoErro)
+      ? 'O provedor de IA demorou demais para responder. Tente novamente.'
+      : 'Não foi possível consultar o provedor de IA agora. Tente novamente em instantes.';
     throw createError({ statusCode: 502, statusMessage: mensagem });
   }
 

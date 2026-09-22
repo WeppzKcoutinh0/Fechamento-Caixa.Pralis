@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { criarFechamentoVazio } from '~/types/fechamento';
 import { calculatePhysicalClosing, calculateRelatorioFinal } from '~/utils/financeiro';
-import { gerarPdfFechamento, nomeArquivoPdf, type DadosRelatorioParaPdf } from './gerarPdfFechamento';
+import {
+  gerarPdfFechamento,
+  nomeArquivoPdf,
+  type DadosRelatorioParaPdf,
+} from './gerarPdfFechamento';
 
 function dadosVazios(): DadosRelatorioParaPdf {
   const relatorio = calculateRelatorioFinal({

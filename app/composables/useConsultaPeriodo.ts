@@ -1,6 +1,12 @@
 import { ref } from 'vue';
 import { useSupabase } from './useSupabase';
-import { calcularJanelaDatetime, extrairLinhas, type FechamentoComItens, type LinhaConsulta, type TipoConsulta } from '~/utils/consultaPeriodo';
+import {
+  calcularJanelaDatetime,
+  extrairLinhas,
+  type FechamentoComItens,
+  type LinhaConsulta,
+  type TipoConsulta,
+} from '~/utils/consultaPeriodo';
 
 interface FechamentoComItensRow {
   id: string;
@@ -11,7 +17,13 @@ interface FechamentoComItensRow {
   entradas: { descricao: string; lacre: string; valor: string }[];
   sangrias: { descricao: string; lacre: string; valor: string }[];
   lancamentos: { tipo: string; fornecedor: string; valor: string }[];
-  transferencias_caixa: { caixa_origem: string | null; caixa_destino: string | null; lacre: string; observacao: string; valor: string }[];
+  transferencias_caixa: {
+    caixa_origem: string | null;
+    caixa_destino: string | null;
+    lacre: string;
+    observacao: string;
+    valor: string;
+  }[];
 }
 
 /**
@@ -25,14 +37,23 @@ export function useConsultaPeriodo() {
   const erro = ref<string | null>(null);
   const linhas = ref<LinhaConsulta[]>([]);
 
-  async function buscar(params: { data: string; horarioDe: string; horarioAte: string; tipo: TipoConsulta }): Promise<void> {
+  async function buscar(params: {
+    data: string;
+    horarioDe: string;
+    horarioAte: string;
+    tipo: TipoConsulta;
+  }): Promise<void> {
     if (carregando.value) return;
     carregando.value = true;
     erro.value = null;
     linhas.value = [];
 
     try {
-      const { inicioISO, fimISO } = calcularJanelaDatetime(params.data, params.horarioDe, params.horarioAte);
+      const { inicioISO, fimISO } = calcularJanelaDatetime(
+        params.data,
+        params.horarioDe,
+        params.horarioAte,
+      );
       const { data, error } = await supabase
         .from('fechamentos')
         .select(
@@ -44,23 +65,37 @@ export function useConsultaPeriodo() {
         .order('criado_em');
       if (error) throw error;
 
-      const fechamentos: FechamentoComItens[] = (data as unknown as FechamentoComItensRow[]).map((f) => ({
-        id: f.id,
-        codigo: f.codigo,
-        caixa: f.caixa,
-        turno: f.turno,
-        criadoEm: f.criado_em,
-        entradas: f.entradas.map((e) => ({ descricao: e.descricao, lacre: e.lacre, valorCents: Math.round(Number(e.valor) * 100) })),
-        sangrias: f.sangrias.map((s) => ({ descricao: s.descricao, lacre: s.lacre, valorCents: Math.round(Number(s.valor) * 100) })),
-        lancamentos: f.lancamentos.map((l) => ({ tipo: l.tipo, fornecedor: l.fornecedor, valorCents: Math.round(Number(l.valor) * 100) })),
-        transferenciasCaixa: f.transferencias_caixa.map((t) => ({
-          caixaOrigem: t.caixa_origem ?? '',
-          caixaDestino: t.caixa_destino ?? '',
-          lacre: t.lacre,
-          observacao: t.observacao,
-          valorCents: Math.round(Number(t.valor) * 100),
-        })),
-      }));
+      const fechamentos: FechamentoComItens[] = (data as unknown as FechamentoComItensRow[]).map(
+        (f) => ({
+          id: f.id,
+          codigo: f.codigo,
+          caixa: f.caixa,
+          turno: f.turno,
+          criadoEm: f.criado_em,
+          entradas: f.entradas.map((e) => ({
+            descricao: e.descricao,
+            lacre: e.lacre,
+            valorCents: Math.round(Number(e.valor) * 100),
+          })),
+          sangrias: f.sangrias.map((s) => ({
+            descricao: s.descricao,
+            lacre: s.lacre,
+            valorCents: Math.round(Number(s.valor) * 100),
+          })),
+          lancamentos: f.lancamentos.map((l) => ({
+            tipo: l.tipo,
+            fornecedor: l.fornecedor,
+            valorCents: Math.round(Number(l.valor) * 100),
+          })),
+          transferenciasCaixa: f.transferencias_caixa.map((t) => ({
+            caixaOrigem: t.caixa_origem ?? '',
+            caixaDestino: t.caixa_destino ?? '',
+            lacre: t.lacre,
+            observacao: t.observacao,
+            valorCents: Math.round(Number(t.valor) * 100),
+          })),
+        }),
+      );
 
       linhas.value = extrairLinhas(fechamentos, params.tipo);
     } catch {

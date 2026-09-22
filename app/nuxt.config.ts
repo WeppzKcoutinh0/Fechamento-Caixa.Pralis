@@ -42,6 +42,20 @@ export default defineNuxtConfig({
     },
   },
   vuetify: {
+    // `useLayout` também é um auto-import nativo do Nuxt. Não o registre pelo Vuetify:
+    // a colisão deixa a resolução dependente da ordem dos presets e pode quebrar componentes
+    // que usem o composable no futuro.
+    moduleOptions: {
+      importComposables: [
+        'useDate',
+        'useLocale',
+        'useDefaults',
+        'useDisplay',
+        'useRtl',
+        'useTheme',
+        'useGoTo',
+      ],
+    },
     vuetifyOptions: {
       icons: { defaultSet: 'mdi' },
       defaults: {

@@ -12,7 +12,10 @@ import type { ResumoPainel } from '~/utils/painel';
 const props = defineProps<{ resumo: ResumoPainel }>();
 
 const saidasHojeCents = computed(
-  () => props.resumo.despesasHojeCents + props.resumo.mercadoriasHojeCents + props.resumo.retiradasHojeCents,
+  () =>
+    props.resumo.despesasHojeCents +
+    props.resumo.mercadoriasHojeCents +
+    props.resumo.retiradasHojeCents,
 );
 </script>
 
@@ -57,7 +60,8 @@ const saidasHojeCents = computed(
             </div>
             <div class="painel-valor cx-num">R$ {{ formatCents(resumo.resultadoHojeCents) }}</div>
             <div class="painel-detalhe">
-              {{ resumo.fechamentosHoje }} fechamento{{ resumo.fechamentosHoje === 1 ? '' : 's' }} hoje
+              {{ resumo.fechamentosHoje }} fechamento{{ resumo.fechamentosHoje === 1 ? '' : 's' }}
+              hoje
             </div>
           </div>
         </article>
@@ -71,7 +75,9 @@ const saidasHojeCents = computed(
           <span class="painel-bar" aria-hidden="true" />
           <div class="painel-corpo">
             <div class="painel-cabeca">
-              <span class="painel-chip"><v-icon icon="mdi-file-document-multiple-outline" size="18" /></span>
+              <span class="painel-chip"
+                ><v-icon icon="mdi-file-document-multiple-outline" size="18"
+              /></span>
               <span class="painel-titulo">Fechamentos</span>
             </div>
             <div class="painel-valor cx-num">{{ resumo.fechamentosMes }}</div>

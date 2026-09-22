@@ -303,11 +303,19 @@ describe('calculateRelatorioFinal — fórmula principal do fechamento', () => {
       pdvCrediarioCents: 0,
     };
 
-    const origem = calculateRelatorioFinal({ ...base, transferenciaSaidaCents: 50000, transferenciaEntradaCents: 0 });
+    const origem = calculateRelatorioFinal({
+      ...base,
+      transferenciaSaidaCents: 50000,
+      transferenciaEntradaCents: 0,
+    });
     expect(origem.diferencaCents).toBe(-50000);
     expect(origem.status).toBe('falta');
 
-    const destino = calculateRelatorioFinal({ ...base, transferenciaSaidaCents: 0, transferenciaEntradaCents: 50000 });
+    const destino = calculateRelatorioFinal({
+      ...base,
+      transferenciaSaidaCents: 0,
+      transferenciaEntradaCents: 50000,
+    });
     expect(destino.diferencaCents).toBe(50000);
     expect(destino.status).toBe('sobra');
   });

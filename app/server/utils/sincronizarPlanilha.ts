@@ -1,4 +1,7 @@
-import { linhaFechamentoCaixaDiaSchema, linhaVendaProdutoDiaSchema } from '../../types/vendasFechamento';
+import {
+  linhaFechamentoCaixaDiaSchema,
+  linhaVendaProdutoDiaSchema,
+} from '../../types/vendasFechamento';
 import { lerAbaPlanilha } from './googleSheets';
 import { processarImportacao } from './importarVendas';
 import { parseDataBot } from './parseValoresBot';
@@ -28,7 +31,10 @@ function filtrarPorEmpresa<T extends { EMPRESA?: string }>(linhas: T[], empresa:
   return linhas.filter((linha) => String(linha.EMPRESA ?? '').trim() === empresa);
 }
 
-function filtrarPorJanelaRecente<T extends { DATA_VENDA?: string }>(linhas: T[], dias: number): T[] {
+function filtrarPorJanelaRecente<T extends { DATA_VENDA?: string }>(
+  linhas: T[],
+  dias: number,
+): T[] {
   const corteMs = Date.now() - dias * 24 * 60 * 60 * 1000;
   return linhas.filter((linha) => {
     const dataVenda = parseDataBot(linha.DATA_VENDA);
@@ -39,7 +45,8 @@ function filtrarPorJanelaRecente<T extends { DATA_VENDA?: string }>(linhas: T[],
 
 function loteEmGrupos<T>(linhas: T[]): T[][] {
   const grupos: T[][] = [];
-  for (let i = 0; i < linhas.length; i += TAMANHO_LOTE) grupos.push(linhas.slice(i, i + TAMANHO_LOTE));
+  for (let i = 0; i < linhas.length; i += TAMANHO_LOTE)
+    grupos.push(linhas.slice(i, i + TAMANHO_LOTE));
   return grupos.length > 0 ? grupos : [[]];
 }
 
@@ -76,7 +83,10 @@ export async function sincronizarPlanilhaCreare(): Promise<ResumoSincronizacaoPl
     aba: 'FECHAMENTOS_CAIXAS',
     colunaInicial,
   });
-  const linhasFechamentoBrutas = filtrarPorJanelaRecente(filtrarPorEmpresa(todasFechamento, empresa), JANELA_DIAS);
+  const linhasFechamentoBrutas = filtrarPorJanelaRecente(
+    filtrarPorEmpresa(todasFechamento, empresa),
+    JANELA_DIAS,
+  );
   let fechamentoRecebidas = 0;
   let fechamentoGravadas = 0;
   let fechamentoInvalidas = 0;
@@ -104,7 +114,10 @@ export async function sincronizarPlanilhaCreare(): Promise<ResumoSincronizacaoPl
       aba: 'VENDAS_PRODUTOS',
       colunaInicial,
     });
-    const linhasProdutosBrutas = filtrarPorJanelaRecente(filtrarPorEmpresa(todosProdutos, empresa), JANELA_DIAS_PRODUTOS);
+    const linhasProdutosBrutas = filtrarPorJanelaRecente(
+      filtrarPorEmpresa(todosProdutos, empresa),
+      JANELA_DIAS_PRODUTOS,
+    );
     produtosNaPlanilha = linhasProdutosBrutas.length;
     for (const lote of loteEmGrupos(linhasProdutosBrutas)) {
       const parseadas = lote.map((linha) => linhaVendaProdutoDiaSchema.safeParse(linha));
@@ -120,7 +133,17 @@ export async function sincronizarPlanilhaCreare(): Promise<ResumoSincronizacaoPl
   return {
     ok: true,
     executadoEm: new Date().toISOString(),
-    fechamentoCaixa: { naPlanilha: linhasFechamentoBrutas.length, recebidas: fechamentoRecebidas, gravadas: fechamentoGravadas, invalidas: fechamentoInvalidas },
-    vendasProdutos: { naPlanilha: produtosNaPlanilha, recebidas: produtosRecebidas, gravadas: produtosGravadas, invalidas: produtosInvalidas },
+    fechamentoCaixa: {
+      naPlanilha: linhasFechamentoBrutas.length,
+      recebidas: fechamentoRecebidas,
+      gravadas: fechamentoGravadas,
+      invalidas: fechamentoInvalidas,
+    },
+    vendasProdutos: {
+      naPlanilha: produtosNaPlanilha,
+      recebidas: produtosRecebidas,
+      gravadas: produtosGravadas,
+      invalidas: produtosInvalidas,
+    },
   };
 }

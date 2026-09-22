@@ -24,7 +24,9 @@ const recolhida = ref(false);
 // arte com só o texto repintado de branco (ícone colorido intacto), gerada uma vez (script
 // descartável, não faz parte do build) a partir do original.
 const { escuro } = useModoEscuro();
-const logoSrc = computed(() => (escuro.value ? '/marca/logo-cicluz-dark.png' : '/marca/logo-cicluz.png'));
+const logoSrc = computed(() =>
+  escuro.value ? '/marca/logo-cicluz-dark.png' : '/marca/logo-cicluz.png',
+);
 
 // Abaixo de 900px o menu não fica mais fixo empurrando o conteúdo (era o que acontecia antes —
 // numa tela de celular ele sozinho ocupava mais da metade da largura) — vira um painel
@@ -63,7 +65,13 @@ const { isAdmin } = usePerfil();
 const grupos = computed<GrupoNav[]>(() => {
   if (!isAdmin.value) return [];
   return [
-    { id: 'entradas', label: 'Entradas', to: '/entradas', icone: 'mdi-arrow-bottom-left-thick', cor: 'var(--cat-venda-base)' },
+    {
+      id: 'entradas',
+      label: 'Entradas',
+      to: '/entradas',
+      icone: 'mdi-arrow-bottom-left-thick',
+      cor: 'var(--cat-venda-base)',
+    },
     {
       id: 'transferencias',
       label: 'Transferências',
@@ -71,8 +79,20 @@ const grupos = computed<GrupoNav[]>(() => {
       icone: 'mdi-swap-horizontal-bold',
       cor: 'var(--cat-transferencias-base)',
     },
-    { id: 'saidas', label: 'Saídas', to: '/saidas', icone: 'mdi-arrow-top-right-thick', cor: 'var(--cat-despesas-base)' },
-    { id: 'historico', label: 'Histórico', to: '/historico', icone: 'mdi-archive-clock-outline', cor: 'var(--cat-resultado-base)' },
+    {
+      id: 'saidas',
+      label: 'Saídas',
+      to: '/saidas',
+      icone: 'mdi-arrow-top-right-thick',
+      cor: 'var(--cat-despesas-base)',
+    },
+    {
+      id: 'historico',
+      label: 'Histórico',
+      to: '/historico',
+      icone: 'mdi-archive-clock-outline',
+      cor: 'var(--cat-resultado-base)',
+    },
   ];
 });
 </script>

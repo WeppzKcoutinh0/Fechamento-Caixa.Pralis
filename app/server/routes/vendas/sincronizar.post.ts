@@ -24,9 +24,16 @@ export default defineEventHandler(async (event) => {
     return await sincronizarPlanilhaCreare();
   } catch (erro) {
     if (erro instanceof ErroImportacaoVendas) {
-      throw createError({ statusCode: erro.statusCode, statusMessage: erro.message, data: erro.data });
+      throw createError({
+        statusCode: erro.statusCode,
+        statusMessage: erro.message,
+        data: erro.data,
+      });
     }
     console.error('[vendas/sincronizar] erro inesperado:', erro);
-    throw createError({ statusCode: 500, statusMessage: erro instanceof Error ? erro.message : 'Erro interno.' });
+    throw createError({
+      statusCode: 500,
+      statusMessage: erro instanceof Error ? erro.message : 'Erro interno.',
+    });
   }
 });

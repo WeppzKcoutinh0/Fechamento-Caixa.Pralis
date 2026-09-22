@@ -5,6 +5,7 @@ import { useFechamentoForm } from '~/composables/useFechamentoForm';
 import { useFechamentos } from '~/composables/useFechamentos';
 import { useSessaoCaixa } from '~/composables/useSessaoCaixa';
 import { useTransferenciasTesouraria } from '~/composables/useTransferenciasTesouraria';
+import { useAnexos } from '~/composables/useAnexos';
 import SecaoIdentificacao from '~/components/fechamento/SecaoIdentificacao.vue';
 import SecaoTransferencias from '~/components/fechamento/SecaoTransferencias.vue';
 import SecaoLancamentos from '~/components/fechamento/SecaoLancamentos.vue';
@@ -31,6 +32,7 @@ const {
 const { salvar } = useFechamentos();
 const { fecharSessao } = useSessaoCaixa();
 const { criarRetornoAutomatico } = useTransferenciasTesouraria();
+const { enviar: enviarAnexo } = useAnexos();
 const router = useRouter();
 
 const salvando = ref(false);
@@ -51,6 +53,21 @@ async function onSalvar() {
   salvando.value = true;
   try {
     const fechamentoId = await salvar(draft.value);
+    const arquivosPendentes = draft.value.arquivosPendentes ?? {};
+    const camposCaminho: Record<'img-manha' | 'img-tarde', 'imgManhaPath' | 'imgTardePath'> = {
+      'img-manha': 'imgManhaPath',
+      'img-tarde': 'imgTardePath',
+    };
+    let houveUploadPendente = false;
+    for (const [campo, arquivo] of Object.entries(arquivosPendentes) as [
+      'img-manha' | 'img-tarde',
+      File
+    ][]) {
+      draft.value[camposCaminho[campo]] = await enviarAnexo(fechamentoId, campo, arquivo);
+      Reflect.deleteProperty(arquivosPendentes, campo);
+      houveUploadPendente = true;
+    }
+    if (houveUploadPendente) await salvar(draft.value);
     // Fluxo de Caixa (18/09/2026): fechamento salvo com sucesso é o único gatilho que fecha a
     // sessão — se isto falhar depois do salvar_fechamento já ter comitado, o fechamento já está
     // gravado (não se perde), só a sessão fica ABERTA até uma nova tentativa/ação admin.

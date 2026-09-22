@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import type { CrediarioItemDraft, FechamentoDraft, PdvEntradaDraft, TipoCrediario } from '~/types/fechamento';
+import type {
+  CrediarioItemDraft,
+  FechamentoDraft,
+  PdvEntradaDraft,
+  TipoCrediario,
+} from '~/types/fechamento';
 import CampoFoto from '~/components/comum/CampoFoto.vue';
 import CartaoValor from '~/components/comum/CartaoValor.vue';
 import { useVendasFechamento } from '~/composables/useVendasFechamento';
@@ -14,6 +19,15 @@ import {
 } from '~/utils/vendasFechamento';
 
 const props = defineProps<{ draft: FechamentoDraft }>();
+
+function registrarFotoMaquininha(campo: 'img-manha' | 'img-tarde', arquivo: File): void {
+  props.draft.arquivosPendentes ??= {};
+  props.draft.arquivosPendentes[campo] = arquivo;
+}
+
+function removerFotoMaquininha(campo: 'img-manha' | 'img-tarde'): void {
+  if (props.draft.arquivosPendentes) Reflect.deleteProperty(props.draft.arquivosPendentes, campo);
+}
 
 // Painéis empilhados (PDV / Maquininhas / Crediário), mesmo padrão visual de faixa colorida +
 // corpo usado em SecaoTransferencias.vue (Entradas/Sangrias/Transferência entre caixas), em vez
@@ -124,7 +138,9 @@ function removerPdvAtual(): void {
   modalPdvAberto.value = false;
 }
 const pdvAtual = computed<PdvEntradaDraft | null>(() =>
-  indicePdvEditando.value === null ? null : (props.draft.pdvEntradas[indicePdvEditando.value] ?? null),
+  indicePdvEditando.value === null
+    ? null
+    : (props.draft.pdvEntradas[indicePdvEditando.value] ?? null),
 );
 
 function totalPdvEntrada(entrada: PdvEntradaDraft): number {
@@ -230,107 +246,118 @@ const crediarioAberto = ref(false);
         <div class="lc-head">
           <span class="lc-ic"><v-icon size="19">mdi-point-of-sale</v-icon></span>
           <span class="lc-titulo">Relatório PDV</span>
-          <v-icon class="lc-x" size="22">{{ pdvAberto ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
+          <v-icon class="lc-x" size="22">{{
+            pdvAberto ? 'mdi-chevron-up' : 'mdi-chevron-down'
+          }}</v-icon>
         </div>
       </button>
       <v-expand-transition>
-      <div v-if="pdvAberto" class="lc-painel-corpo">
-        <div class="d-flex flex-column ga-2 mb-4">
-          <v-btn
-            color="primary"
-            variant="tonal"
-            size="small"
-            :loading="buscandoVendas"
-            :disabled="buscandoVendas"
-            @click="buscarVendasDoDia"
-          >
-            {{ buscandoVendas ? 'Buscando vendas...' : 'Buscar vendas do dia' }}
-          </v-btn>
+        <div v-if="pdvAberto" class="lc-painel-corpo">
+          <div class="d-flex flex-column ga-2 mb-4">
+            <v-btn
+              color="primary"
+              variant="tonal"
+              size="small"
+              :loading="buscandoVendas"
+              :disabled="buscandoVendas"
+              @click="buscarVendasDoDia"
+            >
+              {{ buscandoVendas ? 'Buscando vendas...' : 'Buscar vendas do dia' }}
+            </v-btn>
 
-          <v-alert v-if="jaBuscouVendas && !buscandoVendas && erroVendas" type="error" variant="tonal" density="comfortable">
-            {{ erroVendas }}
-          </v-alert>
-          <v-alert
-            v-else-if="jaBuscouVendas && !buscandoVendas && !vendasEncontradas"
-            type="info"
-            variant="tonal"
-            density="comfortable"
-          >
-            Nenhuma venda sincronizada para {{ rotuloFiltroVendas }} em {{ formatarDataBr(draft.data) }}.
-            Preencha manualmente ou verifique se o bot está rodando.
-          </v-alert>
-          <v-alert
-            v-else-if="jaBuscouVendas && !buscandoVendas && vendasEncontradas"
-            type="success"
-            variant="tonal"
-            density="comfortable"
-          >
-            Campos preenchidos com as vendas de {{ rotuloFiltroVendas }} em
-            {{ formatarDataBr(draft.data) }}. Confira e ajuste se precisar.
-          </v-alert>
+            <v-alert
+              v-if="jaBuscouVendas && !buscandoVendas && erroVendas"
+              type="error"
+              variant="tonal"
+              density="comfortable"
+            >
+              {{ erroVendas }}
+            </v-alert>
+            <v-alert
+              v-else-if="jaBuscouVendas && !buscandoVendas && !vendasEncontradas"
+              type="info"
+              variant="tonal"
+              density="comfortable"
+            >
+              Nenhuma venda sincronizada para {{ rotuloFiltroVendas }} em
+              {{ formatarDataBr(draft.data) }}. Preencha manualmente ou verifique se o bot está
+              rodando.
+            </v-alert>
+            <v-alert
+              v-else-if="jaBuscouVendas && !buscandoVendas && vendasEncontradas"
+              type="success"
+              variant="tonal"
+              density="comfortable"
+            >
+              Campos preenchidos com as vendas de {{ rotuloFiltroVendas }} em
+              {{ formatarDataBr(draft.data) }}. Confira e ajuste se precisar.
+            </v-alert>
 
-          <v-alert
-            v-if="ajustesPresentesRelatorios.length"
-            type="success"
-            variant="tonal"
-            density="comfortable"
+            <v-alert
+              v-if="ajustesPresentesRelatorios.length"
+              type="success"
+              variant="tonal"
+              density="comfortable"
+            >
+              <div class="text-caption font-weight-bold">
+                O CREARE também registrou estes ajustes — já lançados automaticamente como Despesa
+                (passo 3), já entram no cálculo do fechamento:
+              </div>
+              <ul class="text-caption mt-1 pl-4">
+                <li v-for="[nome, valor] in ajustesPresentesRelatorios" :key="nome">
+                  {{ nome }}: R$ {{ formatCents(toCents(valor)) }}
+                </li>
+              </ul>
+            </v-alert>
+          </div>
+
+          <label class="lc-campo">
+            <span class="lc-campo-lbl">Relatório PDV</span>
+            <textarea v-model="draft.relatorioPdv" class="lc-input" rows="2" />
+          </label>
+
+          <button type="button" class="lc-add mt-3 mb-3" @click="abrirNovoPdv">
+            <v-icon size="14">mdi-plus</v-icon> Adicionar PDV
+          </button>
+
+          <button
+            v-for="(entrada, indice) in draft.pdvEntradas"
+            :key="entrada.id"
+            type="button"
+            class="lc-resumo-item mb-2"
+            @click="abrirPdv(entrada)"
           >
-            <div class="text-caption font-weight-bold">
-              O CREARE também registrou estes ajustes — já lançados automaticamente como Despesa
-              (passo 3), já entram no cálculo do fechamento:
-            </div>
-            <ul class="text-caption mt-1 pl-4">
-              <li v-for="[nome, valor] in ajustesPresentesRelatorios" :key="nome">
-                {{ nome }}: R$ {{ formatCents(toCents(valor)) }}
-              </li>
-            </ul>
-          </v-alert>
+            <span class="lc-resumo-ic"><v-icon icon="mdi-point-of-sale" size="18" /></span>
+            <span class="lc-resumo-corpo">
+              <span class="lc-resumo-titulo">PDV {{ indice + 1 }}</span>
+              <span class="lc-resumo-valor">R$ {{ formatCents(totalPdvEntrada(entrada)) }}</span>
+            </span>
+          </button>
+
+          <p v-if="!draft.pdvEntradas.length" class="text-caption text-medium-emphasis mb-0">
+            Nenhum PDV lançado ainda.
+          </p>
+
+          <div class="grade-cartoes lc-mt">
+            <CartaoValor
+              rotulo="Valor Total PDV"
+              :valor="`R$ ${formatCents(pdvTotais.totalCents)}`"
+            />
+            <CartaoValor
+              rotulo="Ticket Médio"
+              :valor="`R$ ${formatCents(pdvTotais.averageTicketCents)}`"
+            />
+          </div>
+
+          <div class="lc-campo lc-mt">
+            <CampoFoto
+              v-model="draft.imgPdvPath"
+              :fechamento-id="draft.id"
+              campo="img-pdv"
+              label="Imagem Relatório PDV"
+            />
+          </div>
         </div>
-
-        <label class="lc-campo">
-          <span class="lc-campo-lbl">Relatório PDV</span>
-          <textarea v-model="draft.relatorioPdv" class="lc-input" rows="2" />
-        </label>
-
-        <button type="button" class="lc-add mt-3 mb-3" @click="abrirNovoPdv">
-          <v-icon size="14">mdi-plus</v-icon> Adicionar PDV
-        </button>
-
-        <button
-          v-for="(entrada, indice) in draft.pdvEntradas"
-          :key="entrada.id"
-          type="button"
-          class="lc-resumo-item mb-2"
-          @click="abrirPdv(entrada)"
-        >
-          <span class="lc-resumo-ic"><v-icon icon="mdi-point-of-sale" size="18" /></span>
-          <span class="lc-resumo-corpo">
-            <span class="lc-resumo-titulo">PDV {{ indice + 1 }}</span>
-            <span class="lc-resumo-valor">R$ {{ formatCents(totalPdvEntrada(entrada)) }}</span>
-          </span>
-        </button>
-
-        <p v-if="!draft.pdvEntradas.length" class="text-caption text-medium-emphasis mb-0">
-          Nenhum PDV lançado ainda.
-        </p>
-
-        <div class="grade-cartoes lc-mt">
-          <CartaoValor rotulo="Valor Total PDV" :valor="`R$ ${formatCents(pdvTotais.totalCents)}`" />
-          <CartaoValor
-            rotulo="Ticket Médio"
-            :valor="`R$ ${formatCents(pdvTotais.averageTicketCents)}`"
-          />
-        </div>
-
-        <div class="lc-campo lc-mt">
-          <CampoFoto
-            v-model="draft.imgPdvPath"
-            :fechamento-id="draft.id"
-            campo="img-pdv"
-            label="Imagem Relatório PDV"
-          />
-        </div>
-      </div>
       </v-expand-transition>
     </div>
 
@@ -444,7 +471,10 @@ const crediarioAberto = ref(false);
           </div>
 
           <div class="lc-campo lc-mt">
-            <CartaoValor rotulo="Valor Total" :valor="`R$ ${formatCents(totalPdvEntrada(pdvAtual))}`" />
+            <CartaoValor
+              rotulo="Valor Total"
+              :valor="`R$ ${formatCents(totalPdvEntrada(pdvAtual))}`"
+            />
           </div>
         </div>
         <div class="lc-acoes">
@@ -471,191 +501,203 @@ const crediarioAberto = ref(false);
         </div>
       </button>
       <v-expand-transition>
-      <div v-if="maquininhasAberto" class="lc-painel-corpo">
-        <label class="lc-campo">
-          <span class="lc-campo-lbl">Nº Maquininha</span>
-          <input
-            :value="draft.nrMaquininha"
-            class="lc-input"
-            inputmode="numeric"
-            placeholder="Número da maquininha"
-            @input="
-              draft.nrMaquininha = aoDigitarNumeros(($event.target as HTMLInputElement).value)
-            "
-          />
-        </label>
+        <div v-if="maquininhasAberto" class="lc-painel-corpo">
+          <label class="lc-campo">
+            <span class="lc-campo-lbl">Nº Maquininha</span>
+            <input
+              :value="draft.nrMaquininha"
+              class="lc-input"
+              inputmode="numeric"
+              placeholder="Número da maquininha"
+              @input="
+                draft.nrMaquininha = aoDigitarNumeros(($event.target as HTMLInputElement).value)
+              "
+            />
+          </label>
 
-        <div
-          class="lc-campo-lbl lc-mt"
-          style="text-transform: none; font-size: var(--cx-fs-caption)"
-        >
-          Turno da Manhã
-        </div>
-        <div class="lc-dois">
+          <div
+            class="lc-campo-lbl lc-mt"
+            style="text-transform: none; font-size: var(--cx-fs-caption)"
+          >
+            Turno da Manhã
+          </div>
+          <div class="lc-dois">
+            <label class="lc-campo">
+              <span class="lc-campo-lbl">Manhã Inicial</span>
+              <input
+                :value="formatCents(draft.manhaInicialCents)"
+                class="lc-input"
+                inputmode="decimal"
+                @input="
+                  draft.manhaInicialCents = aoDigitarCentavos(
+                    ($event.target as HTMLInputElement).value,
+                  )
+                "
+              />
+            </label>
+            <label class="lc-campo">
+              <span class="lc-campo-lbl">Crédito Manhã</span>
+              <input
+                :value="formatCents(draft.creditoManhaCents)"
+                class="lc-input"
+                inputmode="decimal"
+                @input="
+                  draft.creditoManhaCents = aoDigitarCentavos(
+                    ($event.target as HTMLInputElement).value,
+                  )
+                "
+              />
+            </label>
+          </div>
+          <div class="lc-dois">
+            <label class="lc-campo">
+              <span class="lc-campo-lbl">Débito Manhã</span>
+              <input
+                :value="formatCents(draft.debitoManhaCents)"
+                class="lc-input"
+                inputmode="decimal"
+                @input="
+                  draft.debitoManhaCents = aoDigitarCentavos(
+                    ($event.target as HTMLInputElement).value,
+                  )
+                "
+              />
+            </label>
+            <label class="lc-campo">
+              <span class="lc-campo-lbl">Pix Manhã</span>
+              <input
+                :value="formatCents(draft.pixManhaCents)"
+                class="lc-input"
+                inputmode="decimal"
+                @input="
+                  draft.pixManhaCents = aoDigitarCentavos(($event.target as HTMLInputElement).value)
+                "
+              />
+            </label>
+          </div>
           <label class="lc-campo">
-            <span class="lc-campo-lbl">Manhã Inicial</span>
+            <span class="lc-campo-lbl">Voucher Manhã</span>
             <input
-              :value="formatCents(draft.manhaInicialCents)"
+              :value="formatCents(draft.voucherManhaCents)"
               class="lc-input"
               inputmode="decimal"
               @input="
-                draft.manhaInicialCents = aoDigitarCentavos(
+                draft.voucherManhaCents = aoDigitarCentavos(
                   ($event.target as HTMLInputElement).value,
                 )
               "
             />
           </label>
-          <label class="lc-campo">
-            <span class="lc-campo-lbl">Crédito Manhã</span>
-            <input
-              :value="formatCents(draft.creditoManhaCents)"
-              class="lc-input"
-              inputmode="decimal"
-              @input="
-                draft.creditoManhaCents = aoDigitarCentavos(
-                  ($event.target as HTMLInputElement).value,
-                )
-              "
+          <div class="lc-campo">
+            <CampoFoto
+              v-model="draft.imgManhaPath"
+              :fechamento-id="draft.id"
+              campo="img-manha"
+              label="Imagem Manhã"
+              upload-adiado
+              @arquivo-selecionado="registrarFotoMaquininha('img-manha', $event)"
+              @arquivo-removido="removerFotoMaquininha('img-manha')"
             />
-          </label>
-        </div>
-        <div class="lc-dois">
-          <label class="lc-campo">
-            <span class="lc-campo-lbl">Débito Manhã</span>
-            <input
-              :value="formatCents(draft.debitoManhaCents)"
-              class="lc-input"
-              inputmode="decimal"
-              @input="
-                draft.debitoManhaCents = aoDigitarCentavos(
-                  ($event.target as HTMLInputElement).value,
-                )
-              "
-            />
-          </label>
-          <label class="lc-campo">
-            <span class="lc-campo-lbl">Pix Manhã</span>
-            <input
-              :value="formatCents(draft.pixManhaCents)"
-              class="lc-input"
-              inputmode="decimal"
-              @input="
-                draft.pixManhaCents = aoDigitarCentavos(($event.target as HTMLInputElement).value)
-              "
-            />
-          </label>
-        </div>
-        <label class="lc-campo">
-          <span class="lc-campo-lbl">Voucher Manhã</span>
-          <input
-            :value="formatCents(draft.voucherManhaCents)"
-            class="lc-input"
-            inputmode="decimal"
-            @input="
-              draft.voucherManhaCents = aoDigitarCentavos(($event.target as HTMLInputElement).value)
-            "
-          />
-        </label>
-        <div class="lc-campo">
-          <CampoFoto
-            v-model="draft.imgManhaPath"
-            :fechamento-id="draft.id"
-            campo="img-manha"
-            label="Imagem Manhã"
-          />
-        </div>
+          </div>
 
-        <div
-          class="lc-campo-lbl lc-mt"
-          style="text-transform: none; font-size: var(--cx-fs-caption)"
-        >
-          Turno da Tarde
-        </div>
-        <div class="lc-dois">
+          <div
+            class="lc-campo-lbl lc-mt"
+            style="text-transform: none; font-size: var(--cx-fs-caption)"
+          >
+            Turno da Tarde
+          </div>
+          <div class="lc-dois">
+            <label class="lc-campo">
+              <span class="lc-campo-lbl">Tarde Final</span>
+              <input
+                :value="formatCents(draft.tardeFinalCents)"
+                class="lc-input"
+                inputmode="decimal"
+                @input="
+                  draft.tardeFinalCents = aoDigitarCentavos(
+                    ($event.target as HTMLInputElement).value,
+                  )
+                "
+              />
+            </label>
+            <label class="lc-campo">
+              <span class="lc-campo-lbl">Crédito Tarde</span>
+              <input
+                :value="formatCents(draft.creditoTardeCents)"
+                class="lc-input"
+                inputmode="decimal"
+                @input="
+                  draft.creditoTardeCents = aoDigitarCentavos(
+                    ($event.target as HTMLInputElement).value,
+                  )
+                "
+              />
+            </label>
+          </div>
+          <div class="lc-dois">
+            <label class="lc-campo">
+              <span class="lc-campo-lbl">Débito Tarde</span>
+              <input
+                :value="formatCents(draft.debitoTardeCents)"
+                class="lc-input"
+                inputmode="decimal"
+                @input="
+                  draft.debitoTardeCents = aoDigitarCentavos(
+                    ($event.target as HTMLInputElement).value,
+                  )
+                "
+              />
+            </label>
+            <label class="lc-campo">
+              <span class="lc-campo-lbl">Pix Tarde</span>
+              <input
+                :value="formatCents(draft.pixTardeCents)"
+                class="lc-input"
+                inputmode="decimal"
+                @input="
+                  draft.pixTardeCents = aoDigitarCentavos(($event.target as HTMLInputElement).value)
+                "
+              />
+            </label>
+          </div>
           <label class="lc-campo">
-            <span class="lc-campo-lbl">Tarde Final</span>
+            <span class="lc-campo-lbl">Voucher Tarde</span>
             <input
-              :value="formatCents(draft.tardeFinalCents)"
+              :value="formatCents(draft.voucherTardeCents)"
               class="lc-input"
               inputmode="decimal"
               @input="
-                draft.tardeFinalCents = aoDigitarCentavos(($event.target as HTMLInputElement).value)
-              "
-            />
-          </label>
-          <label class="lc-campo">
-            <span class="lc-campo-lbl">Crédito Tarde</span>
-            <input
-              :value="formatCents(draft.creditoTardeCents)"
-              class="lc-input"
-              inputmode="decimal"
-              @input="
-                draft.creditoTardeCents = aoDigitarCentavos(
+                draft.voucherTardeCents = aoDigitarCentavos(
                   ($event.target as HTMLInputElement).value,
                 )
               "
             />
           </label>
-        </div>
-        <div class="lc-dois">
-          <label class="lc-campo">
-            <span class="lc-campo-lbl">Débito Tarde</span>
-            <input
-              :value="formatCents(draft.debitoTardeCents)"
-              class="lc-input"
-              inputmode="decimal"
-              @input="
-                draft.debitoTardeCents = aoDigitarCentavos(
-                  ($event.target as HTMLInputElement).value,
-                )
-              "
+          <div class="lc-campo">
+            <CampoFoto
+              v-model="draft.imgTardePath"
+              :fechamento-id="draft.id"
+              campo="img-tarde"
+              label="Imagem Tarde"
+              upload-adiado
+              @arquivo-selecionado="registrarFotoMaquininha('img-tarde', $event)"
+              @arquivo-removido="removerFotoMaquininha('img-tarde')"
             />
-          </label>
-          <label class="lc-campo">
-            <span class="lc-campo-lbl">Pix Tarde</span>
-            <input
-              :value="formatCents(draft.pixTardeCents)"
-              class="lc-input"
-              inputmode="decimal"
-              @input="
-                draft.pixTardeCents = aoDigitarCentavos(($event.target as HTMLInputElement).value)
-              "
-            />
-          </label>
-        </div>
-        <label class="lc-campo">
-          <span class="lc-campo-lbl">Voucher Tarde</span>
-          <input
-            :value="formatCents(draft.voucherTardeCents)"
-            class="lc-input"
-            inputmode="decimal"
-            @input="
-              draft.voucherTardeCents = aoDigitarCentavos(($event.target as HTMLInputElement).value)
-            "
-          />
-        </label>
-        <div class="lc-campo">
-          <CampoFoto
-            v-model="draft.imgTardePath"
-            :fechamento-id="draft.id"
-            campo="img-tarde"
-            label="Imagem Tarde"
-          />
-        </div>
+          </div>
 
-        <div
-          class="lc-campo-lbl lc-mt"
-          style="text-transform: none; font-size: var(--cx-fs-caption)"
-        >
-          Líquido
+          <div
+            class="lc-campo-lbl lc-mt"
+            style="text-transform: none; font-size: var(--cx-fs-caption)"
+          >
+            Líquido
+          </div>
+          <div class="grade-cartoes">
+            <CartaoValor rotulo="Líquido Crédito" :valor="`R$ ${formatCents(liqCreditoCents)}`" />
+            <CartaoValor rotulo="Líquido Débito" :valor="`R$ ${formatCents(liqDebitoCents)}`" />
+            <CartaoValor rotulo="Líquido Pix" :valor="`R$ ${formatCents(liqPixCents)}`" />
+            <CartaoValor rotulo="Líquido Voucher" :valor="`R$ ${formatCents(liqVoucherCents)}`" />
+          </div>
         </div>
-        <div class="grade-cartoes">
-          <CartaoValor rotulo="Líquido Crédito" :valor="`R$ ${formatCents(liqCreditoCents)}`" />
-          <CartaoValor rotulo="Líquido Débito" :valor="`R$ ${formatCents(liqDebitoCents)}`" />
-          <CartaoValor rotulo="Líquido Pix" :valor="`R$ ${formatCents(liqPixCents)}`" />
-          <CartaoValor rotulo="Líquido Voucher" :valor="`R$ ${formatCents(liqVoucherCents)}`" />
-        </div>
-      </div>
       </v-expand-transition>
     </div>
 
@@ -698,38 +740,41 @@ const crediarioAberto = ref(false);
         </div>
       </div>
       <v-expand-transition>
-      <div v-if="crediarioAberto" class="lc-painel-corpo">
-        <button type="button" class="lc-add mb-3" @click="abrirNovoCrediario(tipoCrediarioAtivo)">
-          <v-icon size="14">mdi-plus</v-icon>
-          Adicionar {{ tipoCrediarioAtivo === 'cliente' ? 'cliente' : 'colaborador' }}
-        </button>
+        <div v-if="crediarioAberto" class="lc-painel-corpo">
+          <button type="button" class="lc-add mb-3" @click="abrirNovoCrediario(tipoCrediarioAtivo)">
+            <v-icon size="14">mdi-plus</v-icon>
+            Adicionar {{ tipoCrediarioAtivo === 'cliente' ? 'cliente' : 'colaborador' }}
+          </button>
 
-        <button
-          v-for="{ item, indice } in itensPorTipo(tipoCrediarioAtivo)"
-          :key="indice"
-          type="button"
-          class="lc-resumo-item mb-2"
-          @click="abrirCrediario(indice)"
-        >
-          <span class="lc-resumo-ic"><v-icon icon="mdi-account-cash-outline" size="18" /></span>
-          <span class="lc-resumo-corpo">
-            <span class="lc-resumo-titulo">{{ item.nome || 'Sem nome' }}</span>
-            <span class="lc-resumo-valor">R$ {{ formatCents(item.valorCents) }}</span>
-          </span>
-        </button>
+          <button
+            v-for="{ item, indice } in itensPorTipo(tipoCrediarioAtivo)"
+            :key="indice"
+            type="button"
+            class="lc-resumo-item mb-2"
+            @click="abrirCrediario(indice)"
+          >
+            <span class="lc-resumo-ic"><v-icon icon="mdi-account-cash-outline" size="18" /></span>
+            <span class="lc-resumo-corpo">
+              <span class="lc-resumo-titulo">{{ item.nome || 'Sem nome' }}</span>
+              <span class="lc-resumo-valor">R$ {{ formatCents(item.valorCents) }}</span>
+            </span>
+          </button>
 
-        <div class="grade-cartoes lc-mt">
-          <CartaoValor
-            rotulo="Total Clientes"
-            :valor="`R$ ${formatCents(totalCredClientesCents)}`"
-          />
-          <CartaoValor
-            rotulo="Total Colaboradores"
-            :valor="`R$ ${formatCents(totalCredColabCents)}`"
-          />
-          <CartaoValor rotulo="Total Crediário" :valor="`R$ ${formatCents(totalCrediarioCents)}`" />
+          <div class="grade-cartoes lc-mt">
+            <CartaoValor
+              rotulo="Total Clientes"
+              :valor="`R$ ${formatCents(totalCredClientesCents)}`"
+            />
+            <CartaoValor
+              rotulo="Total Colaboradores"
+              :valor="`R$ ${formatCents(totalCredColabCents)}`"
+            />
+            <CartaoValor
+              rotulo="Total Crediário"
+              :valor="`R$ ${formatCents(totalCrediarioCents)}`"
+            />
+          </div>
         </div>
-      </div>
       </v-expand-transition>
     </div>
 

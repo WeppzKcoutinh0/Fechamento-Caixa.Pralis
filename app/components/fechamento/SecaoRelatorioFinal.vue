@@ -85,7 +85,12 @@ const vendasPorCategoria = computed(() => [
   { rotulo: 'LANCHES', valorCents: valorPorAjuste('alimentacao') },
 ]);
 
-const { carregando: carregandoProdutos, erro: erroProdutos, produtos, buscarPorData: buscarProdutos } = useVendasProdutoDia();
+const {
+  carregando: carregandoProdutos,
+  erro: erroProdutos,
+  produtos,
+  buscarPorData: buscarProdutos,
+} = useVendasProdutoDia();
 const produtosJaBuscados = ref(false);
 async function aoAbrirProdutos(): Promise<void> {
   if (produtosJaBuscados.value) return;
@@ -109,7 +114,15 @@ const totalTransferidoEntreCaixasCents = computed(() =>
 
 // Mesma soma de draft.pdvEntradas usada em SecaoTransferencias.vue — não repete busca nenhuma,
 // só lê o que "Buscar vendas" já gravou (idempotente, nunca duplica).
-function somaPdv(campo: 'dinheiroCents' | 'creditoCents' | 'debitoCents' | 'pixCents' | 'voucherCents' | 'crediarioCents'): number {
+function somaPdv(
+  campo:
+    | 'dinheiroCents'
+    | 'creditoCents'
+    | 'debitoCents'
+    | 'pixCents'
+    | 'voucherCents'
+    | 'crediarioCents',
+): number {
   return props.draft.pdvEntradas.reduce((soma, p) => soma + p[campo], 0);
 }
 const transferenciasAutomaticas = computed(() => [
@@ -129,12 +142,21 @@ const transferenciasAutomaticas = computed(() => [
 // lista MANUAL (já aparecem no bloco automático abaixo), mas continuam com `tipo: 'despesa'` /
 // `'mercadoria'` de sempre — o motor de cálculo (lancamentosPorTipo acima) não filtra por
 // origemAjusteCreare e continua somando todos eles normalmente.
-const ORIGENS_COM_BLOCO_AUTOMATICO: readonly string[] = ['colaboradores', 'alimentacao', 'sobraPerda', 'rouboFurto'];
+const ORIGENS_COM_BLOCO_AUTOMATICO: readonly string[] = [
+  'colaboradores',
+  'alimentacao',
+  'sobraPerda',
+  'rouboFurto',
+];
 const despesasManuais = computed(() =>
-  props.draft.lancamentos.filter((l) => l.tipo === 'despesa' && !ORIGENS_COM_BLOCO_AUTOMATICO.includes(l.origemAjusteCreare)),
+  props.draft.lancamentos.filter(
+    (l) => l.tipo === 'despesa' && !ORIGENS_COM_BLOCO_AUTOMATICO.includes(l.origemAjusteCreare),
+  ),
 );
 const mercadoriasManuais = computed(() =>
-  props.draft.lancamentos.filter((l) => l.tipo === 'mercadoria' && !ORIGENS_COM_BLOCO_AUTOMATICO.includes(l.origemAjusteCreare)),
+  props.draft.lancamentos.filter(
+    (l) => l.tipo === 'mercadoria' && !ORIGENS_COM_BLOCO_AUTOMATICO.includes(l.origemAjusteCreare),
+  ),
 );
 const retiradas = computed(() => props.draft.lancamentos.filter((l) => l.tipo === 'retirada'));
 
@@ -148,12 +170,36 @@ const mercadoriasAutomaticas = computed(() => [
 ]);
 
 const CAT_VARS = {
-  venda: { '--cat': 'var(--cat-venda-base)', '--cat-soft': 'var(--cat-venda-soft)', '--cat-tinta': 'var(--cat-venda-tinta)' },
-  transferencias: { '--cat': 'var(--cat-transferencias-base)', '--cat-soft': 'var(--cat-transferencias-soft)', '--cat-tinta': 'var(--cat-transferencias-tinta)' },
-  despesas: { '--cat': 'var(--cat-despesas-base)', '--cat-soft': 'var(--cat-despesas-soft)', '--cat-tinta': 'var(--cat-despesas-tinta)' },
-  mercadorias: { '--cat': 'var(--cat-mercadorias-base)', '--cat-soft': 'var(--cat-mercadorias-soft)', '--cat-tinta': 'var(--cat-mercadorias-tinta)' },
-  retiradas: { '--cat': 'var(--cat-retiradas-base)', '--cat-soft': 'var(--cat-retiradas-soft)', '--cat-tinta': 'var(--cat-retiradas-tinta)' },
-  resultado: { '--cat': 'var(--cat-resultado-base)', '--cat-soft': 'var(--cat-resultado-soft)', '--cat-tinta': 'var(--cat-resultado-tinta)' },
+  venda: {
+    '--cat': 'var(--cat-venda-base)',
+    '--cat-soft': 'var(--cat-venda-soft)',
+    '--cat-tinta': 'var(--cat-venda-tinta)',
+  },
+  transferencias: {
+    '--cat': 'var(--cat-transferencias-base)',
+    '--cat-soft': 'var(--cat-transferencias-soft)',
+    '--cat-tinta': 'var(--cat-transferencias-tinta)',
+  },
+  despesas: {
+    '--cat': 'var(--cat-despesas-base)',
+    '--cat-soft': 'var(--cat-despesas-soft)',
+    '--cat-tinta': 'var(--cat-despesas-tinta)',
+  },
+  mercadorias: {
+    '--cat': 'var(--cat-mercadorias-base)',
+    '--cat-soft': 'var(--cat-mercadorias-soft)',
+    '--cat-tinta': 'var(--cat-mercadorias-tinta)',
+  },
+  retiradas: {
+    '--cat': 'var(--cat-retiradas-base)',
+    '--cat-soft': 'var(--cat-retiradas-soft)',
+    '--cat-tinta': 'var(--cat-retiradas-tinta)',
+  },
+  resultado: {
+    '--cat': 'var(--cat-resultado-base)',
+    '--cat-soft': 'var(--cat-resultado-soft)',
+    '--cat-tinta': 'var(--cat-resultado-tinta)',
+  },
 } as const;
 </script>
 
@@ -206,7 +252,11 @@ const CAT_VARS = {
         </v-expansion-panel-title>
         <v-expansion-panel-text>
           <div class="d-flex flex-column ga-2 mb-4">
-            <div v-for="cat in vendasPorCategoria" :key="cat.rotulo" class="d-flex justify-space-between text-body-2">
+            <div
+              v-for="cat in vendasPorCategoria"
+              :key="cat.rotulo"
+              class="d-flex justify-space-between text-body-2"
+            >
               <span class="text-medium-emphasis">{{ cat.rotulo }}</span>
               <strong>R$ {{ formatCents(cat.valorCents) }}</strong>
             </div>
@@ -217,14 +267,26 @@ const CAT_VARS = {
               <v-expansion-panel-title>Produtos vendidos no dia</v-expansion-panel-title>
               <v-expansion-panel-text>
                 <p class="text-caption text-medium-emphasis mb-3">
-                  Loja inteira (não separado por caixa) — a origem dos dados não liga produto a caixa/turno.
-                  Vendas de hoje só aparecem depois que o bot da loja rodar à noite (22h10).
+                  Loja inteira (não separado por caixa) — a origem dos dados não liga produto a
+                  caixa/turno. Vendas de hoje só aparecem depois que o bot da loja rodar à noite
+                  (22h10).
                 </p>
                 <div v-if="carregandoProdutos" class="d-flex justify-center py-4">
                   <v-progress-circular indeterminate color="primary" size="24" />
                 </div>
-                <v-alert v-else-if="erroProdutos" type="error" variant="tonal" density="comfortable">{{ erroProdutos }}</v-alert>
-                <v-alert v-else-if="produtos.length === 0" type="info" variant="tonal" density="comfortable">
+                <v-alert
+                  v-else-if="erroProdutos"
+                  type="error"
+                  variant="tonal"
+                  density="comfortable"
+                  >{{ erroProdutos }}</v-alert
+                >
+                <v-alert
+                  v-else-if="produtos.length === 0"
+                  type="info"
+                  variant="tonal"
+                  density="comfortable"
+                >
                   Nenhum produto sincronizado para {{ draft.data }}.
                 </v-alert>
                 <div v-else class="tabela-produtos-wrap">
@@ -256,7 +318,17 @@ const CAT_VARS = {
       <v-expansion-panel class="cat-painel" :style="CAT_VARS.transferencias">
         <v-expansion-panel-title class="cat-titulo">
           <span class="flex-grow-1">Transferências</span>
-          <strong class="cat-valor">R$ {{ formatCents(totalEntradaCents - totalSaidaCents + transferenciaEntradaCents - transferenciaSaidaCents) }}</strong>
+          <strong class="cat-valor"
+            >R$
+            {{
+              formatCents(
+                totalEntradaCents -
+                  totalSaidaCents +
+                  transferenciaEntradaCents -
+                  transferenciaSaidaCents,
+              )
+            }}</strong
+          >
         </v-expansion-panel-title>
         <v-expansion-panel-text>
           <p class="cat-subgrupo">Manuais</p>
@@ -274,13 +346,19 @@ const CAT_VARS = {
               <strong>R$ {{ formatCents(totalTransferidoEntreCaixasCents) }}</strong>
             </div>
             <div class="d-flex justify-space-between text-body-2">
-              <span class="text-medium-emphasis">↳ Saída confirmada deste caixa (conta na Diferença)</span>
+              <span class="text-medium-emphasis"
+                >↳ Saída confirmada deste caixa (conta na Diferença)</span
+              >
               <strong>R$ {{ formatCents(transferenciaSaidaCents) }}</strong>
             </div>
           </div>
           <p class="cat-subgrupo">Automáticas</p>
           <div class="d-flex flex-column ga-2">
-            <div v-for="item in transferenciasAutomaticas" :key="item.rotulo" class="d-flex justify-space-between text-body-2">
+            <div
+              v-for="item in transferenciasAutomaticas"
+              :key="item.rotulo"
+              class="d-flex justify-space-between text-body-2"
+            >
               <span class="text-medium-emphasis">{{ item.rotulo }}</span>
               <strong>R$ {{ formatCents(item.valorCents) }}</strong>
             </div>
@@ -295,16 +373,26 @@ const CAT_VARS = {
         </v-expansion-panel-title>
         <v-expansion-panel-text>
           <p class="cat-subgrupo">Manuais</p>
-          <div v-if="!despesasManuais.length" class="text-caption text-medium-emphasis mb-4">Nenhuma despesa manual lançada.</div>
+          <div v-if="!despesasManuais.length" class="text-caption text-medium-emphasis mb-4">
+            Nenhuma despesa manual lançada.
+          </div>
           <div v-else class="d-flex flex-column ga-2 mb-4">
-            <div v-for="d in despesasManuais" :key="d.id" class="d-flex justify-space-between text-body-2">
+            <div
+              v-for="d in despesasManuais"
+              :key="d.id"
+              class="d-flex justify-space-between text-body-2"
+            >
               <span class="text-medium-emphasis">{{ d.fornecedor || 'Sem credor' }}</span>
               <strong>R$ {{ formatCents(d.valorCents + d.valorAcrescimoCents) }}</strong>
             </div>
           </div>
           <p class="cat-subgrupo">Automáticas</p>
           <div class="d-flex flex-column ga-2">
-            <div v-for="item in despesasAutomaticas" :key="item.rotulo" class="d-flex justify-space-between text-body-2">
+            <div
+              v-for="item in despesasAutomaticas"
+              :key="item.rotulo"
+              class="d-flex justify-space-between text-body-2"
+            >
               <span class="text-medium-emphasis">{{ item.rotulo }}</span>
               <strong>R$ {{ formatCents(item.valorCents) }}</strong>
             </div>
@@ -315,20 +403,32 @@ const CAT_VARS = {
       <v-expansion-panel class="cat-painel" :style="CAT_VARS.mercadorias">
         <v-expansion-panel-title class="cat-titulo">
           <span class="flex-grow-1">Mercadorias</span>
-          <strong class="cat-valor">R$ {{ formatCents(lancamentosPorTipo.mercadoriaCents) }}</strong>
+          <strong class="cat-valor"
+            >R$ {{ formatCents(lancamentosPorTipo.mercadoriaCents) }}</strong
+          >
         </v-expansion-panel-title>
         <v-expansion-panel-text>
           <p class="cat-subgrupo">Manuais</p>
-          <div v-if="!mercadoriasManuais.length" class="text-caption text-medium-emphasis mb-4">Nenhuma mercadoria manual lançada.</div>
+          <div v-if="!mercadoriasManuais.length" class="text-caption text-medium-emphasis mb-4">
+            Nenhuma mercadoria manual lançada.
+          </div>
           <div v-else class="d-flex flex-column ga-2 mb-4">
-            <div v-for="m in mercadoriasManuais" :key="m.id" class="d-flex justify-space-between text-body-2">
+            <div
+              v-for="m in mercadoriasManuais"
+              :key="m.id"
+              class="d-flex justify-space-between text-body-2"
+            >
               <span class="text-medium-emphasis">{{ m.fornecedor || 'Sem credor' }}</span>
               <strong>R$ {{ formatCents(m.valorCents + m.valorAcrescimoCents) }}</strong>
             </div>
           </div>
           <p class="cat-subgrupo">Automáticas</p>
           <div class="d-flex flex-column ga-2">
-            <div v-for="item in mercadoriasAutomaticas" :key="item.rotulo" class="d-flex justify-space-between text-body-2">
+            <div
+              v-for="item in mercadoriasAutomaticas"
+              :key="item.rotulo"
+              class="d-flex justify-space-between text-body-2"
+            >
               <span class="text-medium-emphasis">{{ item.rotulo }}</span>
               <strong>R$ {{ formatCents(item.valorCents) }}</strong>
             </div>
@@ -342,9 +442,15 @@ const CAT_VARS = {
           <strong class="cat-valor">R$ {{ formatCents(lancamentosPorTipo.retiradaCents) }}</strong>
         </v-expansion-panel-title>
         <v-expansion-panel-text>
-          <div v-if="!retiradas.length" class="text-caption text-medium-emphasis">Nenhuma retirada lançada.</div>
+          <div v-if="!retiradas.length" class="text-caption text-medium-emphasis">
+            Nenhuma retirada lançada.
+          </div>
           <div v-else class="d-flex flex-column ga-2">
-            <div v-for="r in retiradas" :key="r.id" class="d-flex justify-space-between text-body-2">
+            <div
+              v-for="r in retiradas"
+              :key="r.id"
+              class="d-flex justify-space-between text-body-2"
+            >
               <span class="text-medium-emphasis">{{ r.fornecedor || 'Sem credor' }}</span>
               <strong>R$ {{ formatCents(r.valorCents + r.valorAcrescimoCents) }}</strong>
             </div>
@@ -441,8 +547,9 @@ const CAT_VARS = {
     <v-divider />
     <div class="text-subtitle-2">Dinheiro esperado × contado</div>
     <p class="text-caption text-medium-emphasis">
-      Informativo — não altera a Diferença Geral acima. Esperado = dinheiro do PDV + entradas −
-      sangrias − despesas − mercadorias − retiradas.
+      Informativo — não altera a Diferença Geral acima. Esperado = dinheiro do PDV + entradas +
+      transferências recebidas − sangrias − despesas − mercadorias − retiradas − transferências
+      enviadas.
     </p>
     <div class="d-flex flex-column flex-sm-row ga-3">
       <CartaoValor

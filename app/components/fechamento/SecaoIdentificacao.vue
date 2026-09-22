@@ -98,7 +98,9 @@ async function buscarVendas() {
 // isso explícito, pra não parecer que "sincronizar" traz venda que ainda nem existe na origem).
 const sincronizando = ref(false);
 const sincronizacaoErro = ref('');
-const sincronizacaoResultado = ref<{ gravadasFechamento: number; gravadasProdutos: number } | null>(null);
+const sincronizacaoResultado = ref<{ gravadasFechamento: number; gravadasProdutos: number } | null>(
+  null,
+);
 
 async function sincronizarAgora() {
   sincronizando.value = true;
@@ -279,10 +281,15 @@ const ajustesPresentes = computed(() => {
           </div>
         </v-alert>
 
-        <v-alert v-if="ajustesPresentes.length" type="success" variant="tonal" density="comfortable">
+        <v-alert
+          v-if="ajustesPresentes.length"
+          type="success"
+          variant="tonal"
+          density="comfortable"
+        >
           <div class="text-caption font-weight-bold">
-            O CREARE também registrou estes ajustes — já lançados automaticamente como Despesa
-            (passo 3), já entram no cálculo do fechamento:
+            O CREARE também registrou estes ajustes — já lançados automaticamente na categoria
+            correspondente (passo 3), já entram no cálculo do fechamento:
           </div>
           <ul class="text-caption mt-1 pl-4">
             <li v-for="[nome, valor] in ajustesPresentes" :key="nome">

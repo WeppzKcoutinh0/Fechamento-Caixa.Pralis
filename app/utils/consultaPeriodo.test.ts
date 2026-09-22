@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { calcularJanelaDatetime, extrairLinhas, somarValores, type FechamentoComItens } from './consultaPeriodo';
+import {
+  calcularJanelaDatetime,
+  extrairLinhas,
+  somarValores,
+  type FechamentoComItens,
+} from './consultaPeriodo';
 
 describe('calcularJanelaDatetime', () => {
   // Comparado em hora LOCAL de propósito: `<input type="time">` é sempre local (mesma convenção
@@ -45,7 +50,15 @@ describe('extrairLinhas', () => {
           entradas: [{ descricao: 'Troco', lacre: '1', valorCents: 10000 }],
           sangrias: [{ descricao: 'Sangria X', lacre: '2', valorCents: 5000 }],
           lancamentos: [{ tipo: 'despesa', fornecedor: 'Fornecedor', valorCents: 3000 }],
-          transferenciasCaixa: [{ caixaOrigem: 'Caixa 1', caixaDestino: 'Caixa 2', lacre: '3', observacao: '', valorCents: 7000 }],
+          transferenciasCaixa: [
+            {
+              caixaOrigem: 'Caixa 1',
+              caixaDestino: 'Caixa 2',
+              lacre: '3',
+              observacao: '',
+              valorCents: 7000,
+            },
+          ],
         }),
       ],
       'entradas',
@@ -61,7 +74,13 @@ describe('extrairLinhas', () => {
         fechamento({
           entradas: [{ descricao: 'Troco', lacre: '1', valorCents: 10000 }],
           transferenciasCaixa: [
-            { caixaOrigem: 'Caixa 1', caixaDestino: 'Caixa 2', lacre: '9', observacao: 'Troco emprestado', valorCents: 7000 },
+            {
+              caixaOrigem: 'Caixa 1',
+              caixaDestino: 'Caixa 2',
+              lacre: '9',
+              observacao: 'Troco emprestado',
+              valorCents: 7000,
+            },
           ],
         }),
       ],
@@ -92,8 +111,16 @@ describe('extrairLinhas', () => {
   it('ordena por criadoEm', () => {
     const linhas = extrairLinhas(
       [
-        fechamento({ id: 'a', criadoEm: '2026-09-15T14:00:00Z', entradas: [{ descricao: 'Tarde', lacre: '', valorCents: 100 }] }),
-        fechamento({ id: 'b', criadoEm: '2026-09-15T09:00:00Z', entradas: [{ descricao: 'Manhã', lacre: '', valorCents: 100 }] }),
+        fechamento({
+          id: 'a',
+          criadoEm: '2026-09-15T14:00:00Z',
+          entradas: [{ descricao: 'Tarde', lacre: '', valorCents: 100 }],
+        }),
+        fechamento({
+          id: 'b',
+          criadoEm: '2026-09-15T09:00:00Z',
+          entradas: [{ descricao: 'Manhã', lacre: '', valorCents: 100 }],
+        }),
       ],
       'entradas',
     );

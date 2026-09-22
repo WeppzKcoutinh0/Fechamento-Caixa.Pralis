@@ -24,7 +24,12 @@ const { carregando, erro, linhas, buscar } = useConsultaPeriodo();
 
 async function filtrar() {
   jaBuscou.value = true;
-  await buscar({ data: data.value, horarioDe: horarioDe.value, horarioAte: horarioAte.value, tipo: props.tipo });
+  await buscar({
+    data: data.value,
+    horarioDe: horarioDe.value,
+    horarioAte: horarioAte.value,
+    tipo: props.tipo,
+  });
 }
 
 const totalCents = computed(() => somarValores(linhas.value));
@@ -37,7 +42,9 @@ function horaDoRegistro(criadoEm: string): string {
 <template>
   <v-container class="py-6" style="max-width: 900px">
     <div class="d-flex align-center ga-2 mb-6">
-      <span class="consulta-disco" :style="{ '--disco-cor': cor }"><v-icon :icon="icone" size="20" /></span>
+      <span class="consulta-disco" :style="{ '--disco-cor': cor }"
+        ><v-icon :icon="icone" size="20"
+      /></span>
       <h1 class="text-h5">{{ titulo }}</h1>
     </div>
 
@@ -45,8 +52,18 @@ function horaDoRegistro(criadoEm: string): string {
       <div class="d-flex flex-column flex-sm-row ga-3 align-sm-end flex-wrap">
         <v-text-field v-model="data" label="Data" type="date" style="max-width: 200px" />
         <v-text-field v-model="horarioDe" label="Horário de" type="time" style="max-width: 160px" />
-        <v-text-field v-model="horarioAte" label="Horário até" type="time" style="max-width: 160px" />
-        <v-btn color="primary" :loading="carregando" :disabled="carregando || !data" @click="filtrar">
+        <v-text-field
+          v-model="horarioAte"
+          label="Horário até"
+          type="time"
+          style="max-width: 160px"
+        />
+        <v-btn
+          color="primary"
+          :loading="carregando"
+          :disabled="carregando || !data"
+          @click="filtrar"
+        >
           {{ carregando ? 'Buscando...' : 'Filtrar' }}
         </v-btn>
       </div>

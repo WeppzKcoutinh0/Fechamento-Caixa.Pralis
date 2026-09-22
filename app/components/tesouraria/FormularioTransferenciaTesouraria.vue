@@ -2,7 +2,11 @@
 import { computed, ref, watch } from 'vue';
 import { hojeISO } from '~/types/fechamento';
 import { formatarDataBr } from '~/utils/vendasFechamento';
-import { useTransferenciasTesouraria, type CaixaOuCofre, type DestinoExtra } from '~/composables/useTransferenciasTesouraria';
+import {
+  useTransferenciasTesouraria,
+  type CaixaOuCofre,
+  type DestinoExtra,
+} from '~/composables/useTransferenciasTesouraria';
 import CampoDinheiro from '~/components/comum/CampoDinheiro.vue';
 
 const modelValue = defineModel<boolean>({ default: false });
@@ -32,13 +36,17 @@ const opcoesDestinoExtra = computed(() =>
 
 // "Transferência de retorno" só faz sentido Cofre -> um PDV específico (mesma regra do
 // formulário de referência que o usuário mostrou) — sem isso, "retorno pra onde?" não tem resposta.
-const retornoDisponivel = computed(() => caixaOrigem.value === 'Cofre' && !!caixaDestino.value && caixaDestino.value !== 'Cofre');
+const retornoDisponivel = computed(
+  () => caixaOrigem.value === 'Cofre' && !!caixaDestino.value && caixaDestino.value !== 'Cofre',
+);
 watch(retornoDisponivel, (disponivel) => {
   if (!disponivel) transferenciaRetorno.value = false;
 });
 
 watch([caixaOrigem, caixaDestino], () => {
-  destinosExtra.value = destinosExtra.value.filter((d) => opcoesDestinoExtra.value.includes(d.caixa));
+  destinosExtra.value = destinosExtra.value.filter((d) =>
+    opcoesDestinoExtra.value.includes(d.caixa),
+  );
 });
 
 function adicionarDestinoExtra(): void {
@@ -93,11 +101,12 @@ async function salvar(criarNova: boolean): Promise<void> {
       modelValue.value = false;
     }
   } catch (e) {
-    erro.value = e instanceof Error && e.message.includes('duplicate')
-      ? `Já existe uma transferência com o lacre "${lacre.value}".`
-      : e instanceof Error
-        ? e.message
-        : 'Não foi possível salvar a transferência.';
+    erro.value =
+      e instanceof Error && e.message.includes('duplicate')
+        ? `Já existe uma transferência com o lacre "${lacre.value}".`
+        : e instanceof Error
+          ? e.message
+          : 'Não foi possível salvar a transferência.';
   } finally {
     salvando.value = false;
   }
@@ -124,8 +133,18 @@ watch(modelValue, (aberto) => {
         </div>
 
         <div class="d-flex flex-column flex-sm-row ga-3">
-          <v-select v-model="caixaOrigem" :items="OPCOES_CAIXA" label="Origem / Saída" placeholder="Selecione..." />
-          <v-select v-model="caixaDestino" :items="opcoesDestino" label="Destino / Entrada" placeholder="Selecione..." />
+          <v-select
+            v-model="caixaOrigem"
+            :items="OPCOES_CAIXA"
+            label="Origem / Saída"
+            placeholder="Selecione..."
+          />
+          <v-select
+            v-model="caixaDestino"
+            :items="opcoesDestino"
+            label="Destino / Entrada"
+            placeholder="Selecione..."
+          />
         </div>
 
         <v-checkbox v-model="agendamento" label="Agendamento" density="compact" hide-details />
@@ -138,19 +157,44 @@ watch(modelValue, (aberto) => {
           persistent-hint
         />
 
-        <v-checkbox v-model="multiploDestino" label="Múltiplo Destino" density="compact" hide-details />
+        <v-checkbox
+          v-model="multiploDestino"
+          label="Múltiplo Destino"
+          density="compact"
+          hide-details
+        />
         <div v-if="multiploDestino" class="d-flex flex-column ga-2">
           <div v-for="(destino, i) in destinosExtra" :key="i" class="d-flex ga-2 align-center">
-            <v-select v-model="destino.caixa" :items="opcoesDestinoExtra" label="Caixa candidata" density="compact" hide-details style="max-width: 220px" />
-            <v-btn icon="mdi-delete-outline" variant="text" size="small" @click="removerDestinoExtra(i)" />
+            <v-select
+              v-model="destino.caixa"
+              :items="opcoesDestinoExtra"
+              label="Caixa candidata"
+              density="compact"
+              hide-details
+              style="max-width: 220px"
+            />
+            <v-btn
+              icon="mdi-delete-outline"
+              variant="text"
+              size="small"
+              @click="removerDestinoExtra(i)"
+            />
           </div>
-          <v-btn variant="text" size="small" prepend-icon="mdi-plus" @click="adicionarDestinoExtra">Adicionar destino</v-btn>
+          <v-btn variant="text" size="small" prepend-icon="mdi-plus" @click="adicionarDestinoExtra"
+            >Adicionar destino</v-btn
+          >
           <p class="text-caption text-medium-emphasis mb-0">
-            Os destinos são candidatos à confirmação. O valor inteiro da transferência permanece o mesmo.
+            Os destinos são candidatos à confirmação. O valor inteiro da transferência permanece o
+            mesmo.
           </p>
         </div>
 
-        <v-checkbox v-model="tempoConfirmacao" label="Tempo de confirmação" density="compact" hide-details />
+        <v-checkbox
+          v-model="tempoConfirmacao"
+          label="Tempo de confirmação"
+          density="compact"
+          hide-details
+        />
 
         <v-checkbox
           v-model="transferenciaRetorno"
@@ -163,15 +207,24 @@ watch(modelValue, (aberto) => {
           Selecione Cofre como origem e uma conta de PDV ativa como destino para preparar o retorno.
         </p>
 
-        <v-textarea v-model="observacao" label="Observação" rows="2" placeholder="Ex.: Suprimento CX1 — reforço de troco" />
+        <v-textarea
+          v-model="observacao"
+          label="Observação"
+          rows="2"
+          placeholder="Ex.: Suprimento CX1 — reforço de troco"
+        />
 
         <v-alert v-if="erro" type="error" variant="tonal" density="comfortable">{{ erro }}</v-alert>
       </v-card-text>
       <v-card-actions>
         <v-spacer />
         <v-btn variant="text" @click="modelValue = false">Cancelar</v-btn>
-        <v-btn variant="text" :loading="salvando" :disabled="!valido" @click="salvar(true)">Salvar e criar nova</v-btn>
-        <v-btn color="primary" :loading="salvando" :disabled="!valido" @click="salvar(false)">Salvar</v-btn>
+        <v-btn variant="text" :loading="salvando" :disabled="!valido" @click="salvar(true)"
+          >Salvar e criar nova</v-btn
+        >
+        <v-btn color="primary" :loading="salvando" :disabled="!valido" @click="salvar(false)"
+          >Salvar</v-btn
+        >
       </v-card-actions>
     </v-card>
   </v-dialog>

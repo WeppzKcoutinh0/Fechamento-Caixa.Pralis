@@ -17,7 +17,10 @@ export function compararChaveIntegracao(recebida: string, esperada: string): boo
 }
 
 /** Lê `x-api-key` (ou `Authorization: Bearer <chave>`, formato usado pelo bot) dos headers do request. */
-export function extrairChaveIntegracaoDoHeader(headerApiKey: string | null | undefined, headerAuth: string | null | undefined): string {
+export function extrairChaveIntegracaoDoHeader(
+  headerApiKey: string | null | undefined,
+  headerAuth: string | null | undefined,
+): string {
   const bearer = headerAuth?.startsWith('Bearer ') ? headerAuth.slice('Bearer '.length) : null;
   return headerApiKey ?? bearer ?? '';
 }

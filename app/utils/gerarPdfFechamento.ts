@@ -91,7 +91,11 @@ class ConstrutorPdf {
     this.y += 18;
   }
 
-  linha(label: string, valor: string, opts?: { negrito?: boolean; corValor?: [number, number, number] }): void {
+  linha(
+    label: string,
+    valor: string,
+    opts?: { negrito?: boolean; corValor?: [number, number, number] },
+  ): void {
     this.quebraSeNecessario(14);
     this.doc.setFontSize(9.5);
     this.doc.setFont('helvetica', opts?.negrito ? 'bold' : 'normal');
@@ -134,7 +138,10 @@ export function gerarPdfFechamento(draft: FechamentoDraft, dados: DadosRelatorio
     pdf.vazio('Nenhuma entrada registrada.');
   } else {
     for (const e of draft.entradas) {
-      pdf.linha(`${e.descricao || 'Sem descrição'}${e.lacre ? ` (lacre ${e.lacre})` : ''}`, `R$ ${formatCents(e.valorCents)}`);
+      pdf.linha(
+        `${e.descricao || 'Sem descrição'}${e.lacre ? ` (lacre ${e.lacre})` : ''}`,
+        `R$ ${formatCents(e.valorCents)}`,
+      );
     }
   }
 
@@ -143,7 +150,10 @@ export function gerarPdfFechamento(draft: FechamentoDraft, dados: DadosRelatorio
     pdf.vazio('Nenhuma sangria registrada.');
   } else {
     for (const s of draft.sangrias) {
-      pdf.linha(`${s.descricao || 'Sem descrição'}${s.lacre ? ` (lacre ${s.lacre})` : ''}`, `R$ ${formatCents(s.valorCents)}`);
+      pdf.linha(
+        `${s.descricao || 'Sem descrição'}${s.lacre ? ` (lacre ${s.lacre})` : ''}`,
+        `R$ ${formatCents(s.valorCents)}`,
+      );
     }
   }
 
@@ -173,8 +183,17 @@ export function gerarPdfFechamento(draft: FechamentoDraft, dados: DadosRelatorio
   } else {
     draft.pdvEntradas.forEach((p, indice) => {
       const totalEntrada =
-        p.dinheiroCents + p.creditoCents + p.debitoCents + p.pixCents + p.voucherCents + p.crediarioCents;
-      pdf.linha(`PDV ${indice + 1} — ${p.nrClientes} cliente${p.nrClientes === 1 ? '' : 's'}`, `R$ ${formatCents(totalEntrada)}`, { negrito: true });
+        p.dinheiroCents +
+        p.creditoCents +
+        p.debitoCents +
+        p.pixCents +
+        p.voucherCents +
+        p.crediarioCents;
+      pdf.linha(
+        `PDV ${indice + 1} — ${p.nrClientes} cliente${p.nrClientes === 1 ? '' : 's'}`,
+        `R$ ${formatCents(totalEntrada)}`,
+        { negrito: true },
+      );
       pdf.linha('  Dinheiro', `R$ ${formatCents(p.dinheiroCents)}`);
       pdf.linha('  Crédito', `R$ ${formatCents(p.creditoCents)}`);
       pdf.linha('  Débito', `R$ ${formatCents(p.debitoCents)}`);
@@ -202,17 +221,45 @@ export function gerarPdfFechamento(draft: FechamentoDraft, dados: DadosRelatorio
 
   pdf.secao('Conferência por forma de pagamento');
   const formas: { nome: string; finalCents: number; pdvCents: number; diffCents: number }[] = [
-    { nome: 'Crédito', finalCents: dados.liqCreditoCents, pdvCents: dados.pdvCreditoCents, diffCents: relatorio.diffCreditoCents },
-    { nome: 'Débito', finalCents: dados.liqDebitoCents, pdvCents: dados.pdvDebitoCents, diffCents: relatorio.diffDebitoCents },
-    { nome: 'Pix', finalCents: dados.liqPixCents, pdvCents: dados.pdvPixCents, diffCents: relatorio.diffPixCents },
-    { nome: 'Voucher', finalCents: dados.liqVoucherCents, pdvCents: dados.pdvVoucherCents, diffCents: relatorio.diffVoucherCents },
-    { nome: 'Crediário', finalCents: dados.crediarioTotalCents, pdvCents: dados.pdvCrediarioCents, diffCents: relatorio.diffCrediarioCents },
+    {
+      nome: 'Crédito',
+      finalCents: dados.liqCreditoCents,
+      pdvCents: dados.pdvCreditoCents,
+      diffCents: relatorio.diffCreditoCents,
+    },
+    {
+      nome: 'Débito',
+      finalCents: dados.liqDebitoCents,
+      pdvCents: dados.pdvDebitoCents,
+      diffCents: relatorio.diffDebitoCents,
+    },
+    {
+      nome: 'Pix',
+      finalCents: dados.liqPixCents,
+      pdvCents: dados.pdvPixCents,
+      diffCents: relatorio.diffPixCents,
+    },
+    {
+      nome: 'Voucher',
+      finalCents: dados.liqVoucherCents,
+      pdvCents: dados.pdvVoucherCents,
+      diffCents: relatorio.diffVoucherCents,
+    },
+    {
+      nome: 'Crediário',
+      finalCents: dados.crediarioTotalCents,
+      pdvCents: dados.pdvCrediarioCents,
+      diffCents: relatorio.diffCrediarioCents,
+    },
   ];
   for (const f of formas) {
     pdf.linha(
       `${f.nome} — Final: R$ ${formatCents(f.finalCents)} / PDV: R$ ${formatCents(f.pdvCents)}`,
       `Dif.: R$ ${formatCents(f.diffCents)}`,
-      { corValor: Math.abs(f.diffCents) < 1 ? undefined : f.diffCents > 0 ? [22, 163, 74] : [220, 38, 38] },
+      {
+        corValor:
+          Math.abs(f.diffCents) < 1 ? undefined : f.diffCents > 0 ? [22, 163, 74] : [220, 38, 38],
+      },
     );
   }
 
@@ -224,7 +271,11 @@ export function gerarPdfFechamento(draft: FechamentoDraft, dados: DadosRelatorio
   pdf.linha('Cartões (líquido)', `R$ ${formatCents(relatorio.cartoesCents)}`);
   pdf.espaco(4);
   const corDiferenca: [number, number, number] | undefined =
-    relatorio.status === 'zero' ? undefined : relatorio.status === 'sobra' ? [22, 163, 74] : [220, 38, 38];
+    relatorio.status === 'zero'
+      ? undefined
+      : relatorio.status === 'sobra'
+        ? [22, 163, 74]
+        : [220, 38, 38];
   pdf.linha(
     `Diferença Geral — ${STATUS_TEXTO[relatorio.status]}`,
     `R$ ${formatCents(Math.abs(relatorio.diferencaCents))}`,

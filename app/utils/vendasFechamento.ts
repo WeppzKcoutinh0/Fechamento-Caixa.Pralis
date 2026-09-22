@@ -2,7 +2,14 @@
  * Resumo do dia a partir das linhas já sincronizadas de `vendas_fechamento_caixa_dia` (uma linha
  * por PDV/operador/dia) — cálculo puro, mesma convenção de `utils/painel.ts`/`utils/financeiro.ts`.
  */
-import type { FechamentoDraft, Caixa, LancamentoDraft, TipoCredor, TipoLancamento, Turno } from '~/types/fechamento';
+import type {
+  FechamentoDraft,
+  Caixa,
+  LancamentoDraft,
+  TipoCredor,
+  TipoLancamento,
+  Turno,
+} from '~/types/fechamento';
 import type { ResumoVendasDia } from '~/types/vendasFechamento';
 import { formatCents, toCents } from '~/utils/financeiro';
 
@@ -59,7 +66,12 @@ interface AjusteCategoria {
 // despesas; furto/roubo e sobra/perda são mercadorias.
 const AJUSTES_CATEGORIAS: AjusteCategoria[] = [
   { chave: 'colaboradores', rotulo: 'Colaboradores', tipo: 'despesa', tipoCredor: 'colaborador' },
-  { chave: 'alimentacao', rotulo: 'Alimentação/Lanches', tipo: 'despesa', tipoCredor: 'fornecedor' },
+  {
+    chave: 'alimentacao',
+    rotulo: 'Alimentação/Lanches',
+    tipo: 'despesa',
+    tipoCredor: 'fornecedor',
+  },
   { chave: 'rouboFurto', rotulo: 'Furto/Roubo', tipo: 'mercadoria', tipoCredor: 'fornecedor' },
   { chave: 'socios', rotulo: 'Sócios', tipo: 'despesa', tipoCredor: 'fornecedor' },
   { chave: 'sobraPerda', rotulo: 'Sobra/Perda', tipo: 'mercadoria', tipoCredor: 'fornecedor' },
@@ -86,7 +98,10 @@ const AJUSTES_CATEGORIAS: AjusteCategoria[] = [
  * Categoria que chegou zerada (correção no CREARE) remove o lançamento automático anterior, se
  * houver — nunca mexe num lançamento criado manualmente pelo usuário.
  */
-export function aplicarAjustesComoLancamentos(draft: FechamentoDraft, resumo: ResumoVendasDia): void {
+export function aplicarAjustesComoLancamentos(
+  draft: FechamentoDraft,
+  resumo: ResumoVendasDia,
+): void {
   for (const { chave, rotulo, tipo, tipoCredor } of AJUSTES_CATEGORIAS) {
     const valorOriginal = Number(resumo.ajustes[chave]);
     const existente = draft.lancamentos.find((l) => l.origemAjusteCreare === chave);
@@ -161,7 +176,10 @@ function somar(registros: FechamentoCaixaDiaRow[], campo: keyof FechamentoCaixaD
   return registros.reduce((total, registro) => total + Number(registro[campo] ?? 0), 0);
 }
 
-export function calcularResumoVendasDia(data: string, registros: FechamentoCaixaDiaRow[]): ResumoVendasDia {
+export function calcularResumoVendasDia(
+  data: string,
+  registros: FechamentoCaixaDiaRow[],
+): ResumoVendasDia {
   return {
     data,
     registros: registros.length,

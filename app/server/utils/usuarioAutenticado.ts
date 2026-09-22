@@ -11,7 +11,9 @@ import { createClient } from '@supabase/supabase-js';
  * exato de `H3Event` — dois pacotes `h3` diferentes coexistem no projeto (Nitro embutido vs a
  * dependência direta) e são tipos incompatíveis entre si mesmo sendo a "mesma" lib.
  */
-export async function exigirUsuarioAutenticado(cabecalhoAutorizacao: string | undefined): Promise<void> {
+export async function exigirUsuarioAutenticado(
+  cabecalhoAutorizacao: string | undefined,
+): Promise<void> {
   const config = useRuntimeConfig();
   const token = (cabecalhoAutorizacao ?? '').replace(/^Bearer\s+/i, '').trim();
   if (!token) {

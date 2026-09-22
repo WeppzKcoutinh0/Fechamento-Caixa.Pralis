@@ -25,7 +25,10 @@ function irParaWizard(): void {
 </script>
 
 <template>
-  <v-container class="py-6 d-flex flex-column align-center justify-center" style="max-width: 640px; min-height: 60vh">
+  <v-container
+    class="py-6 d-flex flex-column align-center justify-center"
+    style="max-width: 640px; min-height: 60vh"
+  >
     <div v-if="carregando" class="d-flex justify-center py-10">
       <v-progress-circular indeterminate color="primary" />
     </div>
@@ -63,9 +66,16 @@ function irParaWizard(): void {
           <v-icon icon="mdi-point-of-sale" size="32" />
         </v-avatar>
         <div class="text-h6 mb-1">Nenhum caixa aberto</div>
-        <div class="text-body-2 text-medium-emphasis">Abra o caixa para começar o fechamento de hoje.</div>
+        <div class="text-body-2 text-medium-emphasis">
+          Abra o caixa para começar o fechamento de hoje.
+        </div>
       </div>
-      <v-btn color="primary" size="large" prepend-icon="mdi-lock-open-variant" @click="modalAberto = true">
+      <v-btn
+        color="primary"
+        size="large"
+        prepend-icon="mdi-lock-open-variant"
+        @click="modalAberto = true"
+      >
         Abrir Caixa
       </v-btn>
     </template>

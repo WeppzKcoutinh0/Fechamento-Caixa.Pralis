@@ -226,6 +226,10 @@ export interface FechamentoDraft {
   // SecaoIdentificacao.vue) e o wizard fecha a sessão automaticamente ao salvar (ver
   // WizardFechamento.vue).
   cashSessionId: string | null;
+
+  // Arquivos escolhidos para os campos de maquininha antes do primeiro salvamento. Eles ficam
+  // apenas em memória: o Storage só aceita o upload depois que o fechamento existe no banco.
+  arquivosPendentes?: Partial<Record<'img-manha' | 'img-tarde', File>>;
 }
 
 /**
@@ -245,7 +249,12 @@ export interface FechamentoListItem {
   criadoEm: string;
   entradas: { lacre: string; descricao: string; valorCents: number }[];
   sangrias: { lacre: string; descricao: string; valorCents: number }[];
-  transferenciasCaixa: { caixaOrigem: string; caixaDestino: string; lacre: string; valorCents: number }[];
+  transferenciasCaixa: {
+    caixaOrigem: string;
+    caixaDestino: string;
+    lacre: string;
+    valorCents: number;
+  }[];
   lancamentos: { tipo: string; status: string; fornecedor: string; valorCents: number }[];
   discriminacoes: { produto: string }[];
   crediario: { tipo: string; nome: string; valorCents: number }[];
@@ -309,5 +318,6 @@ export function criarFechamentoVazio(contexto?: ContextoSessaoCaixa): Fechamento
     discriminacoes: [],
     dinheiroContadoCents: 0,
     cashSessionId: contexto?.id ?? null,
+    arquivosPendentes: {},
   };
 }

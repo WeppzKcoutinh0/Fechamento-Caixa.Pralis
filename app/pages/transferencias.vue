@@ -4,7 +4,10 @@ import ConsultaPorPeriodo from '~/components/consulta/ConsultaPorPeriodo.vue';
 import FormularioTransferenciaTesouraria from '~/components/tesouraria/FormularioTransferenciaTesouraria.vue';
 import ConfirmacaoDialog from '~/components/comum/ConfirmacaoDialog.vue';
 import { usePerfil } from '~/composables/usePerfil';
-import { useTransferenciasTesouraria, type TransferenciaTesouraria } from '~/composables/useTransferenciasTesouraria';
+import {
+  useTransferenciasTesouraria,
+  type TransferenciaTesouraria,
+} from '~/composables/useTransferenciasTesouraria';
 import { formatCents } from '~/utils/financeiro';
 import { formatarDataBr } from '~/utils/vendasFechamento';
 
@@ -91,7 +94,9 @@ async function confirmarRecebimentoDe(id: string): Promise<void> {
                     <v-spacer />
                     <strong>R$ {{ formatCents(t.valorCents) }}</strong>
                   </div>
-                  <span class="text-caption text-medium-emphasis">Lacre {{ t.lacre }} · {{ formatarDataBr(t.dataLanc) }}</span>
+                  <span class="text-caption text-medium-emphasis"
+                    >Lacre {{ t.lacre }} · {{ formatarDataBr(t.dataLanc) }}</span
+                  >
                   <v-btn
                     size="small"
                     variant="tonal"
@@ -111,7 +116,9 @@ async function confirmarRecebimentoDe(id: string): Promise<void> {
           </v-card>
         </v-menu>
 
-        <v-btn color="primary" prepend-icon="mdi-plus" @click="modalAberto = true">Nova Transferência</v-btn>
+        <v-btn color="primary" prepend-icon="mdi-plus" @click="modalAberto = true"
+          >Nova Transferência</v-btn
+        >
       </div>
 
       <v-alert v-if="erro" type="error" variant="tonal" class="mb-4">{{ erro }}</v-alert>
@@ -133,9 +140,17 @@ async function confirmarRecebimentoDe(id: string): Promise<void> {
             <span class="text-caption text-medium-emphasis">{{ formatarDataBr(t.dataLanc) }}</span>
             <v-spacer />
             <strong>R$ {{ formatCents(t.valorCents) }}</strong>
-            <v-btn size="small" variant="text" color="error" icon="mdi-delete-outline" @click="paraExcluir = t.id" />
+            <v-btn
+              size="small"
+              variant="text"
+              color="error"
+              icon="mdi-delete-outline"
+              @click="paraExcluir = t.id"
+            />
           </div>
-          <p v-if="t.observacao" class="text-caption text-medium-emphasis mt-2 mb-0">{{ t.observacao }}</p>
+          <p v-if="t.observacao" class="text-caption text-medium-emphasis mt-2 mb-0">
+            {{ t.observacao }}
+          </p>
         </v-card>
       </div>
     </div>

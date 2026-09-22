@@ -65,8 +65,28 @@ describe('calcularResumoVendasDia', () => {
 
   it('soma múltiplos PDVs/operadores do mesmo dia, aceitando valores como string (vindos do Postgres numeric)', () => {
     const registros = [
-      linha({ numero_vendas: '128', credito: '1234,56'.replace(',', '.'), debito: 200, dinheiro: 300, pix: 50, voucher: 0, clientes: 100, outros: 0, total_pagamento: 1884.56 }),
-      linha({ numero_vendas: 42, credito: 500, debito: 100, dinheiro: 150, pix: 20, voucher: 10, clientes: 0, outros: 5, total_pagamento: 785 }),
+      linha({
+        numero_vendas: '128',
+        credito: '1234,56'.replace(',', '.'),
+        debito: 200,
+        dinheiro: 300,
+        pix: 50,
+        voucher: 0,
+        clientes: 100,
+        outros: 0,
+        total_pagamento: 1884.56,
+      }),
+      linha({
+        numero_vendas: 42,
+        credito: 500,
+        debito: 100,
+        dinheiro: 150,
+        pix: 20,
+        voucher: 10,
+        clientes: 0,
+        outros: 5,
+        total_pagamento: 785,
+      }),
     ];
 
     const resumo = calcularResumoVendasDia('2026-08-21', registros);
@@ -80,12 +100,25 @@ describe('calcularResumoVendasDia', () => {
 
   it('soma colaboradores/alimentação/furto-roubo/sócios/sobra-perda separado, sem entrar em porForma/totalPagamento', () => {
     const registros = [
-      linha({ total_pagamento: 100, colaboradores: 10, alimentacao: 5, roubo_furto: 20, socios: 8, sobra_perda: 3 }),
+      linha({
+        total_pagamento: 100,
+        colaboradores: 10,
+        alimentacao: 5,
+        roubo_furto: 20,
+        socios: 8,
+        sobra_perda: 3,
+      }),
       linha({ total_pagamento: 50, colaboradores: 2, roubo_furto: 0 }),
     ];
 
     const resumo = calcularResumoVendasDia('2026-08-21', registros);
-    expect(resumo.ajustes).toEqual({ colaboradores: 12, alimentacao: 5, rouboFurto: 20, socios: 8, sobraPerda: 3 });
+    expect(resumo.ajustes).toEqual({
+      colaboradores: 12,
+      alimentacao: 5,
+      rouboFurto: 20,
+      socios: 8,
+      sobraPerda: 3,
+    });
     // Confirma que não vaza pra nenhum outro total — só o que já era somado antes continua.
     expect(resumo.totalPagamento).toBe(150);
   });
@@ -93,7 +126,13 @@ describe('calcularResumoVendasDia', () => {
   it('linhas sem colaboradores/alimentação/etc (undefined, formato antigo) não quebram — viram 0', () => {
     const registros = [linha({ total_pagamento: 100 })];
     const resumo = calcularResumoVendasDia('2026-08-21', registros);
-    expect(resumo.ajustes).toEqual({ colaboradores: 0, alimentacao: 0, rouboFurto: 0, socios: 0, sobraPerda: 0 });
+    expect(resumo.ajustes).toEqual({
+      colaboradores: 0,
+      alimentacao: 0,
+      rouboFurto: 0,
+      socios: 0,
+      sobraPerda: 0,
+    });
   });
 });
 
@@ -104,14 +143,24 @@ function resumoComAjustes(ajustes: Partial<ResumoVendasDia['ajustes']>): ResumoV
     numeroVendas: 0,
     totalPagamento: 0,
     porForma: { dinheiro: 0, credito: 0, debito: 0, pix: 0, voucher: 0, crediario: 0, outros: 0 },
-    ajustes: { colaboradores: 0, alimentacao: 0, rouboFurto: 0, socios: 0, sobraPerda: 0, ...ajustes },
+    ajustes: {
+      colaboradores: 0,
+      alimentacao: 0,
+      rouboFurto: 0,
+      socios: 0,
+      sobraPerda: 0,
+      ...ajustes,
+    },
   };
 }
 
 describe('aplicarAjustesComoLancamentos', () => {
   it('cria uma Despesa por categoria presente, colaboradores com tipoCredor "colaborador"', () => {
     const draft = criarFechamentoVazio();
-    aplicarAjustesComoLancamentos(draft, resumoComAjustes({ colaboradores: 35.09, rouboFurto: 12 }));
+    aplicarAjustesComoLancamentos(
+      draft,
+      resumoComAjustes({ colaboradores: 35.09, rouboFurto: 12 }),
+    );
 
     expect(draft.lancamentos).toHaveLength(2);
     const colab = draft.lancamentos.find((l) => l.origemAjusteCreare === 'colaboradores')!;

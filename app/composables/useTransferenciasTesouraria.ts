@@ -163,7 +163,12 @@ export function useTransferenciasTesouraria() {
    * retorno automático que não foi criado (o usuário ainda pode criar manual em `/transferencias`).
    * Idempotente no banco (`on conflict (lacre) do nothing`) — resalvar o mesmo fechamento nunca duplica.
    */
-  async function criarRetornoAutomatico(dados: { fechamentoId: string; caixa: Caixa; codigo: string; valorCents: number }): Promise<void> {
+  async function criarRetornoAutomatico(dados: {
+    fechamentoId: string;
+    caixa: Caixa;
+    codigo: string;
+    valorCents: number;
+  }): Promise<void> {
     if (dados.valorCents <= 0) return;
     const { error } = await supabase.rpc('criar_retorno_automatico_tesouraria', {
       p_fechamento_id: dados.fechamentoId,

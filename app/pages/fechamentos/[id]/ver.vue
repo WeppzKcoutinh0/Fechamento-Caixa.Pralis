@@ -66,7 +66,12 @@ function totalDiscriminacao(d: FechamentoDraft['discriminacoes'][number]): numbe
 
 function totalPdvEntrada(p: FechamentoDraft['pdvEntradas'][number]): number {
   return (
-    p.dinheiroCents + p.creditoCents + p.debitoCents + p.pixCents + p.voucherCents + p.crediarioCents
+    p.dinheiroCents +
+    p.creditoCents +
+    p.debitoCents +
+    p.pixCents +
+    p.voucherCents +
+    p.crediarioCents
   );
 }
 </script>

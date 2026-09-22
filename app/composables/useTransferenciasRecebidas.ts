@@ -41,7 +41,8 @@ export function useTransferenciasRecebidas() {
         valorCents: Number(l.valor_total_cents),
       }));
     } catch (e) {
-      erro.value = e instanceof Error ? e.message : 'Não foi possível buscar transferências recebidas.';
+      erro.value =
+        e instanceof Error ? e.message : 'Não foi possível buscar transferências recebidas.';
     } finally {
       carregando.value = false;
     }

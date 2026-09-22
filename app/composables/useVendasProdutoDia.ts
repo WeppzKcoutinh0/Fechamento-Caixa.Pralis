@@ -39,7 +39,7 @@ export function useVendasProdutoDia() {
         .eq('data_venda', data)
         .order('total', { ascending: false });
       if (error) throw error;
-      produtos.value = (linhas as LinhaRow[] | null ?? []).map((l) => ({
+      produtos.value = ((linhas as LinhaRow[] | null) ?? []).map((l) => ({
         produto: l.produto,
         produtoCodigo: l.produto_codigo,
         quantidade: Number(l.quantidade),

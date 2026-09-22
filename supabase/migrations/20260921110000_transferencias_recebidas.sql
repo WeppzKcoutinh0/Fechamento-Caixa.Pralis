@@ -29,6 +29,7 @@ as $$
   where f.data = p_data
     and p.caixa_padrao is not null
     and tc.caixa_destino = p.caixa_padrao
+    and tc.caixa_origem is not null
     and tc.caixa_origem is distinct from p.caixa_padrao
   group by tc.caixa_origem;
 $$;

@@ -6,12 +6,18 @@ const props = defineProps<{
   fechamentoId: string;
   campo: string;
   label: string;
+  uploadAdiado?: boolean;
 }>();
 const modelValue = defineModel<string | null>({ default: null });
+const emit = defineEmits<{
+  arquivoSelecionado: [arquivo: File];
+  arquivoRemovido: [];
+}>();
 
 const { enviar, remover } = useAnexos();
 const enviando = ref(false);
 const erro = ref<string | null>(null);
+const arquivoPendente = ref(false);
 
 async function aoEscolherArquivo(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement;
@@ -19,6 +25,13 @@ async function aoEscolherArquivo(event: Event): Promise<void> {
   if (!arquivo) return;
 
   erro.value = null;
+  if (props.uploadAdiado) {
+    arquivoPendente.value = true;
+    emit('arquivoSelecionado', arquivo);
+    input.value = '';
+    return;
+  }
+
   enviando.value = true;
   try {
     modelValue.value = await enviar(props.fechamentoId, props.campo, arquivo);
@@ -31,6 +44,10 @@ async function aoEscolherArquivo(event: Event): Promise<void> {
 }
 
 async function removerFoto(): Promise<void> {
+  if (arquivoPendente.value) {
+    emit('arquivoRemovido');
+    arquivoPendente.value = false;
+  }
   if (!modelValue.value) return;
   await remover(modelValue.value).catch(() => {});
   modelValue.value = null;
@@ -40,7 +57,7 @@ async function removerFoto(): Promise<void> {
 <template>
   <div>
     <div class="text-caption text-medium-emphasis mb-1">{{ label }}</div>
-    <div v-if="modelValue" class="d-flex align-center ga-2">
+    <div v-if="modelValue || arquivoPendente" class="d-flex align-center ga-2">
       <v-chip prepend-icon="mdi-image" color="primary" variant="tonal">Foto anexada</v-chip>
       <v-btn
         icon="mdi-close"
@@ -50,21 +67,38 @@ async function removerFoto(): Promise<void> {
         @click="removerFoto"
       />
     </div>
-    <v-btn
-      v-else
-      :loading="enviando"
-      variant="outlined"
-      prepend-icon="mdi-camera"
-      size="small"
-      @click="($refs.input as HTMLInputElement).click()"
-    >
-      Adicionar foto
-    </v-btn>
+    <div v-else class="d-flex flex-wrap ga-2">
+      <v-btn
+        :loading="enviando"
+        variant="outlined"
+        prepend-icon="mdi-camera"
+        size="small"
+        @click="($refs.cameraInput as HTMLInputElement).click()"
+      >
+        Tirar foto
+      </v-btn>
+      <v-btn
+        :loading="enviando"
+        variant="text"
+        prepend-icon="mdi-image-outline"
+        size="small"
+        @click="($refs.galleryInput as HTMLInputElement).click()"
+      >
+        Escolher da galeria
+      </v-btn>
+    </div>
     <input
-      ref="input"
+      ref="cameraInput"
       type="file"
       accept="image/*"
       capture="environment"
+      class="d-none"
+      @change="aoEscolherArquivo"
+    />
+    <input
+      ref="galleryInput"
+      type="file"
+      accept="image/*"
       class="d-none"
       @change="aoEscolherArquivo"
     />

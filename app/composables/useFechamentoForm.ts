@@ -1,4 +1,8 @@
-import { criarFechamentoVazio, type ContextoSessaoCaixa, type FechamentoDraft } from '~/types/fechamento';
+import {
+  criarFechamentoVazio,
+  type ContextoSessaoCaixa,
+  type FechamentoDraft,
+} from '~/types/fechamento';
 
 const TOTAL_SECOES = 5;
 

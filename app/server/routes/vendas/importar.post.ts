@@ -1,5 +1,8 @@
 import { importarVendasPayloadSchema } from '../../../types/vendasFechamento';
-import { compararChaveIntegracao, extrairChaveIntegracaoDoHeader } from '../../utils/integracaoAuth';
+import {
+  compararChaveIntegracao,
+  extrairChaveIntegracaoDoHeader,
+} from '../../utils/integracaoAuth';
 import { ErroImportacaoVendas, processarImportacao } from '../../utils/importarVendas';
 
 /**
@@ -23,7 +26,10 @@ import { ErroImportacaoVendas, processarImportacao } from '../../utils/importarV
  */
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig();
-  const chaveRecebida = extrairChaveIntegracaoDoHeader(getHeader(event, 'x-api-key'), getHeader(event, 'authorization'));
+  const chaveRecebida = extrairChaveIntegracaoDoHeader(
+    getHeader(event, 'x-api-key'),
+    getHeader(event, 'authorization'),
+  );
 
   if (!compararChaveIntegracao(chaveRecebida, config.integracaoVendasChave)) {
     throw createError({ statusCode: 401, statusMessage: 'Chave de integração inválida.' });
@@ -35,7 +41,12 @@ export default defineEventHandler(async (event) => {
     throw createError({
       statusCode: 400,
       statusMessage: 'INTEGRATION_VALIDATION_ERROR',
-      data: { erros: resultado.error.issues.map((issue) => ({ caminho: issue.path.join('.'), mensagem: issue.message })) },
+      data: {
+        erros: resultado.error.issues.map((issue) => ({
+          caminho: issue.path.join('.'),
+          mensagem: issue.message,
+        })),
+      },
     });
   }
 
@@ -46,7 +57,11 @@ export default defineEventHandler(async (event) => {
     return { ok: true, tipo: payload.tipo, recebidas, gravadas };
   } catch (erro) {
     if (erro instanceof ErroImportacaoVendas) {
-      throw createError({ statusCode: erro.statusCode, statusMessage: erro.message, data: erro.data });
+      throw createError({
+        statusCode: erro.statusCode,
+        statusMessage: erro.message,
+        data: erro.data,
+      });
     }
     console.error('[vendas/importar] erro inesperado:', erro);
     throw createError({ statusCode: 500, statusMessage: 'Erro interno.' });

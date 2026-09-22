@@ -7,7 +7,12 @@ import type {
   TipoCredor,
   TipoLancamento,
 } from '~/types/fechamento';
-import { GRUPOS_DISCRIMINACAO, TIPOS_CREDOR, TIPOS_LANCAMENTO, TIPOS_MER } from '~/types/fechamento';
+import {
+  GRUPOS_DISCRIMINACAO,
+  TIPOS_CREDOR,
+  TIPOS_LANCAMENTO,
+  TIPOS_MER,
+} from '~/types/fechamento';
 import CampoFoto from '~/components/comum/CampoFoto.vue';
 import CartaoValor from '~/components/comum/CartaoValor.vue';
 import GravadorAudio from '~/components/comum/GravadorAudio.vue';
@@ -107,7 +112,12 @@ function novoLancamento(tipo: TipoLancamento): LancamentoDraft {
 // `draft.lancamentos` com `tipo: 'despesa'` de sempre — o motor de cálculo real
 // (useRelatorioCalculado/calculateLancamentosPorTipo) nunca filtra por `origemAjusteCreare` e
 // continua somando todos eles normalmente; isto é só uma mudança de exibição.
-const ORIGENS_COM_BLOCO_AUTOMATICO: readonly string[] = ['colaboradores', 'alimentacao', 'sobraPerda', 'rouboFurto'];
+const ORIGENS_COM_BLOCO_AUTOMATICO: readonly string[] = [
+  'colaboradores',
+  'alimentacao',
+  'sobraPerda',
+  'rouboFurto',
+];
 
 function lancamentosPorTipo(tipo: TipoLancamento): LancamentoDraft[] {
   return props.draft.lancamentos.filter(
@@ -115,7 +125,10 @@ function lancamentosPorTipo(tipo: TipoLancamento): LancamentoDraft[] {
   );
 }
 function totalPorTipo(tipo: TipoLancamento): number {
-  return lancamentosPorTipo(tipo).reduce((soma, l) => soma + l.valorCents + l.valorAcrescimoCents, 0);
+  return lancamentosPorTipo(tipo).reduce(
+    (soma, l) => soma + l.valorCents + l.valorAcrescimoCents,
+    0,
+  );
 }
 
 function valorPorOrigem(origem: string): number {
@@ -159,7 +172,8 @@ function remover(): void {
   if (!lancamento) return;
   // Itens discriminados deste lançamento não fazem mais sentido sem ele.
   for (let i = props.draft.discriminacoes.length - 1; i >= 0; i -= 1) {
-    if (props.draft.discriminacoes[i]?.lancamentoId === lancamento.id) props.draft.discriminacoes.splice(i, 1);
+    if (props.draft.discriminacoes[i]?.lancamentoId === lancamento.id)
+      props.draft.discriminacoes.splice(i, 1);
   }
 }
 
@@ -251,7 +265,9 @@ const totalGeralDiscriminacao = computed(() =>
     >
       <div class="lc-faixa">
         <div class="lc-head">
-          <span class="lc-ic"><v-icon size="19">{{ ICONES_TIPO[tipo] }}</v-icon></span>
+          <span class="lc-ic"
+            ><v-icon size="19">{{ ICONES_TIPO[tipo] }}</v-icon></span
+          >
           <span class="lc-titulo">{{ ROTULOS_TIPO[tipo] }}s</span>
         </div>
       </div>
@@ -280,7 +296,10 @@ const totalGeralDiscriminacao = computed(() =>
           Nenhuma {{ ROTULOS_TIPO[tipo].toLowerCase() }} lançada ainda.
         </p>
         <div v-else class="grade-cartoes lc-mt">
-          <CartaoValor :rotulo="`Total ${ROTULOS_TIPO[tipo]}`" :valor="`R$ ${formatCents(totalPorTipo(tipo))}`" />
+          <CartaoValor
+            :rotulo="`Total ${ROTULOS_TIPO[tipo]}`"
+            :valor="`R$ ${formatCents(totalPorTipo(tipo))}`"
+          />
         </div>
       </div>
     </div>
@@ -288,10 +307,19 @@ const totalGeralDiscriminacao = computed(() =>
     <div class="lc-bloco-automatico">
       <p class="lc-grupo-titulo">Lançamentos Automáticos</p>
       <p class="text-caption text-medium-emphasis mb-0">
-        Identificado e somado automaticamente a partir dos ajustes já sincronizados das vendas — sem edição manual aqui.
+        Identificado e somado automaticamente a partir dos ajustes já sincronizados das vendas — sem
+        edição manual aqui.
       </p>
 
-      <div class="lc-painel" :style="{ '--cat': 'var(--cat-despesas-base)', '--cat-soft': 'var(--cat-despesas-soft)', '--cat-faixa': 'var(--cat-despesas-faixa)', '--cat-tinta': 'var(--cat-despesas-tinta)' }">
+      <div
+        class="lc-painel"
+        :style="{
+          '--cat': 'var(--cat-despesas-base)',
+          '--cat-soft': 'var(--cat-despesas-soft)',
+          '--cat-faixa': 'var(--cat-despesas-faixa)',
+          '--cat-tinta': 'var(--cat-despesas-tinta)',
+        }"
+      >
         <div class="lc-faixa">
           <div class="lc-head">
             <span class="lc-ic"><v-icon size="19">mdi-robot-outline</v-icon></span>
@@ -310,7 +338,15 @@ const totalGeralDiscriminacao = computed(() =>
         </div>
       </div>
 
-      <div class="lc-painel" :style="{ '--cat': 'var(--cat-mercadorias-base)', '--cat-soft': 'var(--cat-mercadorias-soft)', '--cat-faixa': 'var(--cat-mercadorias-faixa)', '--cat-tinta': 'var(--cat-mercadorias-tinta)' }">
+      <div
+        class="lc-painel"
+        :style="{
+          '--cat': 'var(--cat-mercadorias-base)',
+          '--cat-soft': 'var(--cat-mercadorias-soft)',
+          '--cat-faixa': 'var(--cat-mercadorias-faixa)',
+          '--cat-tinta': 'var(--cat-mercadorias-tinta)',
+        }"
+      >
         <div class="lc-faixa">
           <div class="lc-head">
             <span class="lc-ic"><v-icon size="19">mdi-robot-outline</v-icon></span>

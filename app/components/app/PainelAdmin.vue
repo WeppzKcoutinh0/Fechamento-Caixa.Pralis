@@ -131,7 +131,6 @@ async function confirmarExclusao() {
   excluindoId.value = null;
   await carregar();
 }
-
 </script>
 
 <template>

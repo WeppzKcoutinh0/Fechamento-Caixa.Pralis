@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { CAIXAS, TIPOS_CONTA_ENTRADA, type EntradaDraft, type FechamentoDraft, type SangriaDraft, type TransferenciaCaixaDraft } from '~/types/fechamento';
+import {
+  CAIXAS,
+  TIPOS_CONTA_ENTRADA,
+  type EntradaDraft,
+  type FechamentoDraft,
+  type SangriaDraft,
+  type TransferenciaCaixaDraft,
+} from '~/types/fechamento';
 import CartaoValor from '~/components/comum/CartaoValor.vue';
 import { formatCents } from '~/utils/financeiro';
 import { useTransferenciasTesouraria } from '~/composables/useTransferenciasTesouraria';
@@ -33,7 +40,14 @@ function novaSangria(): SangriaDraft {
 // Data travada na data do fechamento (pedido do usuário, 18/09/2026) — ver mesma decisão em
 // SecaoLancamentos.vue.
 function novaTransferencia(): TransferenciaCaixaDraft {
-  return { caixaOrigem: '', caixaDestino: '', valorCents: 0, lacre: '', data: props.draft.data, observacao: '' };
+  return {
+    caixaOrigem: props.draft.caixa || '',
+    caixaDestino: '',
+    valorCents: 0,
+    lacre: '',
+    data: props.draft.data,
+    observacao: '',
+  };
 }
 
 const modalAberto = ref(false);
@@ -115,7 +129,11 @@ const transferenciaAtual = computed(() =>
     : null,
 );
 const modalVars = computed(() =>
-  tipoModal.value === 'entrada' ? ENTRADA_VARS : tipoModal.value === 'sangria' ? SANGRIA_VARS : TRANSFERENCIA_VARS,
+  tipoModal.value === 'entrada'
+    ? ENTRADA_VARS
+    : tipoModal.value === 'sangria'
+      ? SANGRIA_VARS
+      : TRANSFERENCIA_VARS,
 );
 
 // Origem não pode ser a mesma conta do destino — mesma regra (R-030) do Pralís, só que sem
@@ -129,6 +147,12 @@ const caixasDestinoDisponiveis = computed(() =>
 // pro usuário poder desistir/remover em vez de ficar preso no modal).
 const transferenciaSemDestino = computed(
   () => tipoModal.value === 'transferencia' && !transferenciaAtual.value?.caixaDestino,
+);
+const transferenciaSemOrigem = computed(
+  () => tipoModal.value === 'transferencia' && !transferenciaAtual.value?.caixaOrigem,
+);
+const transferenciaInvalida = computed(
+  () => transferenciaSemOrigem.value || transferenciaSemDestino.value,
 );
 
 function remover(): void {
@@ -161,14 +185,23 @@ const totalTransferenciasCents = computed(() =>
 // não editável aqui. Deriva do que JÁ está no draft (não faz uma busca nova): `pdvEntradas` já é
 // preenchido de forma idempotente por `aplicarResumoAoPrimeiroPdv` (sobrescreve, nunca duplica a
 // cada nova busca), então isto nunca soma a mesma venda duas vezes.
-function somaPdv(campo: 'dinheiroCents' | 'creditoCents' | 'debitoCents' | 'pixCents' | 'voucherCents' | 'crediarioCents'): number {
+function somaPdv(
+  campo:
+    | 'dinheiroCents'
+    | 'creditoCents'
+    | 'debitoCents'
+    | 'pixCents'
+    | 'voucherCents'
+    | 'crediarioCents',
+): number {
   return props.draft.pdvEntradas.reduce((soma, p) => soma + p[campo], 0);
 }
 // Transferência recebida de outro caixa (pedido do usuário, 21/09/2026): quando outro caixa
 // registra "Transferência entre caixas" com este caixa como destino, aparece aqui sozinho — sem
 // precisar avisar por fora. Busca via RPC segura (nunca lê o fechamento alheio inteiro, só o
 // agregado — ver useTransferenciasRecebidas.ts).
-const { recebidas: transferenciasRecebidas, buscarPorData: buscarTransferenciasRecebidas } = useTransferenciasRecebidas();
+const { recebidas: transferenciasRecebidas, buscarPorData: buscarTransferenciasRecebidas } =
+  useTransferenciasRecebidas();
 onMounted(() => {
   if (props.draft.data) void buscarTransferenciasRecebidas(props.draft.data);
 });
@@ -312,7 +345,9 @@ const transferenciasAutomaticas = computed(() => [
     <div class="lc-bloco-automatico">
       <p class="lc-grupo-titulo">Transferências Automáticas</p>
       <p class="text-caption text-medium-emphasis mb-0">
-        Somado automaticamente a partir das vendas já sincronizadas ("Buscar vendas") e das transferências que outros caixas já registraram tendo este como destino — sem edição manual aqui.
+        Somado automaticamente a partir das vendas já sincronizadas ("Buscar vendas") e das
+        transferências que outros caixas já registraram tendo este como destino — sem edição manual
+        aqui.
       </p>
       <div class="lc-painel" :style="TRANSFERENCIAS_VARS">
         <div class="lc-faixa">
@@ -401,6 +436,9 @@ const transferenciasAutomaticas = computed(() => [
                 </select>
               </label>
             </div>
+            <p v-if="transferenciaSemOrigem" class="lc-erro-campo">
+              Selecione o caixa origem para poder salvar.
+            </p>
             <p v-if="transferenciaSemDestino" class="lc-erro-campo">
               Selecione o caixa destino pra poder salvar.
             </p>
@@ -435,10 +473,16 @@ const transferenciasAutomaticas = computed(() => [
                 placeholder="000000"
                 inputmode="numeric"
                 @blur="tipoModal === 'entrada' ? aoSairDoLacreEntrada() : undefined"
-                @keydown.enter.prevent="tipoModal === 'entrada' ? aoSairDoLacreEntrada() : undefined"
+                @keydown.enter.prevent="
+                  tipoModal === 'entrada' ? aoSairDoLacreEntrada() : undefined
+                "
               />
             </label>
-            <p v-if="tipoModal === 'entrada' && lacreEncontradoMsg" class="lc-erro-campo" style="color: var(--cx-positive)">
+            <p
+              v-if="tipoModal === 'entrada' && lacreEncontradoMsg"
+              class="lc-erro-campo"
+              style="color: var(--cx-positive)"
+            >
               {{ lacreEncontradoMsg }}
             </p>
 
@@ -461,7 +505,9 @@ const transferenciasAutomaticas = computed(() => [
               <span class="lc-campo-lbl">Tipo de conta</span>
               <select v-model="itemAtual.tipoConta" class="lc-input">
                 <option value="">Selecione...</option>
-                <option v-for="opcao in TIPOS_CONTA_ENTRADA" :key="opcao" :value="opcao">{{ opcao }}</option>
+                <option v-for="opcao in TIPOS_CONTA_ENTRADA" :key="opcao" :value="opcao">
+                  {{ opcao }}
+                </option>
               </select>
             </label>
 
@@ -481,7 +527,7 @@ const transferenciasAutomaticas = computed(() => [
           <button
             type="button"
             class="lc-salvar"
-            :disabled="transferenciaSemDestino"
+            :disabled="transferenciaInvalida"
             @click="modalAberto = false"
           >
             Salvar

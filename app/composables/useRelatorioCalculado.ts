@@ -32,9 +32,18 @@ export function useRelatorioCalculado(draft: Ref<FechamentoDraft>) {
       .filter((t) => t.caixaOrigem === draft.value.caixa)
       .reduce((s, t) => s + t.valorCents, 0),
   );
-  const { recebidas: transferenciasRecebidas, totalCents: transferenciaEntradaCents, buscarPorData: buscarTransferenciasRecebidas } =
-    useTransferenciasRecebidas();
-  watch(() => draft.value.data, (data) => { if (data) void buscarTransferenciasRecebidas(data); }, { immediate: true });
+  const {
+    recebidas: transferenciasRecebidas,
+    totalCents: transferenciaEntradaCents,
+    buscarPorData: buscarTransferenciasRecebidas,
+  } = useTransferenciasRecebidas();
+  watch(
+    () => draft.value.data,
+    (data) => {
+      if (data) void buscarTransferenciasRecebidas(data);
+    },
+    { immediate: true },
+  );
 
   const pdv = computed(() =>
     calculatePdvEntradas(

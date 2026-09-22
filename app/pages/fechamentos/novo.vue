@@ -13,7 +13,12 @@ const { isAdmin, carregar: carregarPerfil } = usePerfil();
 const { sessaoAtual, carregarSessaoAtual } = useSessaoCaixa();
 
 function contextoDe(sessao: SessaoCaixa): ContextoSessaoCaixa {
-  return { id: sessao.id, caixa: sessao.caixa, turno: sessao.turno, businessDate: sessao.businessDate };
+  return {
+    id: sessao.id,
+    caixa: sessao.caixa,
+    turno: sessao.turno,
+    businessDate: sessao.businessDate,
+  };
 }
 
 // Reseta o draft já na primeira renderização (mesmo comportamento síncrono de sempre) usando o

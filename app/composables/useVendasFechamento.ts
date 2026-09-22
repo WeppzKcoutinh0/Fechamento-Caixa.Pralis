@@ -26,7 +26,12 @@ export function useVendasFechamento() {
    */
   async function buscarPorData(
     data: string,
-    filtros?: { caixa?: string | null; turno?: string | null; horaInicio?: number | null; horaFim?: number | null },
+    filtros?: {
+      caixa?: string | null;
+      turno?: string | null;
+      horaInicio?: number | null;
+      horaFim?: number | null;
+    },
   ): Promise<ResumoVendasDia | null> {
     if (carregando.value) return null;
 

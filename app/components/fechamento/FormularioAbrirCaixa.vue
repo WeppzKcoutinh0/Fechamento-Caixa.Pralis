@@ -41,6 +41,17 @@ const maquininhaAbertura = ref('');
 const CAIXAS_OPCOES = ['Caixa 1', 'Caixa 2', 'Caixa 3', 'Caixa 4'] as const;
 const TURNOS_OPCOES = ['Manhã', 'Tarde'] as const;
 
+// Enum fixo das 5 maquininhas físicas da loja (pedido do usuário, 22/09/2026) — só visual/
+// informativo, igual já era com o campo de texto livre: não dispara nenhuma busca, não muda
+// nenhum cálculo. Corrigido "MQA" -> "MAQ" no último item (mesmo padrão dos outros 4).
+const MAQUININHAS_OPCOES: string[] = [
+  'MAQ.cx1-J9D109390816',
+  'MAQ.cx2-1733604190',
+  'MAQ.cx3-1733604129',
+  'MAQ.cx4-J9D509650278',
+  'MAQ.cx-entrega-J9BB07901119',
+];
+
 async function confirmar(): Promise<void> {
   if (!caixaSelecionado.value || !turnoSelecionado.value) return;
   const resultado = await abrirSessao({
@@ -85,8 +96,18 @@ async function confirmar(): Promise<void> {
           hint="Identifica o lacre do malote que trouxe o fundo ao caixa. Não é o lacre usado no fechamento."
           persistent-hint
         />
-        <v-text-field v-model="maquininhaAbertura" label="Maq. Cartão / N° Série" />
-        <v-text-field :model-value="formatarDataBr(hojeISO())" label="Data de abertura" readonly prepend-inner-icon="mdi-clock-outline" />
+        <v-select
+          v-model="maquininhaAbertura"
+          :items="MAQUININHAS_OPCOES"
+          label="Maq. Cartão / N° Série"
+          clearable
+        />
+        <v-text-field
+          :model-value="formatarDataBr(hojeISO())"
+          label="Data de abertura"
+          readonly
+          prepend-inner-icon="mdi-clock-outline"
+        />
         <v-text-field :model-value="perfil?.nome ?? ''" label="Usuário do caixa" readonly />
 
         <v-alert v-if="erro" type="error" variant="tonal" density="comfortable">{{ erro }}</v-alert>

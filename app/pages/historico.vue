@@ -63,28 +63,39 @@ async function carregar(): Promise<void> {
   try {
     const { data: sessoes, error: erroSessoes } = await supabase
       .from('cash_sessions')
-      .select('id, caixa, turno, business_date, opened_at, opened_by, closed_at, status, fechamento_id')
+      .select(
+        'id, caixa, turno, business_date, opened_at, opened_by, closed_at, status, fechamento_id',
+      )
       .order('opened_at', { ascending: false });
     if (erroSessoes) throw erroSessoes;
 
     const linhasSessoes = (sessoes ?? []) as SessaoRow[];
 
     const idsUsuarios = [...new Set(linhasSessoes.map((s) => s.opened_by))];
-    const idsFechamentos = linhasSessoes.map((s) => s.fechamento_id).filter((id): id is string => !!id);
+    const idsFechamentos = linhasSessoes
+      .map((s) => s.fechamento_id)
+      .filter((id): id is string => !!id);
 
-    const [{ data: perfis, error: erroPerfis }, { data: fechamentosResumo, error: erroFechamentos }] =
-      await Promise.all([
-        idsUsuarios.length
-          ? supabase.from('profiles').select('user_id, nome').in('user_id', idsUsuarios)
-          : Promise.resolve({ data: [], error: null }),
-        idsFechamentos.length
-          ? supabase.from('fechamentos').select('id, codigo, valor_total_final, diferenca').in('id', idsFechamentos)
-          : Promise.resolve({ data: [], error: null }),
-      ]);
+    const [
+      { data: perfis, error: erroPerfis },
+      { data: fechamentosResumo, error: erroFechamentos },
+    ] = await Promise.all([
+      idsUsuarios.length
+        ? supabase.from('profiles').select('user_id, nome').in('user_id', idsUsuarios)
+        : Promise.resolve({ data: [], error: null }),
+      idsFechamentos.length
+        ? supabase
+            .from('fechamentos')
+            .select('id, codigo, valor_total_final, diferenca')
+            .in('id', idsFechamentos)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
     if (erroPerfis) throw erroPerfis;
     if (erroFechamentos) throw erroFechamentos;
 
-    const nomePorUsuario = new Map((perfis ?? []).map((p: { user_id: string; nome: string }) => [p.user_id, p.nome]));
+    const nomePorUsuario = new Map(
+      (perfis ?? []).map((p: { user_id: string; nome: string }) => [p.user_id, p.nome]),
+    );
     const fechamentoPorId = new Map(
       ((fechamentosResumo ?? []) as FechamentoResumoRow[]).map((f) => [f.id, f]),
     );
@@ -156,9 +167,30 @@ async function confirmarEncerrar(): Promise<void> {
     <AppCabecalhoTela titulo="Histórico de Caixa" />
 
     <div class="d-flex ga-3 mb-5 flex-wrap">
-      <v-text-field v-model="filtroData" label="Data" type="date" density="comfortable" style="max-width: 180px" clearable />
-      <v-select v-model="filtroCaixa" :items="[...CAIXAS]" label="Caixa" density="comfortable" style="max-width: 160px" clearable />
-      <v-select v-model="filtroTurno" :items="[...TURNOS]" label="Turno" density="comfortable" style="max-width: 140px" clearable />
+      <v-text-field
+        v-model="filtroData"
+        label="Data"
+        type="date"
+        density="comfortable"
+        style="max-width: 180px"
+        clearable
+      />
+      <v-select
+        v-model="filtroCaixa"
+        :items="[...CAIXAS]"
+        label="Caixa"
+        density="comfortable"
+        style="max-width: 160px"
+        clearable
+      />
+      <v-select
+        v-model="filtroTurno"
+        :items="[...TURNOS]"
+        label="Turno"
+        density="comfortable"
+        style="max-width: 140px"
+        clearable
+      />
       <v-select
         v-model="filtroStatus"
         :items="['ABERTO', 'FECHADO']"
@@ -190,21 +222,32 @@ async function confirmarEncerrar(): Promise<void> {
         @click="abrirFechamento(l)"
       >
         <div class="d-flex align-center flex-wrap ga-3">
-          <v-chip :color="l.status === 'ABERTO' ? 'success' : 'default'" size="small" variant="tonal">
+          <v-chip
+            :color="l.status === 'ABERTO' ? 'success' : 'default'"
+            size="small"
+            variant="tonal"
+          >
             {{ l.status }}
           </v-chip>
           <strong>{{ l.caixa }} · {{ l.turno }}</strong>
-          <span class="text-caption text-medium-emphasis">{{ formatarDataBr(l.businessDate) }}</span>
+          <span class="text-caption text-medium-emphasis">{{
+            formatarDataBr(l.businessDate)
+          }}</span>
           <span class="text-caption text-medium-emphasis"
-            >Aberto {{ formatarHora(l.openedAt) }}<template v-if="l.closedAt"> · Fechado {{ formatarHora(l.closedAt) }}</template></span
+            >Aberto {{ formatarHora(l.openedAt)
+            }}<template v-if="l.closedAt"> · Fechado {{ formatarHora(l.closedAt) }}</template></span
           >
           <span class="text-caption text-medium-emphasis">{{ l.operadorNome }}</span>
           <v-spacer />
           <template v-if="l.fechamentoCodigo">
             <span class="text-caption">{{ l.fechamentoCodigo }}</span>
-            <strong v-if="l.valorTotalFinalCents !== null">R$ {{ formatCents(l.valorTotalFinalCents) }}</strong>
+            <strong v-if="l.valorTotalFinalCents !== null"
+              >R$ {{ formatCents(l.valorTotalFinalCents) }}</strong
+            >
           </template>
-          <v-chip v-else-if="l.status === 'ABERTO'" size="small" variant="text" color="warning">Sem fechamento ainda</v-chip>
+          <v-chip v-else-if="l.status === 'ABERTO'" size="small" variant="text" color="warning"
+            >Sem fechamento ainda</v-chip
+          >
           <v-chip v-else size="small" variant="text">Encerrada sem fechamento</v-chip>
           <v-btn
             v-if="l.status === 'ABERTO'"

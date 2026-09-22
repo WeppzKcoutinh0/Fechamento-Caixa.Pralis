@@ -22,7 +22,14 @@ interface SessaoRow {
 }
 
 function linhaParaSessao(l: SessaoRow): SessaoCaixa {
-  return { id: l.id, caixa: l.caixa, turno: l.turno, businessDate: l.business_date, openedAt: l.opened_at, status: l.status };
+  return {
+    id: l.id,
+    caixa: l.caixa,
+    turno: l.turno,
+    businessDate: l.business_date,
+    openedAt: l.opened_at,
+    status: l.status,
+  };
 }
 
 /**
@@ -111,7 +118,12 @@ export function useSessaoCaixa() {
   async function fecharSessao(sessaoId: string, fechamentoId: string): Promise<void> {
     const { error: erroSupabase } = await supabase
       .from('cash_sessions')
-      .update({ status: 'FECHADO', closed_at: new Date().toISOString(), closed_by: session.value?.user.id, fechamento_id: fechamentoId })
+      .update({
+        status: 'FECHADO',
+        closed_at: new Date().toISOString(),
+        closed_by: session.value?.user.id,
+        fechamento_id: fechamentoId,
+      })
       .eq('id', sessaoId)
       .select('id')
       .single();
@@ -123,12 +135,24 @@ export function useSessaoCaixa() {
   async function encerrarSemFechamento(sessaoId: string): Promise<void> {
     const { error: erroSupabase } = await supabase
       .from('cash_sessions')
-      .update({ status: 'FECHADO', closed_at: new Date().toISOString(), closed_by: session.value?.user.id })
+      .update({
+        status: 'FECHADO',
+        closed_at: new Date().toISOString(),
+        closed_by: session.value?.user.id,
+      })
       .eq('id', sessaoId)
       .select('id')
       .single();
     if (erroSupabase) throw erroSupabase;
   }
 
-  return { sessaoAtual, carregando, erro, carregarSessaoAtual, abrirSessao, fecharSessao, encerrarSemFechamento };
+  return {
+    sessaoAtual,
+    carregando,
+    erro,
+    carregarSessaoAtual,
+    abrirSessao,
+    fecharSessao,
+    encerrarSemFechamento,
+  };
 }

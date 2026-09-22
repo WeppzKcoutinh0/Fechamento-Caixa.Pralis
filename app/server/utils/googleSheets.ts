@@ -18,7 +18,11 @@ interface ServiceAccountCredenciais {
 let tokenCache: { token: string; expiraEm: number } | null = null;
 
 function base64Url(input: Buffer | string): string {
-  return Buffer.from(input).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return Buffer.from(input)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
 }
 
 async function obterAccessToken(credenciais: ServiceAccountCredenciais): Promise<string> {
@@ -35,17 +39,24 @@ async function obterAccessToken(credenciais: ServiceAccountCredenciais): Promise
       exp: agora + 3600,
     }),
   );
-  const assinatura = createSign('RSA-SHA256').update(`${header}.${claims}`).sign(credenciais.private_key);
+  const assinatura = createSign('RSA-SHA256')
+    .update(`${header}.${claims}`)
+    .sign(credenciais.private_key);
   const jwt = `${header}.${claims}.${base64Url(assinatura)}`;
 
   const resposta = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: jwt }),
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      assertion: jwt,
+    }),
   });
   if (!resposta.ok) {
     const corpo = await resposta.text().catch(() => '');
-    throw new Error(`Falha ao autenticar com o Google (${resposta.status}): ${corpo.slice(0, 300)}`);
+    throw new Error(
+      `Falha ao autenticar com o Google (${resposta.status}): ${corpo.slice(0, 300)}`,
+    );
   }
   const dados = (await resposta.json()) as { access_token: string; expires_in: number };
   tokenCache = { token: dados.access_token, expiraEm: Date.now() + dados.expires_in * 1000 };
@@ -92,7 +103,9 @@ export async function lerAbaPlanilha({
   const resposta = await fetch(url, { headers: { authorization: `Bearer ${accessToken}` } });
   if (!resposta.ok) {
     const corpo = await resposta.text().catch(() => '');
-    throw new Error(`Falha ao ler a planilha (aba ${aba}, HTTP ${resposta.status}): ${corpo.slice(0, 300)}`);
+    throw new Error(
+      `Falha ao ler a planilha (aba ${aba}, HTTP ${resposta.status}): ${corpo.slice(0, 300)}`,
+    );
   }
   const dados = (await resposta.json()) as { values?: string[][] };
   const linhas = dados.values ?? [];

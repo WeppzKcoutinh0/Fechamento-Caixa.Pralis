@@ -60,8 +60,14 @@ export const linhaVendaProdutoDiaSchema = z.object({
 });
 
 export const importarVendasPayloadSchema = z.discriminatedUnion('tipo', [
-  z.object({ tipo: z.literal('fechamento_caixa_dia'), linhas: z.array(linhaFechamentoCaixaDiaSchema).max(500) }),
-  z.object({ tipo: z.literal('venda_produto_dia'), linhas: z.array(linhaVendaProdutoDiaSchema).max(500) }),
+  z.object({
+    tipo: z.literal('fechamento_caixa_dia'),
+    linhas: z.array(linhaFechamentoCaixaDiaSchema).max(500),
+  }),
+  z.object({
+    tipo: z.literal('venda_produto_dia'),
+    linhas: z.array(linhaVendaProdutoDiaSchema).max(500),
+  }),
 ]);
 
 export type LinhaFechamentoCaixaDia = z.infer<typeof linhaFechamentoCaixaDiaSchema>;

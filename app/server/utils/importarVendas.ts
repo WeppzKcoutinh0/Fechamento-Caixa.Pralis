@@ -38,13 +38,27 @@ function validarDatas(linhas: { data_venda: string | null }[]): void {
 // sempre mandou).
 async function limparLinhasTurnoSuperadas(
   supabase: ReturnType<typeof useSupabaseAdmin>,
-  linhas: { empresa: string; data_venda: string | null; pdv: string; operador: string; hora: number | null }[],
+  linhas: {
+    empresa: string;
+    data_venda: string | null;
+    pdv: string;
+    operador: string;
+    hora: number | null;
+  }[],
 ): Promise<void> {
-  const chaves = new Map<string, { empresa: string; data_venda: string; pdv: string; operador: string }>();
+  const chaves = new Map<
+    string,
+    { empresa: string; data_venda: string; pdv: string; operador: string }
+  >();
   for (const linha of linhas) {
     if (linha.hora === null || linha.data_venda === null) continue;
     const chave = `${linha.empresa}|${linha.data_venda}|${linha.pdv}|${linha.operador}`;
-    chaves.set(chave, { empresa: linha.empresa, data_venda: linha.data_venda, pdv: linha.pdv, operador: linha.operador });
+    chaves.set(chave, {
+      empresa: linha.empresa,
+      data_venda: linha.data_venda,
+      pdv: linha.pdv,
+      operador: linha.operador,
+    });
   }
   for (const { empresa, data_venda, pdv, operador } of chaves.values()) {
     await supabase
@@ -80,7 +94,10 @@ async function limparSnapshotsSuperados(
   const pares = new Map<string, { empresa: string; data_venda: string }>();
   for (const linha of linhas) {
     if (linha.data_venda === null) continue;
-    pares.set(`${linha.empresa}|${linha.data_venda}`, { empresa: linha.empresa, data_venda: linha.data_venda });
+    pares.set(`${linha.empresa}|${linha.data_venda}`, {
+      empresa: linha.empresa,
+      data_venda: linha.data_venda,
+    });
   }
 
   for (const { empresa, data_venda } of pares.values()) {
@@ -93,7 +110,10 @@ async function limparSnapshotsSuperados(
       .eq('data_venda', data_venda);
     if (!existentes || existentes.length === 0) continue;
 
-    type Linha = { id: string; atualizado_em_origem: string | null; criado_em: string } & Record<string, unknown>;
+    type Linha = { id: string; atualizado_em_origem: string | null; criado_em: string } & Record<
+      string,
+      unknown
+    >;
     const grupos = new Map<string, Linha[]>();
     for (const linha of existentes as unknown as Linha[]) {
       const chave = colunasChave.map((c) => String(linha[c] ?? '')).join('|');
@@ -105,7 +125,11 @@ async function limparSnapshotsSuperados(
     const idsParaRemover: string[] = [];
     for (const grupo of grupos.values()) {
       if (grupo.length <= 1) continue;
-      grupo.sort((a, b) => (b.atualizado_em_origem ?? b.criado_em).localeCompare(a.atualizado_em_origem ?? a.criado_em));
+      grupo.sort((a, b) =>
+        (b.atualizado_em_origem ?? b.criado_em).localeCompare(
+          a.atualizado_em_origem ?? a.criado_em,
+        ),
+      );
       idsParaRemover.push(...grupo.slice(1).map((l) => l.id));
     }
     if (idsParaRemover.length > 0) {
@@ -130,7 +154,12 @@ export async function processarImportacao(
             .upsert(linhas, { onConflict: 'hash', count: 'exact' });
           if (!error) {
             await limparLinhasTurnoSuperadas(supabase, linhas);
-            await limparSnapshotsSuperados(supabase, 'vendas_fechamento_caixa_dia', ['pdv', 'operador', 'hora'], linhas);
+            await limparSnapshotsSuperados(
+              supabase,
+              'vendas_fechamento_caixa_dia',
+              ['pdv', 'operador', 'hora'],
+              linhas,
+            );
           }
           return { error, count, recebidas: linhas.length };
         })()
@@ -141,13 +170,20 @@ export async function processarImportacao(
             .from('vendas_produto_dia')
             .upsert(linhas, { onConflict: 'hash', count: 'exact' });
           if (!error) {
-            await limparSnapshotsSuperados(supabase, 'vendas_produto_dia', ['produto_codigo', 'produto'], linhas);
+            await limparSnapshotsSuperados(
+              supabase,
+              'vendas_produto_dia',
+              ['produto_codigo', 'produto'],
+              linhas,
+            );
           }
           return { error, count, recebidas: linhas.length };
         })();
 
   if (resposta.error) {
-    throw new ErroImportacaoVendas('INTEGRATION_DATABASE_ERROR', 503, { codigo: resposta.error.code ?? null });
+    throw new ErroImportacaoVendas('INTEGRATION_DATABASE_ERROR', 503, {
+      codigo: resposta.error.code ?? null,
+    });
   }
 
   return { recebidas: resposta.recebidas, gravadas: resposta.count ?? resposta.recebidas };

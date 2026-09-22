@@ -51,7 +51,10 @@ describe('calcularResumoPainel', () => {
         diferencaCents: 500,
       }),
       // Fechamento de outro dia não deve entrar nas somas de "hoje".
-      fechamento({ data: '2026-09-14', entradas: [{ lacre: '2', descricao: '', valorCents: 99999 }] }),
+      fechamento({
+        data: '2026-09-14',
+        entradas: [{ lacre: '2', descricao: '', valorCents: 99999 }],
+      }),
     ];
 
     const resumo = calcularResumoPainel(fechamentos, '2026-09-15');

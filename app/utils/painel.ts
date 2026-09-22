@@ -19,13 +19,18 @@ export interface ResumoPainel {
 
 function somaLancamentosPorTipo(lista: FechamentoListItem[], tipo: string): number {
   return lista.reduce(
-    (total, f) => total + f.lancamentos.filter((l) => l.tipo === tipo).reduce((soma, l) => soma + l.valorCents, 0),
+    (total, f) =>
+      total +
+      f.lancamentos.filter((l) => l.tipo === tipo).reduce((soma, l) => soma + l.valorCents, 0),
     0,
   );
 }
 
 function somaEntradas(lista: FechamentoListItem[]): number {
-  return lista.reduce((total, f) => total + f.entradas.reduce((soma, e) => soma + e.valorCents, 0), 0);
+  return lista.reduce(
+    (total, f) => total + f.entradas.reduce((soma, e) => soma + e.valorCents, 0),
+    0,
+  );
 }
 
 function somaDiferenca(lista: FechamentoListItem[]): number {
@@ -33,7 +38,10 @@ function somaDiferenca(lista: FechamentoListItem[]): number {
 }
 
 /** `hojeISO`/mês injetados (não `new Date()` aqui dentro) para a função continuar pura e testável. */
-export function calcularResumoPainel(fechamentos: FechamentoListItem[], hojeISO: string): ResumoPainel {
+export function calcularResumoPainel(
+  fechamentos: FechamentoListItem[],
+  hojeISO: string,
+): ResumoPainel {
   const mesAtual = hojeISO.slice(0, 7); // "YYYY-MM"
   const doHoje = fechamentos.filter((f) => f.data === hojeISO);
   const doMes = fechamentos.filter((f) => f.data.startsWith(mesAtual));

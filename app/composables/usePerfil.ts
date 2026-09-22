@@ -21,7 +21,8 @@ const perfilState = () => useState<Perfil | null>('perfil-usuario', () => null);
 const perfilUserIdState = () => useState<string | null>('perfil-usuario-id', () => null);
 const carregandoState = () => useState<boolean>('perfil-carregando', () => false);
 const erroState = () => useState<string | null>('perfil-erro', () => null);
-const requisicaoUserIdState = () => useState<string | null>('perfil-requisicao-user-id', () => null);
+const requisicaoUserIdState = () =>
+  useState<string | null>('perfil-requisicao-user-id', () => null);
 
 /**
  * Fluxo de Caixa (18/09/2026): busca o `profiles` do usuário logado (role admin/caixa, e pra
@@ -80,7 +81,8 @@ export function usePerfil() {
       if (session.value?.user.id === userId) {
         perfil.value = null;
         perfilUserId.value = null;
-        erro.value = e instanceof Error ? e.message : 'Não foi possível carregar o perfil do usuário.';
+        erro.value =
+          e instanceof Error ? e.message : 'Não foi possível carregar o perfil do usuário.';
       }
     } finally {
       if (requisicaoUserId.value === userId) {

@@ -150,7 +150,12 @@ interface ListRow {
   criado_em: string;
   entradas: { lacre: string; descricao: string; valor: string }[];
   sangrias: { lacre: string; descricao: string; valor: string }[];
-  transferencias_caixa: { caixa_origem: string | null; caixa_destino: string | null; lacre: string; valor: string }[];
+  transferencias_caixa: {
+    caixa_origem: string | null;
+    caixa_destino: string | null;
+    lacre: string;
+    valor: string;
+  }[];
   lancamentos: { tipo: string; status: string; fornecedor: string; valor: string }[];
   discriminacoes: { produto: string }[];
   crediario_itens: { tipo: string; nome: string; valor: string }[];
@@ -167,8 +172,16 @@ function linhaParaResumo(row: ListRow): FechamentoListItem {
     valorTotalFinalCents: toCents(row.valor_total_final),
     diferencaCents: toCents(row.diferenca),
     criadoEm: row.criado_em,
-    entradas: row.entradas.map((e) => ({ lacre: e.lacre, descricao: e.descricao, valorCents: toCents(e.valor) })),
-    sangrias: row.sangrias.map((s) => ({ lacre: s.lacre, descricao: s.descricao, valorCents: toCents(s.valor) })),
+    entradas: row.entradas.map((e) => ({
+      lacre: e.lacre,
+      descricao: e.descricao,
+      valorCents: toCents(e.valor),
+    })),
+    sangrias: row.sangrias.map((s) => ({
+      lacre: s.lacre,
+      descricao: s.descricao,
+      valorCents: toCents(s.valor),
+    })),
     transferenciasCaixa: row.transferencias_caixa.map((t) => ({
       caixaOrigem: t.caixa_origem ?? '',
       caixaDestino: t.caixa_destino ?? '',
@@ -303,6 +316,13 @@ export function useFechamentos() {
   }
 
   async function salvar(draft: FechamentoDraft): Promise<string> {
+    if (
+      draft.transferenciasCaixa.some(
+        (t) => !t.caixaOrigem || !t.caixaDestino || t.caixaOrigem === t.caixaDestino,
+      )
+    ) {
+      throw new Error('Toda transferência entre caixas precisa ter origem e destino diferentes.');
+    }
     const totalEntradaCents = sumValores(draft.entradas);
     const totalSaidaCents = sumValores(draft.sangrias);
 
@@ -313,13 +333,27 @@ export function useFechamentos() {
     const transferenciaSaidaCents = draft.transferenciasCaixa
       .filter((t) => t.caixaOrigem === draft.caixa)
       .reduce((s, t) => s + t.valorCents, 0);
-    const { data: transferenciasRecebidasRows, error: erroTransferenciasRecebidas } = await supabase.rpc(
-      'transferencias_caixa_recebidas',
-      { p_data: draft.data },
-    );
-    if (erroTransferenciasRecebidas) throw erroTransferenciasRecebidas;
+    const { data: transferenciasRecebidasRows, error: erroTransferenciasRecebidas } =
+      await supabase.rpc('transferencias_caixa_recebidas', { p_data: draft.data });
+    // A RPC é uma melhoria opcional para bases que já receberam a migration nova. Durante uma
+    // implantação gradual, uma base antiga ainda pode responder "função não encontrada"; isso não
+    // pode impedir o salvamento do fechamento, que continua correto com entrada automática igual a
+    // zero. Outros erros (rede, RLS, sessão expirada) continuam bloqueando o save e são exibidos.
+    if (
+      erroTransferenciasRecebidas &&
+      !['42883', 'PGRST202'].includes(erroTransferenciasRecebidas.code ?? '')
+    ) {
+      throw erroTransferenciasRecebidas;
+    }
+    if (erroTransferenciasRecebidas)
+      console.warn(
+        '[fechamento] RPC de transferências recebidas ainda não disponível; usando zero.',
+        erroTransferenciasRecebidas,
+      );
     const transferenciaEntradaCents = (
-      (transferenciasRecebidasRows as { valor_total_cents: number }[] | null) ?? []
+      (erroTransferenciasRecebidas
+        ? []
+        : (transferenciasRecebidasRows as { valor_total_cents: number }[] | null)) ?? []
     ).reduce((s, r) => s + Number(r.valor_total_cents), 0);
 
     const pdv = calculatePdvEntradas(

@@ -14,7 +14,16 @@ const emit = defineEmits<{ criada: [] }>();
 
 const { criar } = useTransferenciasTesouraria();
 
-const OPCOES_CAIXA: CaixaOuCofre[] = ['Cofre', 'Caixa 1', 'Caixa 2', 'Caixa 3', 'Caixa 4'];
+const OPCOES_CAIXA: CaixaOuCofre[] = [
+  'Cofre',
+  'Caixa Principal',
+  'Caixa de Troco',
+  'Fluxo',
+  'Caixa 1',
+  'Caixa 2',
+  'Caixa 3',
+  'Caixa 4',
+];
 
 // Notas/Moedas (pedido do usuário, 23/09/2026): decomposição do fundo de caixa que o operador vai
 // conferir fisicamente na abertura (ver FormularioAbrirCaixa.vue). Valor total agora é SEMPRE a

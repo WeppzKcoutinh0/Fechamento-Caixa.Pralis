@@ -1,7 +1,22 @@
 import { useSupabase } from './useSupabase';
 import { hojeISO, type Caixa } from '~/types/fechamento';
 
-export type CaixaOuCofre = 'Cofre' | 'Caixa 1' | 'Caixa 2' | 'Caixa 3' | 'Caixa 4';
+// Caixa Principal / Caixa de Troco / Fluxo (pedido do usuário, 23/09/2026): três cofres centrais
+// NOVOS, independentes do "Cofre" genérico que já existia — decisão explícita do usuário de não
+// misturar os dois conceitos. Ciclo: CAIXA PRINCIPAL → CAIXA DE TROCO → CAIXAS/FLUXO →
+// CONFERÊNCIA → (parte fica no Fluxo, parte volta pro Principal) → recomeça.
+export type CaixaOuCofre =
+  | 'Cofre'
+  | 'Caixa Principal'
+  | 'Caixa de Troco'
+  | 'Fluxo'
+  | 'Caixa 1'
+  | 'Caixa 2'
+  | 'Caixa 3'
+  | 'Caixa 4';
+
+export const COFRES_CENTRAIS = ['Caixa Principal', 'Caixa de Troco', 'Fluxo'] as const;
+export type CofreCentral = (typeof COFRES_CENTRAIS)[number];
 
 export interface DestinoExtra {
   caixa: CaixaOuCofre;

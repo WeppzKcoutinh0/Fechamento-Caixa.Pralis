@@ -87,6 +87,15 @@ const grupos = computed<GrupoNav[]>(() => {
       cor: 'var(--cat-transferencias-base)',
     },
     {
+      // Caixa Principal/Troco/Fluxo (23/09/2026) — não são uma das 6 categorias reais do
+      // Pralís, mesmo caso de Maquininhas/Crediário/Pendências: roxo neutro da marca.
+      id: 'cofres',
+      label: 'Cofres',
+      to: '/cofres',
+      icone: 'mdi-safe-square-outline',
+      cor: 'var(--cx-brand)',
+    },
+    {
       id: 'saidas',
       label: 'Saídas',
       to: '/saidas',

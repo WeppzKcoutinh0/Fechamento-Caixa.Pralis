@@ -172,6 +172,12 @@ const pdvTotais = computed(() =>
 );
 
 // calcCartoes atual: líquido = tarde - manhã
+//
+// Por quê: é UMA maquininha só, compartilhada entre o turno da manhã e o da tarde — quando a
+// pessoa da tarde chega, a máquina já tem venda registrada (a da manhã). Por isso o relatório
+// tirado de manhã (campos "Manhã") vira o saldo inicial da tarde: ela não zera a máquina, então
+// o resultado real do turno dela é o total mostrado no relatório da tarde MENOS esse saldo
+// inicial que veio da manhã. É exatamente essa subtração que os 4 campos abaixo fazem.
 const liqCreditoCents = computed(
   () => props.draft.creditoTardeCents - props.draft.creditoManhaCents,
 );

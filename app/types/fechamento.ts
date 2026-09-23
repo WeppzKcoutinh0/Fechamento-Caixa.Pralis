@@ -213,7 +213,12 @@ export interface FechamentoDraft {
   pdvEntradas: PdvEntradaDraft[];
   imgPdvPath: string | null;
 
-  // Seção 4 — Maquininhas
+  // Seção 4 — Maquininhas. É UMA máquina só, dividida entre manhã e tarde: quando a pessoa da
+  // tarde assume, a máquina já vem com venda da manhã registrada (não zera por turno). Por isso o
+  // relatório tirado de manhã vira o "saldo inicial" da tarde (manhaInicialCents guarda essa
+  // leitura), e no fechamento da tarde o resultado real dela é o total lido na tarde (tardeFinalCents,
+  // credito/debito/pix/voucherTardeCents) MENOS esse saldo inicial da manhã — ver
+  // liqCreditoCents/liqDebitoCents/liqPixCents/liqVoucherCents em SecaoRelatorios.vue.
   nrMaquininha: string;
   nrMaquininhaTarde: string;
   manhaInicialCents: number;

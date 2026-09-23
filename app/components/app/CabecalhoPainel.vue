@@ -73,7 +73,7 @@ onUnmounted(() => clearInterval(timer));
 <style scoped>
 .cabecalho-painel {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--cx-sp-3);
@@ -82,10 +82,11 @@ onUnmounted(() => clearInterval(timer));
 
 .cp-esquerda {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: var(--cx-sp-2);
+  flex: 1 1 auto;
   min-width: 0;
+  overflow: hidden;
 }
 
 .cp-menu-btn {
@@ -95,17 +96,26 @@ onUnmounted(() => clearInterval(timer));
 
 .cp-relogio {
   display: flex;
-  flex-wrap: wrap;
   align-items: baseline;
-  gap: var(--cx-sp-3);
+  gap: var(--cx-sp-2);
   margin: 0;
+  min-width: 0;
+  overflow: hidden;
   color: var(--cx-ink-soft);
   font-size: var(--cx-fs-body);
 }
 
+/* Em telas estreitas, "Nome, saudação" pode ser mais longo que o espaço disponível ao lado do
+   avatar — trunca com reticências em vez de empurrar o avatar pra uma segunda linha (bug
+   reportado pelo usuário: o avatar "sumia" lá embaixo no mobile). Hora nunca encolhe/trunca. */
 .cp-saudacao {
+  overflow: hidden;
+  flex: 1 1 auto;
+  min-width: 0;
   color: var(--cx-ink);
   font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .cp-nome {
@@ -113,16 +123,19 @@ onUnmounted(() => clearInterval(timer));
 }
 
 .cp-hora {
+  flex: 0 0 auto;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
 }
 
 .cp-data {
+  flex: 0 0 auto;
   text-transform: capitalize;
 }
 
 .cp-acoes {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: var(--cx-sp-2);
 }

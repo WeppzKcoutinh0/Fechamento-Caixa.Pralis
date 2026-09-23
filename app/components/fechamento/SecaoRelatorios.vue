@@ -187,6 +187,35 @@ const liqVoucherCents = computed(
   () => props.draft.voucherTardeCents - props.draft.voucherManhaCents,
 );
 
+// Pedido do usuário (23/09/2026): conferência separada por turno — a soma bruta da manhã (o que
+// o relatório da manhã mostrou, sem subtrair nada) ao lado do líquido da tarde (a diferença
+// acima, já isolando só o que a tarde realmente vendeu), cada um expansível pra ver o
+// detalhamento por forma de pagamento antes de bater com os relatórios impressos.
+const totalManhaCents = computed(
+  () =>
+    props.draft.creditoManhaCents +
+    props.draft.debitoManhaCents +
+    props.draft.pixManhaCents +
+    props.draft.voucherManhaCents,
+);
+const totalLiquidoTardeCents = computed(
+  () => liqCreditoCents.value + liqDebitoCents.value + liqPixCents.value + liqVoucherCents.value,
+);
+const detalheManhaAberto = ref(false);
+const detalheLiquidoTardeAberto = ref(false);
+const detalhesTotalManha = computed(() => [
+  { nome: 'Crédito', valorCents: props.draft.creditoManhaCents },
+  { nome: 'Débito', valorCents: props.draft.debitoManhaCents },
+  { nome: 'Pix', valorCents: props.draft.pixManhaCents },
+  { nome: 'Voucher', valorCents: props.draft.voucherManhaCents },
+]);
+const detalhesLiquidoTarde = computed(() => [
+  { nome: 'Crédito', valorCents: liqCreditoCents.value },
+  { nome: 'Débito', valorCents: liqDebitoCents.value },
+  { nome: 'Pix', valorCents: liqPixCents.value },
+  { nome: 'Voucher', valorCents: liqVoucherCents.value },
+]);
+
 const { ler: lerRelatorioMaquininha, lerArquivo: lerArquivoMaquininha } = useLeituraMaquininha();
 const lendoMaquininha = ref<'manha' | 'tarde' | null>(null);
 const erroLeituraMaquininha = ref('');
@@ -905,10 +934,28 @@ function alternarTurnoMaquininha(turno: 'manha' | 'tarde'): void {
             Líquido
           </div>
           <div class="grade-cartoes">
-            <CartaoValor rotulo="Líquido Crédito" :valor="`R$ ${formatCents(liqCreditoCents)}`" />
-            <CartaoValor rotulo="Líquido Débito" :valor="`R$ ${formatCents(liqDebitoCents)}`" />
-            <CartaoValor rotulo="Líquido Pix" :valor="`R$ ${formatCents(liqPixCents)}`" />
-            <CartaoValor rotulo="Líquido Voucher" :valor="`R$ ${formatCents(liqVoucherCents)}`" />
+            <div>
+              <CartaoValor
+                rotulo="Valor Líquido Calculado - Manhã"
+                :valor="`R$ ${formatCents(totalManhaCents)}`"
+              />
+              <DetalhesPagamentoMaquininha
+                :detalhes="detalhesTotalManha"
+                :aberto="detalheManhaAberto"
+                @alternar="detalheManhaAberto = !detalheManhaAberto"
+              />
+            </div>
+            <div>
+              <CartaoValor
+                rotulo="Valor Líquido Calculado - Tarde"
+                :valor="`R$ ${formatCents(totalLiquidoTardeCents)}`"
+              />
+              <DetalhesPagamentoMaquininha
+                :detalhes="detalhesLiquidoTarde"
+                :aberto="detalheLiquidoTardeAberto"
+                @alternar="detalheLiquidoTardeAberto = !detalheLiquidoTardeAberto"
+              />
+            </div>
           </div>
         </div>
       </v-expand-transition>

@@ -56,7 +56,8 @@ export function listaAvisos(valor: unknown): string[] {
 }
 
 export function extrairConteudo(resposta: unknown): string {
-  if (!resposta || typeof resposta !== 'object') throw new Error('Resposta inválida do provedor de IA.');
+  if (!resposta || typeof resposta !== 'object')
+    throw new Error('Resposta inválida do provedor de IA.');
   const escolha = (resposta as { choices?: unknown[] }).choices?.[0];
   const conteudo =
     escolha && typeof escolha === 'object'
@@ -65,7 +66,10 @@ export function extrairConteudo(resposta: unknown): string {
   if (typeof conteudo !== 'string' || !conteudo.trim()) {
     throw new Error('A IA não retornou dados estruturados.');
   }
-  return conteudo.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+  return conteudo
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
 }
 
 export function lerModeloJson<T>(texto: string): T {
@@ -89,15 +93,18 @@ function ehTimeout(erro: unknown): boolean {
   return /timeout|aborted/.test(textoErro(erro));
 }
 function ehErroTransitorio(erro: unknown): boolean {
-  const status = (erro as { response?: { status?: number }; statusCode?: number })?.response?.status
-    ?? (erro as { statusCode?: number })?.statusCode;
+  const status =
+    (erro as { response?: { status?: number }; statusCode?: number })?.response?.status ??
+    (erro as { statusCode?: number })?.statusCode;
   if (status === 503 || status === 429) return true;
   return ehTimeout(erro);
 }
 
 export interface MensagemIa {
   role: 'system' | 'user';
-  content: string | Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }>;
+  content:
+    | string
+    | Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }>;
 }
 
 /**
@@ -114,13 +121,18 @@ export async function chamarProvedorIa<T>(mensagens: MensagemIa[]): Promise<T> {
   if (!apiKey || !model) {
     throw createError({
       statusCode: 503,
-      statusMessage: 'Leitura por IA não configurada. Defina NUXT_AI_VISION_API_KEY e NUXT_AI_VISION_MODEL.',
+      statusMessage:
+        'Leitura por IA não configurada. Defina NUXT_AI_VISION_API_KEY e NUXT_AI_VISION_MODEL.',
     });
   }
 
   const corpoRequisicaoIa = {
     model,
     temperature: 0,
+    // O detalhamento por bandeira/tipo (VISA/MASTER/ELO/MAESTRO, PLUXEE/ALELO/TICKET/VR...)
+    // pode ter muitos itens numa nota cheia — 1400 tokens já cortava resposta no meio em relatórios
+    // grandes, virando "formato que não pôde ser lido" em vez de um resultado completo.
+    max_tokens: 3000,
     response_format: { type: 'json_object' },
     messages: mensagens,
   };
@@ -128,9 +140,11 @@ export async function chamarProvedorIa<T>(mensagens: MensagemIa[]): Promise<T> {
   // O tier gratuito de modelos Flash/Flash-Lite ocasionalmente responde 503 (sobrecarga
   // momentânea do provedor) ou simplesmente trava a conexão sem nunca responder — sem um
   // timeout explícito, o $fetch fica pendurado pra sempre e a tela nunca mostra erro nenhum.
-  // Poucas tentativas com timeout + backoff curto resolvem sem custo extra perceptível.
+  // Pedir o detalhamento por bandeira deixou a geração mais longa (mais tokens de saída), então o
+  // timeout/tentativas de antes (22s × 2) passaram a estourar com frequência real — aumentado
+  // pra dar mais folga sem custo extra perceptível (achado real reportado pelo usuário, 23/09/2026).
   const TENTATIVAS = 3;
-  const TIMEOUT_MS = 25_000;
+  const TIMEOUT_MS = 35_000;
   let resposta: unknown;
   let ultimoErro: unknown;
   for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa += 1) {
@@ -160,7 +174,11 @@ export async function chamarProvedorIa<T>(mensagens: MensagemIa[]): Promise<T> {
 }
 
 export function validarImagemRecebida(mimeType: unknown, imageBase64: unknown): void {
-  if (!imageBase64 || typeof imageBase64 !== 'string' || !/^image\/(jpeg|jpg|png|webp)$/i.test(String(mimeType ?? ''))) {
+  if (
+    !imageBase64 ||
+    typeof imageBase64 !== 'string' ||
+    !/^image\/(jpeg|jpg|png|webp)$/i.test(String(mimeType ?? ''))
+  ) {
     throw createError({ statusCode: 400, statusMessage: 'Envie uma imagem JPG, PNG ou WEBP.' });
   }
   // Evita receber payloads acidentalmente gigantes na função serverless.

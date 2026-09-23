@@ -11,10 +11,12 @@ import {
   sumValores,
   toCents,
 } from '~/utils/financeiro';
+import { criarDetalhesMaquininhaVazios } from '~/types/fechamento';
 import type {
   Caixa,
   CrediarioItemDraft,
   DiscriminacaoDraft,
+  DetalhesMaquininhaDraft,
   EntradaDraft,
   FechamentoDraft,
   FechamentoListItem,
@@ -117,11 +119,13 @@ interface FechamentoRow {
   debito_manha: string;
   pix_manha: string;
   voucher_manha: string;
+  detalhes_maquininha_manha: unknown;
   img_manha_path: string | null;
   credito_tarde: string;
   debito_tarde: string;
   pix_tarde: string;
   voucher_tarde: string;
+  detalhes_maquininha_tarde: unknown;
   img_tarde_path: string | null;
   dinheiro_contado: string | null;
   dinheiro_contado_notas: string | null;
@@ -135,6 +139,38 @@ interface FechamentoRow {
   discriminacoes: DiscriminacaoRow[];
   crediario_itens: CrediarioItemRow[];
   pdv_entradas: PdvEntradaRow[];
+}
+
+type FormaMaquininha = keyof DetalhesMaquininhaDraft;
+
+function detalhesMaquininhaDoBanco(valor: unknown): DetalhesMaquininhaDraft {
+  const detalhes = criarDetalhesMaquininhaVazios();
+  if (!valor || typeof valor !== 'object') return detalhes;
+  const objeto = valor as Record<string, unknown>;
+  for (const forma of ['credito', 'debito', 'pix', 'voucher'] as FormaMaquininha[]) {
+    const itens = objeto[forma];
+    if (!Array.isArray(itens)) continue;
+    detalhes[forma] = itens.flatMap((item) => {
+      if (!item || typeof item !== 'object') return [];
+      const linha = item as Record<string, unknown>;
+      if (typeof linha.nome !== 'string' || !linha.nome.trim()) return [];
+      const valorCents = toCents(linha.valor as string | number);
+      return [{ nome: linha.nome.trim(), valorCents }];
+    });
+  }
+  return detalhes;
+}
+
+function detalhesMaquininhaParaBanco(detalhes: DetalhesMaquininhaDraft) {
+  return Object.fromEntries(
+    (['credito', 'debito', 'pix', 'voucher'] as FormaMaquininha[]).map((forma) => [
+      forma,
+      detalhes[forma].map((item) => ({
+        nome: item.nome,
+        valor: centsToDecimalString(item.valorCents),
+      })),
+    ]),
+  );
 }
 
 function ordenado<T extends { ordem: number }>(itens: T[]): T[] {
@@ -276,11 +312,13 @@ function linhaParaDraft(row: FechamentoRow): FechamentoDraft {
     debitoManhaCents: toCents(row.debito_manha),
     pixManhaCents: toCents(row.pix_manha),
     voucherManhaCents: toCents(row.voucher_manha),
+    detalhesMaquininhaManha: detalhesMaquininhaDoBanco(row.detalhes_maquininha_manha),
     imgManhaPath: row.img_manha_path,
     creditoTardeCents: toCents(row.credito_tarde),
     debitoTardeCents: toCents(row.debito_tarde),
     pixTardeCents: toCents(row.pix_tarde),
     voucherTardeCents: toCents(row.voucher_tarde),
+    detalhesMaquininhaTarde: detalhesMaquininhaDoBanco(row.detalhes_maquininha_tarde),
     imgTardePath: row.img_tarde_path,
     crediario: ordenado(row.crediario_itens).map((c): CrediarioItemDraft => ({
       tipo: c.tipo,
@@ -470,11 +508,13 @@ export function useFechamentos() {
         debito_manha: cents(draft.debitoManhaCents),
         pix_manha: cents(draft.pixManhaCents),
         voucher_manha: cents(draft.voucherManhaCents),
+        detalhes_maquininha_manha: detalhesMaquininhaParaBanco(draft.detalhesMaquininhaManha),
         img_manha_path: draft.imgManhaPath,
         credito_tarde: cents(draft.creditoTardeCents),
         debito_tarde: cents(draft.debitoTardeCents),
         pix_tarde: cents(draft.pixTardeCents),
         voucher_tarde: cents(draft.voucherTardeCents),
+        detalhes_maquininha_tarde: detalhesMaquininhaParaBanco(draft.detalhesMaquininhaTarde),
         img_tarde_path: draft.imgTardePath,
         liq_credito: cents(liqCreditoCents),
         liq_debito: cents(liqDebitoCents),

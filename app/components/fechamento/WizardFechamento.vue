@@ -31,7 +31,7 @@ const {
 } = useFechamentoForm();
 const { salvar } = useFechamentos();
 const { fecharSessao } = useSessaoCaixa();
-const { criarRetornoAutomatico } = useTransferenciasTesouraria();
+const { criarRetornoAutomatico, criarSangriaAutomatica } = useTransferenciasTesouraria();
 const { enviar: enviarAnexo } = useAnexos();
 const router = useRouter();
 
@@ -108,6 +108,22 @@ async function onSalvar() {
         // O fechamento já foi salvo, mas o retorno precisa ficar visível para
         // permitir uma conferência/repetição posterior sem esconder a falha.
         console.error('[fechamento] falha ao criar retorno automático:', e);
+      }
+    }
+    // Sangria automática pro Fluxo (23/09/2026, pedido do usuário — correção de conceito: "Fluxo
+    // é tudo o que sobe dos caixas: sangrias e o valor total ao fechar o caixa"). Mesmo espírito
+    // de melhor esforço do retorno automático acima.
+    const totalSangriasCents = draft.value.sangrias.reduce((soma, s) => soma + s.valorCents, 0);
+    if (draft.value.caixa && totalSangriasCents > 0) {
+      try {
+        await criarSangriaAutomatica({
+          fechamentoId,
+          caixa: draft.value.caixa,
+          codigo: draft.value.codigo,
+          valorCents: totalSangriasCents,
+        });
+      } catch (e) {
+        console.error('[fechamento] falha ao criar sangria automática:', e);
       }
     }
     await router.push('/');

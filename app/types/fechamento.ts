@@ -79,6 +79,22 @@ export interface SangriaDraft {
   valorCents: number;
 }
 
+export interface DetalheMaquininhaDraft {
+  nome: string;
+  valorCents: number;
+}
+
+export interface DetalhesMaquininhaDraft {
+  credito: DetalheMaquininhaDraft[];
+  debito: DetalheMaquininhaDraft[];
+  pix: DetalheMaquininhaDraft[];
+  voucher: DetalheMaquininhaDraft[];
+}
+
+export function criarDetalhesMaquininhaVazios(): DetalhesMaquininhaDraft {
+  return { credito: [], debito: [], pix: [], voucher: [] };
+}
+
 /**
  * Registro de dinheiro movido entre dois caixas (ex.: Caixa 1 emprestou troco pro Caixa 2) —
  * versão simplificada, por decisão do usuário, da "Transferência" do Sistema Inteligente Pralís
@@ -206,11 +222,13 @@ export interface FechamentoDraft {
   debitoManhaCents: number;
   pixManhaCents: number;
   voucherManhaCents: number;
+  detalhesMaquininhaManha: DetalhesMaquininhaDraft;
   imgManhaPath: string | null;
   creditoTardeCents: number;
   debitoTardeCents: number;
   pixTardeCents: number;
   voucherTardeCents: number;
+  detalhesMaquininhaTarde: DetalhesMaquininhaDraft;
   imgTardePath: string | null;
 
   // Seção 4 — Crediário
@@ -330,11 +348,13 @@ export function criarFechamentoVazio(contexto?: ContextoSessaoCaixa): Fechamento
     debitoManhaCents: 0,
     pixManhaCents: 0,
     voucherManhaCents: 0,
+    detalhesMaquininhaManha: criarDetalhesMaquininhaVazios(),
     imgManhaPath: null,
     creditoTardeCents: 0,
     debitoTardeCents: 0,
     pixTardeCents: 0,
     voucherTardeCents: 0,
+    detalhesMaquininhaTarde: criarDetalhesMaquininhaVazios(),
     imgTardePath: null,
     crediario: [],
     discriminacoes: [],

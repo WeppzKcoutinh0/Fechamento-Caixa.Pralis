@@ -8,6 +8,7 @@ import type {
 } from '~/types/fechamento';
 import CampoFoto from '~/components/comum/CampoFoto.vue';
 import CartaoValor from '~/components/comum/CartaoValor.vue';
+import DetalhesPagamentoMaquininha from './DetalhesPagamentoMaquininha.vue';
 import { useVendasFechamento } from '~/composables/useVendasFechamento';
 import { useLeituraMaquininha } from '~/composables/useLeituraMaquininha';
 import { calculatePdvEntradas, formatCents, toCents } from '~/utils/financeiro';
@@ -184,6 +185,19 @@ const { ler: lerRelatorioMaquininha, lerArquivo: lerArquivoMaquininha } = useLei
 const lendoMaquininha = ref<'manha' | 'tarde' | null>(null);
 const erroLeituraMaquininha = ref('');
 const avisoLeituraMaquininha = ref('');
+type FormaMaquininha = 'credito' | 'debito' | 'pix' | 'voucher';
+const detalheMaquininhaAberto = ref<string | null>(null);
+
+function detalhesMaquininha(turno: 'manha' | 'tarde', forma: FormaMaquininha) {
+  return turno === 'manha'
+    ? props.draft.detalhesMaquininhaManha[forma]
+    : props.draft.detalhesMaquininhaTarde[forma];
+}
+
+function alternarDetalhesMaquininha(turno: 'manha' | 'tarde', forma: FormaMaquininha): void {
+  const chave = `${turno}-${forma}`;
+  detalheMaquininhaAberto.value = detalheMaquininhaAberto.value === chave ? null : chave;
+}
 
 // A foto pode ainda não ter sido enviada pro Storage (upload adiado até o primeiro "Salvar")
 // — nesse caso não existe path ainda, mas o arquivo já está em memória em arquivosPendentes,
@@ -619,6 +633,11 @@ function alternarTurnoMaquininha(turno: 'manha' | 'tarde'): void {
                       )
                     "
                   />
+                  <DetalhesPagamentoMaquininha
+                    :detalhes="detalhesMaquininha('manha', 'credito')"
+                    :aberto="detalheMaquininhaAberto === 'manha-credito'"
+                    @alternar="alternarDetalhesMaquininha('manha', 'credito')"
+                  />
                 </label>
               </div>
               <div class="lc-dois">
@@ -634,6 +653,11 @@ function alternarTurnoMaquininha(turno: 'manha' | 'tarde'): void {
                       )
                     "
                   />
+                  <DetalhesPagamentoMaquininha
+                    :detalhes="detalhesMaquininha('manha', 'debito')"
+                    :aberto="detalheMaquininhaAberto === 'manha-debito'"
+                    @alternar="alternarDetalhesMaquininha('manha', 'debito')"
+                  />
                 </label>
                 <label class="lc-campo">
                   <span class="lc-campo-lbl">Pix Manhã</span>
@@ -646,6 +670,11 @@ function alternarTurnoMaquininha(turno: 'manha' | 'tarde'): void {
                         ($event.target as HTMLInputElement).value,
                       )
                     "
+                  />
+                  <DetalhesPagamentoMaquininha
+                    :detalhes="detalhesMaquininha('manha', 'pix')"
+                    :aberto="detalheMaquininhaAberto === 'manha-pix'"
+                    @alternar="alternarDetalhesMaquininha('manha', 'pix')"
                   />
                 </label>
               </div>
@@ -660,6 +689,11 @@ function alternarTurnoMaquininha(turno: 'manha' | 'tarde'): void {
                       ($event.target as HTMLInputElement).value,
                     )
                   "
+                />
+                <DetalhesPagamentoMaquininha
+                  :detalhes="detalhesMaquininha('manha', 'voucher')"
+                  :aberto="detalheMaquininhaAberto === 'manha-voucher'"
+                  @alternar="alternarDetalhesMaquininha('manha', 'voucher')"
                 />
               </label>
               <div class="lc-campo">
@@ -749,6 +783,11 @@ function alternarTurnoMaquininha(turno: 'manha' | 'tarde'): void {
                       )
                     "
                   />
+                  <DetalhesPagamentoMaquininha
+                    :detalhes="detalhesMaquininha('tarde', 'credito')"
+                    :aberto="detalheMaquininhaAberto === 'tarde-credito'"
+                    @alternar="alternarDetalhesMaquininha('tarde', 'credito')"
+                  />
                 </label>
               </div>
               <div class="lc-dois">
@@ -764,6 +803,11 @@ function alternarTurnoMaquininha(turno: 'manha' | 'tarde'): void {
                       )
                     "
                   />
+                  <DetalhesPagamentoMaquininha
+                    :detalhes="detalhesMaquininha('tarde', 'debito')"
+                    :aberto="detalheMaquininhaAberto === 'tarde-debito'"
+                    @alternar="alternarDetalhesMaquininha('tarde', 'debito')"
+                  />
                 </label>
                 <label class="lc-campo">
                   <span class="lc-campo-lbl">Pix Tarde</span>
@@ -776,6 +820,11 @@ function alternarTurnoMaquininha(turno: 'manha' | 'tarde'): void {
                         ($event.target as HTMLInputElement).value,
                       )
                     "
+                  />
+                  <DetalhesPagamentoMaquininha
+                    :detalhes="detalhesMaquininha('tarde', 'pix')"
+                    :aberto="detalheMaquininhaAberto === 'tarde-pix'"
+                    @alternar="alternarDetalhesMaquininha('tarde', 'pix')"
                   />
                 </label>
               </div>
@@ -790,6 +839,11 @@ function alternarTurnoMaquininha(turno: 'manha' | 'tarde'): void {
                       ($event.target as HTMLInputElement).value,
                     )
                   "
+                />
+                <DetalhesPagamentoMaquininha
+                  :detalhes="detalhesMaquininha('tarde', 'voucher')"
+                  :aberto="detalheMaquininhaAberto === 'tarde-voucher'"
+                  @alternar="alternarDetalhesMaquininha('tarde', 'voucher')"
                 />
               </label>
               <div class="lc-campo">

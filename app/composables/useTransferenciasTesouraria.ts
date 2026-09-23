@@ -214,5 +214,34 @@ export function useTransferenciasTesouraria() {
     if (error) throw error;
   }
 
-  return { listar, buscarPorLacre, criar, confirmarRecebimento, excluir, criarRetornoAutomatico };
+  /**
+   * Sangria automática pro Fluxo (23/09/2026, pedido do usuário — correção de conceito: "Fluxo é
+   * tudo o que sobe dos caixas: sangrias e o valor total ao fechar o caixa"). Mesmo padrão exato
+   * de `criarRetornoAutomatico` (melhor esforço depois do `salvar()`, idempotente por lacre).
+   */
+  async function criarSangriaAutomatica(dados: {
+    fechamentoId: string;
+    caixa: Caixa;
+    codigo: string;
+    valorCents: number;
+  }): Promise<void> {
+    if (dados.valorCents <= 0) return;
+    const { error } = await supabase.rpc('criar_sangria_automatica_tesouraria', {
+      p_fechamento_id: dados.fechamentoId,
+      p_caixa: dados.caixa,
+      p_codigo: dados.codigo,
+      p_valor: (dados.valorCents / 100).toFixed(2),
+    });
+    if (error) throw error;
+  }
+
+  return {
+    listar,
+    buscarPorLacre,
+    criar,
+    confirmarRecebimento,
+    excluir,
+    criarRetornoAutomatico,
+    criarSangriaAutomatica,
+  };
 }

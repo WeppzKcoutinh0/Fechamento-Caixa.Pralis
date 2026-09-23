@@ -25,6 +25,13 @@ const OPCOES_CAIXA: CaixaOuCofre[] = [
   'Caixa 4',
 ];
 
+function rotuloCaixa(valor: CaixaOuCofre): string {
+  if (valor === 'Caixa Principal') return 'Cofre Principal';
+  if (valor === 'Caixa de Troco') return 'Cofre Troco';
+  if (valor === 'Fluxo') return 'Cofre Fluxo';
+  return valor;
+}
+
 // Notas/Moedas (pedido do usuário, 23/09/2026): decomposição do fundo de caixa que o operador vai
 // conferir fisicamente na abertura (ver FormularioAbrirCaixa.vue). Valor total agora é SEMPRE a
 // soma automática dos dois (pedido do usuário, 23/09/2026 — revendo a decisão inicial de campos
@@ -179,12 +186,14 @@ watch(modelValue, (aberto) => {
           <v-select
             v-model="caixaOrigem"
             :items="OPCOES_CAIXA"
+            :item-title="rotuloCaixa"
             label="Origem / Saída"
             placeholder="Selecione..."
           />
           <v-select
             v-model="caixaDestino"
             :items="opcoesDestino"
+            :item-title="rotuloCaixa"
             label="Destino / Entrada"
             placeholder="Selecione..."
           />
@@ -211,6 +220,7 @@ watch(modelValue, (aberto) => {
             <v-select
               v-model="destino.caixa"
               :items="opcoesDestinoExtra"
+              :item-title="rotuloCaixa"
               label="Caixa candidata"
               density="compact"
               hide-details

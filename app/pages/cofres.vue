@@ -12,14 +12,22 @@ import { hojeISO } from '~/types/fechamento';
 import {
   useTransferenciasTesouraria,
   COFRES_CENTRAIS,
+  type CaixaOuCofre,
   type CofreCentral,
   type TransferenciaTesouraria,
 } from '~/composables/useTransferenciasTesouraria';
 import { useCofreNotas, type CofreNota } from '~/composables/useCofreNotas';
+import {
+  FLUXO_CONTAS,
+  useFluxoLancamentos,
+  type FluxoConta,
+  type FluxoLancamento,
+} from '~/composables/useFluxoLancamentos';
 import CampoDinheiro from '~/components/comum/CampoDinheiro.vue';
 import { formatCents } from '~/utils/financeiro';
 import { formatarDataBr } from '~/utils/vendasFechamento';
 import AppCabecalhoTela from '~/components/app/AppCabecalhoTela.vue';
+import { useSupabase } from '~/composables/useSupabase';
 
 definePageMeta({ middleware: ['admin'] });
 
@@ -35,13 +43,23 @@ const DESCRICAO_COFRE: Record<CofreCentral, string> = {
   Fluxo:
     'Dinheiro circulando nos malotes/caixas. Depois da conferência, parte fica aqui e parte volta pro Principal.',
 };
+const NOME_COFRE: Record<CofreCentral, string> = {
+  'Caixa Principal': 'Cofre Principal',
+  'Caixa de Troco': 'Cofre Troco',
+  Fluxo: 'Cofre Fluxo',
+};
 
-const { listar, confirmarRecebimento, criar } = useTransferenciasTesouraria();
+const { listar, confirmarRecebimento, criar, editar: editarTransferencia } = useTransferenciasTesouraria();
+const { listar: listarFluxo, criar: criarFluxo, editar: editarFluxo } = useFluxoLancamentos();
 const { listar: listarNotas, adicionar: adicionarNota, remover: removerNota } = useCofreNotas();
+const supabase = useSupabase();
 
 const carregando = ref(true);
 const erro = ref<string | null>(null);
 const transferencias = ref<TransferenciaTesouraria[]>([]);
+const fluxoLancamentos = ref<FluxoLancamento[]>([]);
+const entradasCofreCents = ref(0);
+const fluxoBancoDisponivel = ref(true);
 const confirmandoId = ref<string | null>(null);
 
 // `carregando` controla o `v-if` que troca todo o conteúdo pelo spinner — ótimo na carga
@@ -54,11 +72,38 @@ async function carregar(mostrarSpinner = true): Promise<void> {
   erro.value = null;
   try {
     transferencias.value = await listar();
+    const { data: entradasCofre, error: erroEntradasCofre } = await supabase
+      .from('entradas')
+      .select('valor')
+      .eq('tipo_conta', 'COFRE');
+    if (erroEntradasCofre) throw erroEntradasCofre;
+    entradasCofreCents.value = (entradasCofre ?? []).reduce(
+      (soma, entrada) => soma + Math.round(Number(entrada.valor) * 100),
+      0,
+    );
+    fluxoBancoDisponivel.value = true;
+    try {
+      fluxoLancamentos.value = await listarFluxo();
+    } catch (e) {
+      if (ehTabelaFluxoAusente(e)) {
+        fluxoLancamentos.value = [];
+        fluxoBancoDisponivel.value = false;
+      } else {
+        throw e;
+      }
+    }
   } catch (e) {
     erro.value = e instanceof Error ? e.message : 'Não foi possível carregar os cofres.';
   } finally {
     if (mostrarSpinner) carregando.value = false;
   }
+}
+
+function ehTabelaFluxoAusente(e: unknown): boolean {
+  if (!e || typeof e !== 'object') return false;
+  const erroSupabase = e as { code?: string; message?: string; details?: string };
+  const texto = `${erroSupabase.message ?? ''} ${erroSupabase.details ?? ''}`.toLowerCase();
+  return erroSupabase.code === '42P01' || texto.includes('fluxo_lancamentos');
 }
 onMounted(async () => {
   await carregar();
@@ -68,16 +113,40 @@ onMounted(async () => {
 });
 
 function movimentacoesDe(cofre: CofreCentral): TransferenciaTesouraria[] {
+  if (cofre === 'Fluxo') return movimentacoesDoFluxo();
   return transferencias.value
     .filter((t) => t.caixaOrigem === cofre || t.caixaDestino === cofre)
     .sort((a, b) => (a.criadoEm < b.criadoEm ? 1 : -1));
 }
+
+function movimentacoesDoFluxo(): TransferenciaTesouraria[] {
+  return transferencias.value
+    .filter(
+      (t) =>
+        /^Caixa [1-4]$/.test(t.caixaOrigem) &&
+        (t.transferenciaRetorno ||
+          t.lacre.toUpperCase().startsWith('RETORNO-') ||
+          /retorno|sangria/i.test(t.observacao)),
+    )
+    .sort((a, b) => (a.criadoEm < b.criadoEm ? 1 : -1));
+}
 function saldoDe(cofre: CofreCentral): number {
-  return transferencias.value.reduce((soma, t) => {
+  if (cofre === 'Fluxo') {
+    const transferenciasDeEntrada = movimentacoesDe(cofre).reduce((soma, t) => soma + t.valorCents, 0);
+    const lancamentosManuais = fluxoLancamentos.value.reduce((soma, l) => soma + l.valorCents, 0);
+    return transferenciasDeEntrada + lancamentosManuais;
+  }
+  const saldoTransferencias = transferencias.value.reduce((soma, t) => {
     if (t.caixaDestino === cofre) return soma + t.valorCents;
     if (t.caixaOrigem === cofre) return soma - t.valorCents;
     return soma;
   }, 0);
+  if (cofre === 'Caixa de Troco') return saldoTransferencias - entradasCofreCents.value;
+  return saldoTransferencias;
+}
+
+function nomeCofre(cofre: CofreCentral): string {
+  return NOME_COFRE[cofre];
 }
 function pendentesDe(cofre: CofreCentral): TransferenciaTesouraria[] {
   return transferencias.value.filter((t) => t.caixaDestino === cofre && !t.dataRecebimento);
@@ -239,14 +308,112 @@ async function registrarSaidaParaTroco(): Promise<void> {
     salvandoSaida.value = false;
   }
 }
+
+const fluxoData = ref(hojeISO());
+const fluxoValorCents = ref(0);
+const fluxoConta = ref<FluxoConta>('Conta Cofre');
+const salvandoFluxo = ref(false);
+
+async function registrarLancamentoFluxo(): Promise<void> {
+  if (!fluxoData.value || fluxoValorCents.value <= 0) return;
+  salvandoFluxo.value = true;
+  try {
+    await criarFluxo({ data: fluxoData.value, valorCents: fluxoValorCents.value, conta: fluxoConta.value });
+    fluxoData.value = hojeISO();
+    fluxoValorCents.value = 0;
+    fluxoConta.value = 'Conta Cofre';
+    await carregar(false);
+  } catch (e) {
+    erro.value = e instanceof Error ? e.message : 'Não foi possível registrar o lançamento do Fluxo.';
+  } finally {
+    salvandoFluxo.value = false;
+  }
+}
+const OPCOES_COFRE_EDIT: CaixaOuCofre[] = [
+  'Cofre',
+  'Caixa Principal',
+  'Caixa de Troco',
+  'Fluxo',
+  'Caixa 1',
+  'Caixa 2',
+  'Caixa 3',
+  'Caixa 4',
+];
+function rotuloCofreEdit(valor: CaixaOuCofre): string {
+  if (valor === 'Caixa Principal') return 'Cofre Principal';
+  if (valor === 'Caixa de Troco') return 'Cofre Troco';
+  if (valor === 'Fluxo') return 'Cofre Fluxo';
+  return valor;
+}
+const editorAberto = ref(false);
+const editorTipo = ref<'fluxo' | 'transferencia'>('fluxo');
+const editorId = ref('');
+const editorData = ref(hojeISO());
+const editorValorCents = ref(0);
+const editorConta = ref<FluxoConta>('Conta Cofre');
+const editorLacre = ref('');
+const editorOrigem = ref<CaixaOuCofre>('Cofre');
+const editorDestino = ref<CaixaOuCofre>('Fluxo');
+const editorObservacao = ref('');
+const salvandoEdicao = ref(false);
+
+function abrirEdicaoFluxo(lancamento: FluxoLancamento): void {
+  editorTipo.value = 'fluxo';
+  editorId.value = lancamento.id;
+  editorData.value = lancamento.data;
+  editorValorCents.value = lancamento.valorCents;
+  editorConta.value = lancamento.conta;
+  editorAberto.value = true;
+}
+
+function abrirEdicaoTransferencia(transferencia: TransferenciaTesouraria): void {
+  editorTipo.value = 'transferencia';
+  editorId.value = transferencia.id;
+  editorData.value = transferencia.dataLanc;
+  editorValorCents.value = transferencia.valorCents;
+  editorLacre.value = transferencia.lacre;
+  editorOrigem.value = transferencia.caixaOrigem;
+  editorDestino.value = transferencia.caixaDestino;
+  editorObservacao.value = transferencia.observacao;
+  editorAberto.value = true;
+}
+
+async function salvarEdicaoCofre(): Promise<void> {
+  if (!editorId.value || !editorData.value || editorValorCents.value <= 0) return;
+  salvandoEdicao.value = true;
+  try {
+    if (editorTipo.value === 'fluxo') {
+      await editarFluxo(editorId.value, {
+        data: editorData.value,
+        valorCents: editorValorCents.value,
+        conta: editorConta.value,
+      });
+    } else {
+      await editarTransferencia(editorId.value, {
+        valorCents: editorValorCents.value,
+        lacre: editorLacre.value,
+        dataLanc: editorData.value,
+        caixaOrigem: editorOrigem.value,
+        caixaDestino: editorDestino.value,
+        observacao: editorObservacao.value,
+      });
+    }
+    editorAberto.value = false;
+    await carregar(false);
+  } catch (e) {
+    erro.value = e instanceof Error ? e.message : 'Não foi possível editar o lançamento.';
+  } finally {
+    salvandoEdicao.value = false;
+  }
+}
 </script>
 
 <template>
   <v-container class="py-6" style="max-width: 900px">
     <AppCabecalhoTela titulo="Cofres" />
     <p class="text-body-2 text-medium-emphasis mb-5">
-      Caixa Principal → Caixa de Troco → Caixas/Fluxo → Conferência → parte volta pro Principal, o
-      resto fica no Fluxo. Clique num cofre pra ver saldo, pendências, histórico e anotar.
+      Cofre Principal → Cofre Troco → Caixas/Cofre Fluxo → Conferência → parte volta pro Principal, o
+      resto fica no Cofre Fluxo. Clique num cofre pra ver saldo, pendências, histórico e anotar.
     </p>
 
     <v-alert v-if="erro" type="error" variant="tonal" class="mb-4">{{ erro }}</v-alert>
@@ -264,7 +431,7 @@ async function registrarSaidaParaTroco(): Promise<void> {
       >
         <v-expansion-panel-title class="cat-titulo">
           <v-icon size="18" class="mr-2">{{ ICONE_COFRE[cofre] }}</v-icon>
-          <span class="flex-grow-1 cat-titulo-rotulo">{{ cofre }}</span>
+          <span class="flex-grow-1 cat-titulo-rotulo">{{ nomeCofre(cofre) }}</span>
           <strong class="cat-valor">R$ {{ formatCents(saldoDe(cofre)) }}</strong>
         </v-expansion-panel-title>
         <v-expansion-panel-text>
@@ -339,6 +506,44 @@ async function registrarSaidaParaTroco(): Promise<void> {
             </div>
           </div>
 
+          <div v-if="cofre === 'Fluxo'" class="lancamento-rapido mb-4">
+            <p class="text-caption font-weight-bold mb-2">Registrar no Fluxo</p>
+            <v-alert v-if="!fluxoBancoDisponivel" type="warning" variant="tonal" density="compact" class="mb-3">
+              O banco ainda precisa receber a atualização dos lançamentos do Fluxo.
+            </v-alert>
+            <div class="d-flex flex-wrap ga-2 align-end">
+              <v-text-field
+                v-model="fluxoData"
+                type="date"
+                label="Data"
+                density="compact"
+                hide-details
+                :disabled="!fluxoBancoDisponivel"
+                style="max-width: 160px"
+              />
+              <CampoDinheiro v-model="fluxoValorCents" label="Valor" :readonly="!fluxoBancoDisponivel" />
+              <v-select
+                v-model="fluxoConta"
+                :items="FLUXO_CONTAS"
+                label="Conta"
+                density="compact"
+                hide-details
+                :disabled="!fluxoBancoDisponivel"
+                style="max-width: 190px"
+              />
+              <v-btn
+                size="small"
+                color="primary"
+                variant="tonal"
+                :loading="salvandoFluxo"
+                :disabled="!fluxoBancoDisponivel || !fluxoData || fluxoValorCents <= 0"
+                @click="registrarLancamentoFluxo"
+              >
+                Registrar
+              </v-btn>
+            </div>
+          </div>
+
           <!-- Pendentes de confirmação -->
           <div v-if="pendentesDe(cofre).length" class="mb-4">
             <p class="text-caption font-weight-bold mb-2">Aguardando confirmação de recebimento</p>
@@ -408,29 +613,108 @@ async function registrarSaidaParaTroco(): Promise<void> {
 
           <!-- Histórico -->
           <p class="text-caption font-weight-bold mb-2">Movimentações</p>
-          <div v-if="movimentacoesDe(cofre).length" class="d-flex flex-column ga-2">
+          <div
+            v-if="movimentacoesDe(cofre).length || (cofre === 'Fluxo' && fluxoLancamentos.length)"
+            class="d-flex flex-column ga-2"
+          >
             <div
               v-for="t in movimentacoesDe(cofre)"
               :key="t.id"
               class="d-flex align-center flex-wrap ga-2 pa-2 movimentacao-item"
             >
-              <v-icon size="16" :color="t.caixaDestino === cofre ? 'success' : 'error'">
-                {{ t.caixaDestino === cofre ? 'mdi-arrow-bottom-left' : 'mdi-arrow-top-right' }}
+              <v-icon size="16" :color="cofre === 'Fluxo' || t.caixaDestino === cofre ? 'success' : 'error'">
+                {{ cofre === 'Fluxo' || t.caixaDestino === cofre ? 'mdi-arrow-bottom-left' : 'mdi-arrow-top-right' }}
               </v-icon>
               <span class="text-caption">
-                {{ t.caixaDestino === cofre ? t.caixaOrigem : t.caixaDestino }}
+                {{ cofre === 'Fluxo' || t.caixaDestino === cofre ? t.caixaOrigem : t.caixaDestino }}
               </span>
               <span v-if="t.observacao" class="text-caption text-medium-emphasis">{{ t.observacao }}</span>
               <span v-else class="text-caption text-medium-emphasis">Lacre {{ t.lacre }}</span>
               <span class="text-caption text-medium-emphasis">{{ formatarDataBr(t.dataLanc) }}</span>
               <v-spacer />
               <strong class="text-caption">R$ {{ formatCents(t.valorCents) }}</strong>
+              <v-btn
+                icon="mdi-pencil-outline"
+                size="x-small"
+                variant="text"
+                aria-label="Editar movimentação"
+                @click="abrirEdicaoTransferencia(t)"
+              />
             </div>
+            <template v-if="cofre === 'Fluxo'">
+              <div
+                v-for="l in fluxoLancamentos"
+                :key="l.id"
+                class="d-flex align-center flex-wrap ga-2 pa-2 movimentacao-item"
+              >
+                <v-icon size="16" color="success">mdi-arrow-bottom-left</v-icon>
+                <span class="text-caption">{{ l.conta }}</span>
+                <span class="text-caption text-medium-emphasis">Lançamento manual</span>
+                <span class="text-caption text-medium-emphasis">{{ formatarDataBr(l.data) }}</span>
+                <v-spacer />
+                <strong class="text-caption">R$ {{ formatCents(l.valorCents) }}</strong>
+                <v-btn
+                  icon="mdi-pencil-outline"
+                  size="x-small"
+                  variant="text"
+                  aria-label="Editar lançamento"
+                  @click="abrirEdicaoFluxo(l)"
+                />
+              </div>
+            </template>
           </div>
           <p v-else class="text-caption text-medium-emphasis mb-0">Nenhuma movimentação ainda.</p>
         </v-expansion-panel-text>
       </v-expansion-panel>
     </v-expansion-panels>
+
+    <v-dialog v-model="editorAberto" max-width="620">
+      <v-card>
+        <v-card-title>Editar lançamento do cofre</v-card-title>
+        <v-card-text class="d-flex flex-column ga-3">
+          <div class="d-flex flex-wrap ga-3">
+            <v-text-field v-model="editorData" type="date" label="Data" />
+            <CampoDinheiro v-model="editorValorCents" label="Valor" />
+          </div>
+          <v-select
+            v-if="editorTipo === 'fluxo'"
+            v-model="editorConta"
+            :items="FLUXO_CONTAS"
+            label="Conta"
+          />
+          <template v-else>
+            <v-text-field v-model="editorLacre" label="Lacre" />
+            <div class="d-flex flex-wrap ga-3">
+              <v-select
+                v-model="editorOrigem"
+                :items="OPCOES_COFRE_EDIT"
+                :item-title="rotuloCofreEdit"
+                label="Origem"
+              />
+              <v-select
+                v-model="editorDestino"
+                :items="OPCOES_COFRE_EDIT"
+                :item-title="rotuloCofreEdit"
+                label="Destino"
+              />
+            </div>
+            <v-textarea v-model="editorObservacao" label="Observação" rows="2" />
+          </template>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="editorAberto = false">Cancelar</v-btn>
+          <v-btn
+            color="primary"
+            :loading="salvandoEdicao"
+            :disabled="!editorData || editorValorCents <= 0"
+            @click="salvarEdicaoCofre"
+          >
+            Salvar alterações
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 

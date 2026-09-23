@@ -539,7 +539,7 @@ const totalTransferenciasAutomaticasCents = computed(() =>
               </label>
               <label class="lc-campo">
                 <span class="lc-campo-lbl">Conta de destino fixa</span>
-                <input class="lc-input" value="Fluxo" readonly />
+                <input class="lc-input" value="Cofre Fluxo" readonly />
               </label>
             </div>
 
@@ -558,7 +558,7 @@ const totalTransferenciasAutomaticasCents = computed(() =>
             <div v-if="tipoModal === 'entrada' && entradaCofreSelecionada" class="lc-dois">
               <label class="lc-campo">
                 <span class="lc-campo-lbl">Origem fixa</span>
-                <input class="lc-input" value="Cofre" readonly />
+                <input class="lc-input" value="Cofre Troco" readonly />
               </label>
               <label class="lc-campo">
                 <span class="lc-campo-lbl">Destino fixo</span>

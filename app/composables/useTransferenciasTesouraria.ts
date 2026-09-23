@@ -184,6 +184,32 @@ export function useTransferenciasTesouraria() {
     if (error) throw error;
   }
 
+  async function editar(
+    id: string,
+    dados: {
+      valorCents: number;
+      lacre: string;
+      dataLanc: string;
+      caixaOrigem: CaixaOuCofre;
+      caixaDestino: CaixaOuCofre;
+      observacao: string;
+    },
+  ): Promise<void> {
+    const { error } = await supabase
+      .from('transferencias_tesouraria')
+      .update({
+        valor: (dados.valorCents / 100).toFixed(2),
+        lacre: dados.lacre.trim(),
+        data_lanc: dados.dataLanc,
+        caixa_origem: dados.caixaOrigem,
+        caixa_destino: dados.caixaDestino,
+        observacao: dados.observacao,
+        atualizado_em: new Date().toISOString(),
+      })
+      .eq('id', id);
+    if (error) throw error;
+  }
+
   /**
    * Retorno automático pro cofre (18/09/2026, pedido do usuário — versão simplificada do que o
    * Sistema Inteligente Pralís faz no fechamento: se sobrar dinheiro contado, ele volta pra
@@ -241,6 +267,7 @@ export function useTransferenciasTesouraria() {
     criar,
     confirmarRecebimento,
     excluir,
+    editar,
     criarRetornoAutomatico,
     criarSangriaAutomatica,
   };

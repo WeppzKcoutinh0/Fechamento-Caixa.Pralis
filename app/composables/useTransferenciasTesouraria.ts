@@ -136,6 +136,10 @@ export function useTransferenciasTesouraria() {
     tempoConfirmacao: boolean;
     transferenciaRetorno: boolean;
     observacao: string;
+    // Formulário completo (admin, Nova Transferência) sempre usa hoje — campo readonly lá. Os
+    // lançamentos rápidos de /cofres.vue (pedido do usuário, 23/09/2026) deixam o operador
+    // escolher a data (registrando algo de um dia anterior, ex.: "caixa do dia 21/09").
+    dataLanc?: string;
   }): Promise<TransferenciaTesouraria> {
     const destinosExtras = [...new Set(dados.destinosExtra.map((d) => d.caixa))]
       .filter((caixa) => caixa !== dados.caixaOrigem && caixa !== dados.caixaDestino)
@@ -147,7 +151,7 @@ export function useTransferenciasTesouraria() {
         valor_notas: (dados.valorNotasCents / 100).toFixed(2),
         valor_moedas: (dados.valorMoedasCents / 100).toFixed(2),
         lacre: dados.lacre.trim(),
-        data_lanc: hojeISO(),
+        data_lanc: dados.dataLanc || hojeISO(),
         agendamento: dados.agendamento,
         caixa_origem: dados.caixaOrigem,
         caixa_destino: dados.caixaDestino,

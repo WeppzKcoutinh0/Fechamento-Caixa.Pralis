@@ -62,6 +62,7 @@ export const TIPOS_CONTA_ENTRADA = [
   'SOBRA/PERDA',
   'FURTO/ROUBO',
   'LANCHES',
+  'COFRE',
 ] as const;
 export type TipoContaEntrada = (typeof TIPOS_CONTA_ENTRADA)[number];
 

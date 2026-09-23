@@ -128,6 +128,12 @@ const transferenciaAtual = computed(() =>
     ? props.draft.transferenciasCaixa[indiceEditando.value]
     : null,
 );
+const entradaAtual = computed<EntradaDraft | null>(() =>
+  tipoModal.value === 'entrada' && indiceEditando.value !== null
+    ? (props.draft.entradas[indiceEditando.value] ?? null)
+    : null,
+);
+const entradaCofreSelecionada = computed(() => entradaAtual.value?.tipoConta === 'COFRE');
 const modalVars = computed(() =>
   tipoModal.value === 'entrada'
     ? ENTRADA_VARS
@@ -548,6 +554,17 @@ const totalTransferenciasAutomaticasCents = computed(() =>
                 </option>
               </select>
             </label>
+
+            <div v-if="tipoModal === 'entrada' && entradaCofreSelecionada" class="lc-dois">
+              <label class="lc-campo">
+                <span class="lc-campo-lbl">Origem fixa</span>
+                <input class="lc-input" value="Cofre" readonly />
+              </label>
+              <label class="lc-campo">
+                <span class="lc-campo-lbl">Destino fixo</span>
+                <input class="lc-input" :value="draft.caixa || '—'" readonly />
+              </label>
+            </div>
 
             <label class="lc-campo">
               <span class="lc-campo-lbl">Descrição</span>

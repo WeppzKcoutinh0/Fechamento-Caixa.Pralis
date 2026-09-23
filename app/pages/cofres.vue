@@ -7,7 +7,8 @@
 // Saldo de cada cofre é sempre CALCULADO (soma de entradas − saídas em transferencias_tesouraria)
 // — não existe campo de saldo gravado em lugar nenhum, mesmo espírito de nunca confiar num campo
 // espelho já documentado em useFechamentos.ts.
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+import { hojeISO } from '~/types/fechamento';
 import {
   useTransferenciasTesouraria,
   COFRES_CENTRAIS,
@@ -15,6 +16,7 @@ import {
   type TransferenciaTesouraria,
 } from '~/composables/useTransferenciasTesouraria';
 import { useCofreNotas, type CofreNota } from '~/composables/useCofreNotas';
+import CampoDinheiro from '~/components/comum/CampoDinheiro.vue';
 import { formatCents } from '~/utils/financeiro';
 import { formatarDataBr } from '~/utils/vendasFechamento';
 import AppCabecalhoTela from '~/components/app/AppCabecalhoTela.vue';
@@ -34,7 +36,7 @@ const DESCRICAO_COFRE: Record<CofreCentral, string> = {
     'Dinheiro circulando nos malotes/caixas. Depois da conferência, parte fica aqui e parte volta pro Principal.',
 };
 
-const { listar, confirmarRecebimento } = useTransferenciasTesouraria();
+const { listar, confirmarRecebimento, criar } = useTransferenciasTesouraria();
 const { listar: listarNotas, adicionar: adicionarNota, remover: removerNota } = useCofreNotas();
 
 const carregando = ref(true);
@@ -42,15 +44,20 @@ const erro = ref<string | null>(null);
 const transferencias = ref<TransferenciaTesouraria[]>([]);
 const confirmandoId = ref<string | null>(null);
 
-async function carregar(): Promise<void> {
-  carregando.value = true;
+// `carregando` controla o `v-if` que troca todo o conteúdo pelo spinner — ótimo na carga
+// inicial, mas recarregar depois de registrar uma entrada/saída/confirmação com o MESMO `v-if`
+// desmonta e remonta `v-expansion-panels` inteiro, perdendo qual painel estava aberto (achado
+// real em teste: o painel do Caixa Principal fechava sozinho toda vez que o saldo atualizava).
+// `mostrarSpinner: false` nas recargas depois da primeira mantém os painéis abertos.
+async function carregar(mostrarSpinner = true): Promise<void> {
+  if (mostrarSpinner) carregando.value = true;
   erro.value = null;
   try {
     transferencias.value = await listar();
   } catch (e) {
     erro.value = e instanceof Error ? e.message : 'Não foi possível carregar os cofres.';
   } finally {
-    carregando.value = false;
+    if (mostrarSpinner) carregando.value = false;
   }
 }
 onMounted(async () => {
@@ -80,7 +87,7 @@ async function confirmar(t: TransferenciaTesouraria): Promise<void> {
   confirmandoId.value = t.id;
   try {
     await confirmarRecebimento(t.id);
-    await carregar();
+    await carregar(false);
   } catch (e) {
     erro.value = e instanceof Error ? e.message : 'Não foi possível confirmar o recebimento.';
   } finally {
@@ -142,6 +149,96 @@ async function excluirNota(cofre: CofreCentral, id: string): Promise<void> {
 function formatarDataHora(iso: string): string {
   return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 }
+function formatarDataCurta(iso: string): string {
+  return iso ? formatarDataBr(iso).slice(0, 5) : '';
+}
+
+// Lançamentos rápidos do Caixa Principal (pedido do usuário, 23/09/2026) — dois atalhos que criam
+// uma transferência de verdade (mesma tabela `transferencias_tesouraria` de sempre) sem passar
+// pelo modal completo "Nova Transferência", com uma frase de confirmação formada em tempo real:
+//   Entrada: "22/09 + 5.250 caixa do dia 21/09" — dinheiro que veio do Fluxo (é de lá que o
+//   dinheiro do fechamento de um caixa passa antes de eventualmente voltar pro Principal).
+//   Saída: "23/09 - 2.000 para caixa troco" — destino sempre fixo em Caixa de Troco (decisão
+//   explícita do usuário: sem seletor de destino aqui, só Data + Valor).
+const entradaData = ref(hojeISO());
+const entradaValorCents = ref(0);
+const entradaDataReferencia = ref('');
+const salvandoEntrada = ref(false);
+
+const fraseEntrada = computed(() => {
+  if (!entradaData.value || !entradaValorCents.value || !entradaDataReferencia.value) return '';
+  return `${formatarDataCurta(entradaData.value)} + ${formatCents(entradaValorCents.value)} caixa do dia ${formatarDataCurta(entradaDataReferencia.value)}`;
+});
+
+async function registrarEntradaPrincipal(): Promise<void> {
+  if (!fraseEntrada.value) return;
+  salvandoEntrada.value = true;
+  try {
+    await criar({
+      valorCents: entradaValorCents.value,
+      valorNotasCents: 0,
+      valorMoedasCents: 0,
+      lacre: `PRINCIPAL-ENT-${Date.now()}`,
+      agendamento: false,
+      caixaOrigem: 'Fluxo',
+      caixaDestino: 'Caixa Principal',
+      multiploDestino: false,
+      destinosExtra: [],
+      tempoConfirmacao: false,
+      transferenciaRetorno: false,
+      observacao: `Caixa do dia ${formatarDataBr(entradaDataReferencia.value)}`,
+      dataLanc: entradaData.value,
+    });
+    entradaValorCents.value = 0;
+    entradaDataReferencia.value = '';
+    entradaData.value = hojeISO();
+    await carregar(false);
+  } catch (e) {
+    erro.value = e instanceof Error ? e.message : 'Não foi possível registrar a entrada.';
+  } finally {
+    salvandoEntrada.value = false;
+  }
+}
+
+const saidaAberta = ref(false);
+const saidaData = ref(hojeISO());
+const saidaValorCents = ref(0);
+const salvandoSaida = ref(false);
+
+const fraseSaida = computed(() => {
+  if (!saidaData.value || !saidaValorCents.value) return '';
+  return `${formatarDataCurta(saidaData.value)} - ${formatCents(saidaValorCents.value)} para caixa troco`;
+});
+
+async function registrarSaidaParaTroco(): Promise<void> {
+  if (!fraseSaida.value) return;
+  salvandoSaida.value = true;
+  try {
+    await criar({
+      valorCents: saidaValorCents.value,
+      valorNotasCents: 0,
+      valorMoedasCents: 0,
+      lacre: `PRINCIPAL-SAI-${Date.now()}`,
+      agendamento: false,
+      caixaOrigem: 'Caixa Principal',
+      caixaDestino: 'Caixa de Troco',
+      multiploDestino: false,
+      destinosExtra: [],
+      tempoConfirmacao: false,
+      transferenciaRetorno: false,
+      observacao: 'Saída do Principal pro Troco',
+      dataLanc: saidaData.value,
+    });
+    saidaValorCents.value = 0;
+    saidaData.value = hojeISO();
+    saidaAberta.value = false;
+    await carregar(false);
+  } catch (e) {
+    erro.value = e instanceof Error ? e.message : 'Não foi possível registrar a saída.';
+  } finally {
+    salvandoSaida.value = false;
+  }
+}
 </script>
 
 <template>
@@ -172,6 +269,75 @@ function formatarDataHora(iso: string): string {
         </v-expansion-panel-title>
         <v-expansion-panel-text>
           <p class="text-caption text-medium-emphasis">{{ DESCRICAO_COFRE[cofre] }}</p>
+
+          <!-- Lançamentos rápidos — só no Caixa Principal (pedido do usuário, 23/09/2026) -->
+          <div v-if="cofre === 'Caixa Principal'" class="lancamento-rapido mb-4">
+            <p class="text-caption font-weight-bold mb-2">Registrar caixa do dia</p>
+            <div class="d-flex flex-wrap ga-2 align-end">
+              <v-text-field
+                v-model="entradaData"
+                type="date"
+                label="Data"
+                density="compact"
+                hide-details
+                style="max-width: 160px"
+              />
+              <CampoDinheiro v-model="entradaValorCents" label="Valor" />
+              <v-text-field
+                v-model="entradaDataReferencia"
+                type="date"
+                label="Caixa do dia"
+                density="compact"
+                hide-details
+                style="max-width: 160px"
+              />
+              <v-btn
+                size="small"
+                color="primary"
+                variant="tonal"
+                :loading="salvandoEntrada"
+                :disabled="!fraseEntrada"
+                @click="registrarEntradaPrincipal"
+              >
+                Registrar
+              </v-btn>
+            </div>
+            <p v-if="fraseEntrada" class="text-caption text-success mt-1 mb-0">{{ fraseEntrada }}</p>
+
+            <v-btn
+              size="small"
+              variant="text"
+              class="mt-3"
+              :append-icon="saidaAberta ? 'mdi-chevron-up' : 'mdi-chevron-down'"
+              @click="saidaAberta = !saidaAberta"
+            >
+              Saídas para cofre
+            </v-btn>
+            <div v-if="saidaAberta" class="mt-2">
+              <div class="d-flex flex-wrap ga-2 align-end">
+                <v-text-field
+                  v-model="saidaData"
+                  type="date"
+                  label="Data"
+                  density="compact"
+                  hide-details
+                  style="max-width: 160px"
+                />
+                <CampoDinheiro v-model="saidaValorCents" label="Valor" />
+                <v-btn
+                  size="small"
+                  color="primary"
+                  variant="tonal"
+                  :loading="salvandoSaida"
+                  :disabled="!fraseSaida"
+                  @click="registrarSaidaParaTroco"
+                >
+                  Registrar
+                </v-btn>
+              </div>
+              <p v-if="fraseSaida" class="text-caption text-error mt-1 mb-0">{{ fraseSaida }}</p>
+            </div>
+          </div>
 
           <!-- Pendentes de confirmação -->
           <div v-if="pendentesDe(cofre).length" class="mb-4">
@@ -254,7 +420,8 @@ function formatarDataHora(iso: string): string {
               <span class="text-caption">
                 {{ t.caixaDestino === cofre ? t.caixaOrigem : t.caixaDestino }}
               </span>
-              <span class="text-caption text-medium-emphasis">Lacre {{ t.lacre }}</span>
+              <span v-if="t.observacao" class="text-caption text-medium-emphasis">{{ t.observacao }}</span>
+              <span v-else class="text-caption text-medium-emphasis">Lacre {{ t.lacre }}</span>
               <span class="text-caption text-medium-emphasis">{{ formatarDataBr(t.dataLanc) }}</span>
               <v-spacer />
               <strong class="text-caption">R$ {{ formatCents(t.valorCents) }}</strong>
@@ -268,6 +435,12 @@ function formatarDataHora(iso: string): string {
 </template>
 
 <style scoped>
+.lancamento-rapido {
+  padding: var(--cx-sp-3);
+  border: 1px dashed var(--cx-line);
+  border-radius: var(--cx-r-lg);
+  background: var(--cx-surface-sunken);
+}
 .pendencia-item {
   border-radius: var(--cx-r-md);
   background: var(--cx-warning-wash, var(--cx-surface-sunken));

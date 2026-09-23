@@ -131,6 +131,9 @@ interface FechamentoRow {
   dinheiro_contado_notas: string | null;
   dinheiro_contado_moedas: string | null;
   lacre_fechamento: string;
+  vendas_canceladas_motivo_tipo: string;
+  vendas_canceladas_motivo_texto: string;
+  vendas_canceladas_motivo_audio_path: string | null;
   cash_session_id: string | null;
   entradas: EntradaRow[];
   sangrias: SangriaRow[];
@@ -340,6 +343,10 @@ function linhaParaDraft(row: FechamentoRow): FechamentoDraft {
     dinheiroContadoNotasCents: toCents(row.dinheiro_contado_notas ?? 0),
     dinheiroContadoMoedasCents: toCents(row.dinheiro_contado_moedas ?? 0),
     lacreFechamento: row.lacre_fechamento,
+    vendasCanceladasMotivoTipo:
+      row.vendas_canceladas_motivo_tipo === 'audio' ? 'audio' : 'texto',
+    vendasCanceladasMotivoTexto: row.vendas_canceladas_motivo_texto ?? '',
+    vendasCanceladasMotivoAudioPath: row.vendas_canceladas_motivo_audio_path,
     cashSessionId: row.cash_session_id,
     // Só existe pro fluxo de abertura (ver criarFechamentoVazio) — reabrir um fechamento já
     // salvo pra edição não deve disparar o lookup de novo com um valor de Tesouraria que já
@@ -534,6 +541,9 @@ export function useFechamentos() {
         dinheiro_contado_notas: cents(draft.dinheiroContadoNotasCents),
         dinheiro_contado_moedas: cents(draft.dinheiroContadoMoedasCents),
         lacre_fechamento: draft.lacreFechamento,
+        vendas_canceladas_motivo_tipo: draft.vendasCanceladasMotivoTipo,
+        vendas_canceladas_motivo_texto: draft.vendasCanceladasMotivoTexto,
+        vendas_canceladas_motivo_audio_path: draft.vendasCanceladasMotivoAudioPath,
         saldo_fisico_esperado: cents(fisico.expectedCents),
         cash_session_id: draft.cashSessionId,
       },

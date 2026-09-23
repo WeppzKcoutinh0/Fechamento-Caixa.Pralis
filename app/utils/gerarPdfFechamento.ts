@@ -53,7 +53,9 @@ const LARGURA_PAGINA = 595.28; // A4 em pt
 const LARGURA_UTIL = LARGURA_PAGINA - MARGEM_X * 2;
 const LIMITE_Y = 800;
 
-class ConstrutorPdf {
+/** Exportado pra outros geradores de PDF (ex.: gerarPdfVendasCanceladas.ts) reusarem o mesmo
+ * layout/tipografia sem duplicar as primitivas — um único "estilo de PDF" no app inteiro. */
+export class ConstrutorPdf {
   doc = new jsPDF({ unit: 'pt', format: 'a4' });
   y = 48;
 

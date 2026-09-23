@@ -95,6 +95,14 @@
   --cat-resultado-soft: #f3eefc;
   --cat-resultado-tinta: #441987;
   --cat-resultado-faixa: #6d28d9;
+  /* Cancelados (23/09/2026): categoria nova, sem par na planilha antiga do Pralís — cinza-ardósia
+     neutro de propósito, pra não competir com as 6 cores "oficiais" acima nem sugerir que já é
+     uma fonte de dados real (ver useVendasCanceladas.ts: ainda é só o cenário, aguardando o robô
+     de vendas ser adaptado). */
+  --cat-cancelados-base: #64748b;
+  --cat-cancelados-soft: #f1f5f9;
+  --cat-cancelados-tinta: #334155;
+  --cat-cancelados-faixa: #475569;
 
   /* ---- Tipografia ---- */
   --cx-fs-micro: 11px;
@@ -146,6 +154,8 @@
     --cat-retiradas-tinta: #789ef3;
     --cat-resultado-soft: color-mix(in srgb, var(--cat-resultado-base) 18%, var(--cx-surface));
     --cat-resultado-tinta: #a47ae7;
+    --cat-cancelados-soft: color-mix(in srgb, var(--cat-cancelados-base) 18%, var(--cx-surface));
+    --cat-cancelados-tinta: #b6c0cc;
   }
 }
 :root[data-theme='dark'] {
@@ -182,6 +192,8 @@
   --cat-retiradas-tinta: #789ef3;
   --cat-resultado-soft: color-mix(in srgb, var(--cat-resultado-base) 18%, var(--cx-surface));
   --cat-resultado-tinta: #a47ae7;
+  --cat-cancelados-soft: color-mix(in srgb, var(--cat-cancelados-base) 18%, var(--cx-surface));
+  --cat-cancelados-tinta: #b6c0cc;
 }
 
 html,

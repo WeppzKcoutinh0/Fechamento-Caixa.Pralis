@@ -242,6 +242,15 @@ export interface FechamentoDraft {
   // Seção 5
   discriminacoes: DiscriminacaoDraft[];
 
+  // Seção 5 — Vendas/Produtos Cancelados (pedido do usuário, 23/09/2026). CENÁRIO: o robô de
+  // vendas (CREARE/Compliart) ainda não envia vendas canceladas (só as com STATUS='F' — ver
+  // integracoes-scripts/queries/FECHAMENTO_CAIXA.sql), então só o motivo (texto ou áudio) é
+  // real/persistido hoje; a lista de itens cancelados (useVendasCanceladas.ts) fica vazia até o
+  // robô ser adaptado — trocar só a implementação do composable, sem mudar esses campos.
+  vendasCanceladasMotivoTipo: 'texto' | 'audio';
+  vendasCanceladasMotivoTexto: string;
+  vendasCanceladasMotivoAudioPath: string | null;
+
   // Seção 6 — card aditivo esperado × contado (decisão do plano). Notas/Moedas (pedido do
   // usuário, 23/09/2026): dinheiroContadoCents passa a ser SEMPRE a soma automática dos dois —
   // diferente do formulário da Tesouraria (admin), aqui o Valor Total é sempre calculado, nunca
@@ -363,6 +372,9 @@ export function criarFechamentoVazio(contexto?: ContextoSessaoCaixa): Fechamento
     imgTardePath: null,
     crediario: [],
     discriminacoes: [],
+    vendasCanceladasMotivoTipo: 'texto',
+    vendasCanceladasMotivoTexto: '',
+    vendasCanceladasMotivoAudioPath: null,
     dinheiroContadoCents: 0,
     dinheiroContadoNotasCents: 0,
     dinheiroContadoMoedasCents: 0,

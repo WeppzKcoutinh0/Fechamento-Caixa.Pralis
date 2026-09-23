@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue';
 import { CAIXAS, TURNOS, type Caixa, type FechamentoDraft, type Turno } from '~/types/fechamento';
 import { useSupabase } from '~/composables/useSupabase';
+import { useVendasCanceladas } from '~/composables/useVendasCanceladas';
 import { useVendasFechamento } from '~/composables/useVendasFechamento';
 import { formatCents, toCents } from '~/utils/financeiro';
 import {
@@ -132,6 +133,22 @@ async function sincronizarAgora() {
   }
 }
 
+// Vendas canceladas (pedido do usuário, 23/09/2026) — CENÁRIO: mesmo botão espelhado de "Buscar
+// vendas", mas o robô ainda não envia vendas canceladas (ver useVendasCanceladas.ts). Por
+// enquanto sempre mostra o aviso de "ainda não disponível" — assim que o robô for adaptado, o
+// composable passa a devolver dados reais sem precisar mudar nada aqui.
+const {
+  carregando: buscandoCanceladas,
+  itens: vendasCanceladas,
+  disponivel: vendasCanceladasDisponivel,
+  buscarPorData: buscarVendasCanceladasBase,
+} = useVendasCanceladas();
+const jaBuscouCanceladas = ref(false);
+async function buscarVendasCanceladas() {
+  jaBuscouCanceladas.value = true;
+  await buscarVendasCanceladasBase(dataVendas.value);
+}
+
 const formasPagamento = computed(() => {
   if (!resumo.value) return [];
   const { dinheiro, credito, debito, pix, voucher, crediario, outros } = resumo.value.porForma;
@@ -235,7 +252,39 @@ const ajustesPresentes = computed(() => {
         >
           {{ sincronizando ? 'Sincronizando...' : 'Sincronizar vendas agora' }}
         </v-btn>
+        <v-btn
+          variant="outlined"
+          size="small"
+          prepend-icon="mdi-cancel"
+          :loading="buscandoCanceladas"
+          :disabled="buscandoCanceladas || !dataVendas"
+          @click="buscarVendasCanceladas"
+        >
+          {{ buscandoCanceladas ? 'Buscando...' : 'Buscar vendas canceladas' }}
+        </v-btn>
       </div>
+
+      <template v-if="jaBuscouCanceladas && !buscandoCanceladas">
+        <v-alert v-if="!vendasCanceladasDisponivel" type="info" variant="tonal" density="comfortable">
+          Vendas canceladas ainda não são enviadas pelo robô de vendas. Assim que estiver
+          disponível, essa busca passa a trazer os dados automaticamente — sem precisar mudar nada
+          aqui.
+        </v-alert>
+        <v-alert
+          v-else-if="!vendasCanceladas.length"
+          type="info"
+          variant="tonal"
+          density="comfortable"
+        >
+          Nenhuma venda cancelada para {{ formatarDataBr(dataVendas) }}.
+        </v-alert>
+        <v-alert v-else type="warning" variant="tonal" density="comfortable">
+          {{ vendasCanceladas.length }} venda{{ vendasCanceladas.length === 1 ? '' : 's' }}
+          cancelada{{ vendasCanceladas.length === 1 ? '' : 's' }} em
+          {{ formatarDataBr(dataVendas) }}. Confira em "Vendas/Produtos Cancelados" no Relatório
+          Final (passo 5).
+        </v-alert>
+      </template>
       <p class="text-caption text-medium-emphasis mt-n2">
         Puxa a planilha do bot na hora, sem esperar o sync automático de madrugada — mas só traz o
         que o bot da loja já escreveu lá. Vendas de HOJE só aparecem depois que o bot rodar hoje à

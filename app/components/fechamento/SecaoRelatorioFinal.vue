@@ -4,9 +4,13 @@ import type { FechamentoDraft } from '~/types/fechamento';
 import CampoDinheiro from '~/components/comum/CampoDinheiro.vue';
 import CartaoValor from '~/components/comum/CartaoValor.vue';
 import { useRelatorioCalculado } from '~/composables/useRelatorioCalculado';
+import { useVendasCanceladas } from '~/composables/useVendasCanceladas';
 import { useVendasProdutoDia } from '~/composables/useVendasProdutoDia';
+import GravadorAudio from '~/components/comum/GravadorAudio.vue';
 import { formatCents } from '~/utils/financeiro';
 import { baixarPdfFechamento } from '~/utils/gerarPdfFechamento';
+import { baixarPdfVendasCanceladas } from '~/utils/gerarPdfVendasCanceladas';
+import { abrirWhatsappVendasCanceladas } from '~/utils/whatsappVendasCanceladas';
 
 const props = defineProps<{ draft: FechamentoDraft }>();
 
@@ -111,6 +115,31 @@ async function aoAbrirProdutos(): Promise<void> {
 }
 function formatarQtd(qtd: number): string {
   return qtd.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
+}
+
+// Vendas/Produtos Cancelados (pedido do usuário, 23/09/2026) — CENÁRIO: mesmo padrão de
+// carregamento sob demanda de "Produtos vendidos no dia" acima, mas useVendasCanceladas ainda
+// sempre devolve vazio (ver o composable) até o robô de vendas ser adaptado.
+const {
+  carregando: carregandoCancelados,
+  itens: itensCancelados,
+  disponivel: canceladosDisponivel,
+  buscarPorData: buscarCancelados,
+} = useVendasCanceladas();
+const canceladosJaBuscados = ref(false);
+async function aoAbrirCancelados(): Promise<void> {
+  if (canceladosJaBuscados.value) return;
+  canceladosJaBuscados.value = true;
+  await buscarCancelados(props.draft.data);
+}
+const totalCanceladosCents = computed(() =>
+  itensCancelados.value.reduce((soma, i) => soma + i.valorCents, 0),
+);
+function baixarPdfCancelados(): void {
+  baixarPdfVendasCanceladas(props.draft, itensCancelados.value);
+}
+function enviarWhatsappCancelados(): void {
+  abrirWhatsappVendasCanceladas(props.draft, itensCancelados.value);
 }
 
 // Relatório em accordion por categoria (pedido do usuário, 21/09/2026, réplica da estrutura do
@@ -230,6 +259,11 @@ const CAT_VARS = {
     '--cat-soft': 'var(--cat-resultado-soft)',
     '--cat-tinta': 'var(--cat-resultado-tinta)',
   },
+  cancelados: {
+    '--cat': 'var(--cat-cancelados-base)',
+    '--cat-soft': 'var(--cat-cancelados-soft)',
+    '--cat-tinta': 'var(--cat-cancelados-tinta)',
+  },
 } as const;
 </script>
 
@@ -342,6 +376,101 @@ const CAT_VARS = {
               </v-expansion-panel-text>
             </v-expansion-panel>
           </v-expansion-panels>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+
+      <v-expansion-panel
+        class="cat-painel"
+        :style="CAT_VARS.cancelados"
+        @group:selected="({ value }) => value && aoAbrirCancelados()"
+      >
+        <v-expansion-panel-title class="cat-titulo">
+          <span class="flex-grow-1">Vendas/Produtos Cancelados</span>
+          <strong class="cat-valor">R$ {{ formatCents(totalCanceladosCents) }}</strong>
+        </v-expansion-panel-title>
+        <v-expansion-panel-text>
+          <p class="cat-subgrupo">Motivo</p>
+          <div class="d-flex ga-2 mb-3">
+            <v-btn
+              size="small"
+              :color="draft.vendasCanceladasMotivoTipo === 'texto' ? 'primary' : undefined"
+              :variant="draft.vendasCanceladasMotivoTipo === 'texto' ? 'flat' : 'outlined'"
+              @click="draft.vendasCanceladasMotivoTipo = 'texto'"
+            >
+              Texto
+            </v-btn>
+            <v-btn
+              size="small"
+              :color="draft.vendasCanceladasMotivoTipo === 'audio' ? 'primary' : undefined"
+              :variant="draft.vendasCanceladasMotivoTipo === 'audio' ? 'flat' : 'outlined'"
+              @click="draft.vendasCanceladasMotivoTipo = 'audio'"
+            >
+              Áudio
+            </v-btn>
+          </div>
+          <v-textarea
+            v-if="draft.vendasCanceladasMotivoTipo === 'texto'"
+            v-model="draft.vendasCanceladasMotivoTexto"
+            label="Motivo do(s) cancelamento(s)"
+            rows="2"
+            auto-grow
+            class="mb-4"
+          />
+          <GravadorAudio
+            v-else
+            v-model="draft.vendasCanceladasMotivoAudioPath"
+            :fechamento-id="draft.id"
+            campo="vendas-canceladas-motivo"
+            class="mb-4"
+          />
+
+          <p class="cat-subgrupo">Itens cancelados</p>
+          <div v-if="carregandoCancelados" class="d-flex justify-center py-4">
+            <v-progress-circular indeterminate color="primary" size="24" />
+          </div>
+          <v-alert v-else-if="!canceladosDisponivel" type="info" variant="tonal" density="comfortable">
+            Vendas canceladas ainda não são enviadas pelo robô de vendas. Assim que estiver
+            disponível, essa lista passa a trazer os dados automaticamente.
+          </v-alert>
+          <v-alert
+            v-else-if="!itensCancelados.length"
+            type="info"
+            variant="tonal"
+            density="comfortable"
+          >
+            Nenhum item cancelado para {{ draft.data }}.
+          </v-alert>
+          <div v-else class="d-flex flex-column ga-2 mb-2">
+            <div
+              v-for="(item, i) in itensCancelados"
+              :key="`${item.produto}-${i}`"
+              class="d-flex justify-space-between text-body-2"
+            >
+              <span class="text-medium-emphasis"
+                >{{ item.produto }} ({{ formatarQtd(item.quantidade) }})</span
+              >
+              <strong>R$ {{ formatCents(item.valorCents) }}</strong>
+            </div>
+          </div>
+
+          <div class="d-flex flex-wrap ga-2 mt-3">
+            <v-btn
+              size="small"
+              variant="tonal"
+              prepend-icon="mdi-file-pdf-box"
+              @click="baixarPdfCancelados"
+            >
+              Exportar PDF
+            </v-btn>
+            <v-btn
+              size="small"
+              variant="tonal"
+              prepend-icon="mdi-whatsapp"
+              @click="enviarWhatsappCancelados"
+            >
+              Enviar por WhatsApp
+            </v-btn>
+          </div>
         </v-expansion-panel-text>
       </v-expansion-panel>
 

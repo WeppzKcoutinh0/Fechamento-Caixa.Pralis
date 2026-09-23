@@ -16,12 +16,21 @@ const { criar } = useTransferenciasTesouraria();
 
 const OPCOES_CAIXA: CaixaOuCofre[] = ['Cofre', 'Caixa 1', 'Caixa 2', 'Caixa 3', 'Caixa 4'];
 
-const valorCents = ref(0);
 // Notas/Moedas (pedido do usuário, 23/09/2026): decomposição do fundo de caixa que o operador vai
-// conferir fisicamente na abertura (ver FormularioAbrirCaixa.vue). Campos independentes do "Valor"
-// de propósito — decisão explícita do usuário de não validar que a soma bate com o total.
+// conferir fisicamente na abertura (ver FormularioAbrirCaixa.vue). Valor total agora é SEMPRE a
+// soma automática dos dois (pedido do usuário, 23/09/2026 — revendo a decisão inicial de campos
+// independentes), mesmo padrão de SecaoRelatorioFinal.vue.
+const valorCents = ref(0);
 const valorNotasCents = ref(0);
 const valorMoedasCents = ref(0);
+function aoAlterarNotas(cents: number): void {
+  valorNotasCents.value = cents;
+  valorCents.value = cents + valorMoedasCents.value;
+}
+function aoAlterarMoedas(cents: number): void {
+  valorMoedasCents.value = cents;
+  valorCents.value = valorNotasCents.value + cents;
+}
 const lacre = ref('');
 const agendamento = ref(false);
 const caixaOrigem = ref<CaixaOuCofre | null>(null);
@@ -134,15 +143,22 @@ watch(modelValue, (aberto) => {
         Nova transferência
       </v-card-title>
       <v-card-text class="d-flex flex-column ga-4">
-        <CampoDinheiro v-model="valorCents" label="Valor" required />
-
         <div class="d-flex flex-column flex-sm-row ga-3">
-          <CampoDinheiro v-model="valorNotasCents" label="Valor em Notas" />
-          <CampoDinheiro v-model="valorMoedasCents" label="Valor em Moedas" />
+          <CampoDinheiro
+            :model-value="valorNotasCents"
+            label="Valor em Notas"
+            @update:model-value="aoAlterarNotas"
+          />
+          <CampoDinheiro
+            :model-value="valorMoedasCents"
+            label="Valor em Moedas"
+            @update:model-value="aoAlterarMoedas"
+          />
         </div>
+        <CampoDinheiro :model-value="valorCents" label="Valor" readonly />
         <p class="text-caption text-medium-emphasis mt-n2 mb-0">
-          Usado na conferência de fundo quando o caixa abre com este lacre — não precisa bater com
-          o Valor total acima.
+          O Valor total é a soma de Notas + Moedas — usado também na conferência de fundo quando o
+          caixa abre com este lacre.
         </p>
 
         <div class="d-flex flex-column flex-sm-row ga-3">

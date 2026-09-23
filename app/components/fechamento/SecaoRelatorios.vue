@@ -935,8 +935,9 @@ function alternarTurnoMaquininha(turno: 'manha' | 'tarde'): void {
           </div>
           <div class="grade-cartoes">
             <div>
+              <div class="lc-liquido-turno-lbl">Manhã</div>
               <CartaoValor
-                rotulo="Valor Líquido Calculado - Manhã"
+                rotulo="Valor Líquido Calculado"
                 :valor="`R$ ${formatCents(totalManhaCents)}`"
               />
               <DetalhesPagamentoMaquininha
@@ -946,8 +947,9 @@ function alternarTurnoMaquininha(turno: 'manha' | 'tarde'): void {
               />
             </div>
             <div>
+              <div class="lc-liquido-turno-lbl">Tarde</div>
               <CartaoValor
-                rotulo="Valor Líquido Calculado - Tarde"
+                rotulo="Valor Líquido Calculado"
                 :valor="`R$ ${formatCents(totalLiquidoTardeCents)}`"
               />
               <DetalhesPagamentoMaquininha
@@ -1094,6 +1096,14 @@ function alternarTurnoMaquininha(turno: 'manha' | 'tarde'): void {
 <style scoped>
 /* .lc-painel / .lc-painel-corpo agora vivem em assets/main.css (eram só daqui, "scoped", e por
    isso nunca aplicavam nas outras telas que também usam essas classes). */
+/* O rótulo do CartaoValor corta com "..." em telas estreitas (ellipsis + nowrap) — "Manhã"/"Tarde"
+   sumia do texto cortado. Por isso vira um cabeçalho curto próprio, que nunca é cortado. */
+.lc-liquido-turno-lbl {
+  margin-bottom: var(--cx-sp-1);
+  color: var(--cx-brand-text);
+  font-size: var(--cx-fs-micro);
+  font-weight: 700;
+}
 .lc-faixa-btn {
   display: block;
   width: 100%;

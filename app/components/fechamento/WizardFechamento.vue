@@ -100,6 +100,9 @@ async function onSalvar() {
           caixa: draft.value.caixa,
           codigo: draft.value.codigo,
           valorCents: draft.value.dinheiroContadoCents,
+          valorNotasCents: draft.value.dinheiroContadoNotasCents,
+          valorMoedasCents: draft.value.dinheiroContadoMoedasCents,
+          lacre: draft.value.lacreFechamento,
         });
       } catch (e) {
         // O fechamento já foi salvo, mas o retorno precisa ficar visível para

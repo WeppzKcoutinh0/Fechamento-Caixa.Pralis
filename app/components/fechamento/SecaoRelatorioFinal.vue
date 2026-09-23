@@ -28,6 +28,17 @@ const {
   fisico,
 } = useRelatorioCalculado(toRef(props, 'draft'));
 
+// Notas/Moedas (pedido do usuário, 23/09/2026): dinheiroContadoCents deixa de ser digitado
+// direto — vira sempre a soma automática dos dois, atualizada a cada alteração de qualquer um.
+function aoAlterarNotasContadas(cents: number): void {
+  props.draft.dinheiroContadoNotasCents = cents;
+  props.draft.dinheiroContadoCents = cents + props.draft.dinheiroContadoMoedasCents;
+}
+function aoAlterarMoedasContadas(cents: number): void {
+  props.draft.dinheiroContadoMoedasCents = cents;
+  props.draft.dinheiroContadoCents = props.draft.dinheiroContadoNotasCents + cents;
+}
+
 // Geração 100% client-side (jsPDF) — reusa os mesmos valores já calculados acima, não recalcula
 // nada por conta própria (ver utils/gerarPdfFechamento.ts).
 function baixarPdf(): void {
@@ -589,13 +600,31 @@ const CAT_VARS = {
       transferências recebidas − sangrias − despesas − mercadorias − retiradas − transferências
       enviadas.
     </p>
+    <CartaoValor
+      rotulo="Dinheiro esperado na gaveta"
+      :valor="`R$ ${formatCents(fisico.expectedCents)}`"
+      class="mb-3"
+    />
     <div class="d-flex flex-column flex-sm-row ga-3">
-      <CartaoValor
-        rotulo="Dinheiro esperado na gaveta"
-        :valor="`R$ ${formatCents(fisico.expectedCents)}`"
+      <CampoDinheiro
+        :model-value="draft.dinheiroContadoNotasCents"
+        label="Valor Notas"
+        @update:model-value="aoAlterarNotasContadas"
       />
-      <CampoDinheiro v-model="draft.dinheiroContadoCents" label="Dinheiro contado na gaveta" />
+      <CampoDinheiro
+        :model-value="draft.dinheiroContadoMoedasCents"
+        label="Valor Moedas"
+        @update:model-value="aoAlterarMoedasContadas"
+      />
+      <CampoDinheiro :model-value="draft.dinheiroContadoCents" label="Valor Total" readonly />
     </div>
+    <v-text-field
+      v-model="draft.lacreFechamento"
+      label="N° Lacre do malote"
+      class="mt-3"
+      hint="Identifica o malote que leva esse dinheiro contado de volta ao cofre — sobe junto com esses valores pro administrador conferir."
+      persistent-hint
+    />
     <CartaoValor
       v-if="draft.dinheiroContadoCents"
       rotulo="Diferença (contado − esperado)"

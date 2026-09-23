@@ -524,7 +524,7 @@ const totalTransferenciasAutomaticasCents = computed(() =>
               {{ lacreEncontradoMsg }}
             </p>
 
-            <!-- Sangria sempre sai DESTE caixa e vai pro Cofre — não é uma escolha, é informativo
+            <!-- Sangria sempre sai DESTE caixa e vai pro Fluxo — não é uma escolha, é informativo
                  (pedido do usuário, 21/09/2026). -->
             <div v-if="tipoModal === 'sangria'" class="lc-dois">
               <label class="lc-campo">
@@ -533,7 +533,7 @@ const totalTransferenciasAutomaticasCents = computed(() =>
               </label>
               <label class="lc-campo">
                 <span class="lc-campo-lbl">Conta de destino fixa</span>
-                <input class="lc-input" value="Cofre" readonly />
+                <input class="lc-input" value="Fluxo" readonly />
               </label>
             </div>
 

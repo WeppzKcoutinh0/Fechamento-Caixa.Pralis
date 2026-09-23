@@ -124,6 +124,9 @@ interface FechamentoRow {
   voucher_tarde: string;
   img_tarde_path: string | null;
   dinheiro_contado: string | null;
+  dinheiro_contado_notas: string | null;
+  dinheiro_contado_moedas: string | null;
+  lacre_fechamento: string;
   cash_session_id: string | null;
   entradas: EntradaRow[];
   sangrias: SangriaRow[];
@@ -296,6 +299,9 @@ function linhaParaDraft(row: FechamentoRow): FechamentoDraft {
       descontoPct: parseFloat(d.desconto_pct),
     })),
     dinheiroContadoCents: toCents(row.dinheiro_contado ?? 0),
+    dinheiroContadoNotasCents: toCents(row.dinheiro_contado_notas ?? 0),
+    dinheiroContadoMoedasCents: toCents(row.dinheiro_contado_moedas ?? 0),
+    lacreFechamento: row.lacre_fechamento,
     cashSessionId: row.cash_session_id,
     // Só existe pro fluxo de abertura (ver criarFechamentoVazio) — reabrir um fechamento já
     // salvo pra edição não deve disparar o lookup de novo com um valor de Tesouraria que já
@@ -485,6 +491,9 @@ export function useFechamentos() {
         diferenca: cents(relatorio.diferencaCents),
         rel_pdv_diferenca: cents(relatorio.relPdvDiferencaCents),
         dinheiro_contado: cents(draft.dinheiroContadoCents),
+        dinheiro_contado_notas: cents(draft.dinheiroContadoNotasCents),
+        dinheiro_contado_moedas: cents(draft.dinheiroContadoMoedasCents),
+        lacre_fechamento: draft.lacreFechamento,
         saldo_fisico_esperado: cents(fisico.expectedCents),
         cash_session_id: draft.cashSessionId,
       },

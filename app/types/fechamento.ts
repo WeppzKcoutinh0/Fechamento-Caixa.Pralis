@@ -218,8 +218,17 @@ export interface FechamentoDraft {
   // Seção 5
   discriminacoes: DiscriminacaoDraft[];
 
-  // Seção 6 — card aditivo esperado × contado (decisão do plano)
+  // Seção 6 — card aditivo esperado × contado (decisão do plano). Notas/Moedas (pedido do
+  // usuário, 23/09/2026): dinheiroContadoCents passa a ser SEMPRE a soma automática dos dois —
+  // diferente do formulário da Tesouraria (admin), aqui o Valor Total é sempre calculado, nunca
+  // digitado direto (ver SecaoRelatorioFinal.vue).
   dinheiroContadoCents: number;
+  dinheiroContadoNotasCents: number;
+  dinheiroContadoMoedasCents: number;
+  // Lacre do malote que leva o dinheiro contado de volta ao cofre — sobe junto no retorno
+  // automático pra Tesouraria (ver WizardFechamento.vue/useTransferenciasTesouraria.ts), pra
+  // identificar esse malote específico na notificação do admin.
+  lacreFechamento: string;
 
   // Fluxo de Caixa (18/09/2026): liga este fechamento à sessão de caixa que o originou —
   // `null` quando não veio de uma sessão (ex.: fechamento criado direto pelo admin). Quando
@@ -329,6 +338,9 @@ export function criarFechamentoVazio(contexto?: ContextoSessaoCaixa): Fechamento
     crediario: [],
     discriminacoes: [],
     dinheiroContadoCents: 0,
+    dinheiroContadoNotasCents: 0,
+    dinheiroContadoMoedasCents: 0,
+    lacreFechamento: '',
     cashSessionId: contexto?.id ?? null,
     lacreAbertura: contexto?.lacreAbertura ?? '',
     arquivosPendentes: {},

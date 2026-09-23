@@ -178,6 +178,9 @@ export function useTransferenciasTesouraria() {
     caixa: Caixa;
     codigo: string;
     valorCents: number;
+    valorNotasCents?: number;
+    valorMoedasCents?: number;
+    lacre?: string;
   }): Promise<void> {
     if (dados.valorCents <= 0) return;
     const { error } = await supabase.rpc('criar_retorno_automatico_tesouraria', {
@@ -185,6 +188,9 @@ export function useTransferenciasTesouraria() {
       p_caixa: dados.caixa,
       p_codigo: dados.codigo,
       p_valor: (dados.valorCents / 100).toFixed(2),
+      p_valor_notas: ((dados.valorNotasCents ?? 0) / 100).toFixed(2),
+      p_valor_moedas: ((dados.valorMoedasCents ?? 0) / 100).toFixed(2),
+      p_lacre: dados.lacre?.trim() || null,
     });
     if (error) throw error;
   }

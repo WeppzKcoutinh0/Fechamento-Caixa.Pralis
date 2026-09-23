@@ -17,6 +17,11 @@ const { criar } = useTransferenciasTesouraria();
 const OPCOES_CAIXA: CaixaOuCofre[] = ['Cofre', 'Caixa 1', 'Caixa 2', 'Caixa 3', 'Caixa 4'];
 
 const valorCents = ref(0);
+// Notas/Moedas (pedido do usuário, 23/09/2026): decomposição do fundo de caixa que o operador vai
+// conferir fisicamente na abertura (ver FormularioAbrirCaixa.vue). Campos independentes do "Valor"
+// de propósito — decisão explícita do usuário de não validar que a soma bate com o total.
+const valorNotasCents = ref(0);
+const valorMoedasCents = ref(0);
 const lacre = ref('');
 const agendamento = ref(false);
 const caixaOrigem = ref<CaixaOuCofre | null>(null);
@@ -59,6 +64,8 @@ function removerDestinoExtra(indice: number): void {
 
 function resetar(): void {
   valorCents.value = 0;
+  valorNotasCents.value = 0;
+  valorMoedasCents.value = 0;
   lacre.value = '';
   agendamento.value = false;
   caixaOrigem.value = null;
@@ -84,6 +91,8 @@ async function salvar(criarNova: boolean): Promise<void> {
   try {
     await criar({
       valorCents: valorCents.value,
+      valorNotasCents: valorNotasCents.value,
+      valorMoedasCents: valorMoedasCents.value,
       lacre: lacre.value,
       agendamento: agendamento.value,
       caixaOrigem: caixaOrigem.value,
@@ -126,6 +135,15 @@ watch(modelValue, (aberto) => {
       </v-card-title>
       <v-card-text class="d-flex flex-column ga-4">
         <CampoDinheiro v-model="valorCents" label="Valor" required />
+
+        <div class="d-flex flex-column flex-sm-row ga-3">
+          <CampoDinheiro v-model="valorNotasCents" label="Valor em Notas" />
+          <CampoDinheiro v-model="valorMoedasCents" label="Valor em Moedas" />
+        </div>
+        <p class="text-caption text-medium-emphasis mt-n2 mb-0">
+          Usado na conferência de fundo quando o caixa abre com este lacre — não precisa bater com
+          o Valor total acima.
+        </p>
 
         <div class="d-flex flex-column flex-sm-row ga-3">
           <v-text-field v-model="lacre" label="N° Lacre / Doc" placeholder="Ex.: 000123" required />

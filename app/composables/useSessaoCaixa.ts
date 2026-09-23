@@ -84,8 +84,16 @@ export function useSessaoCaixa() {
     turno: Turno;
     lacreAbertura: string;
     maquininhaAbertura: string;
+    // Conferência de fundo (pedido do usuário, 23/09/2026): null quando não havia lacre com
+    // notas/moedas cadastradas pra conferir (nada a confirmar); true/false é a escolha do
+    // operador em FormularioAbrirCaixa.vue — ver migration 20260923090000 pro significado de cada
+    // um. `fundoValorNotasContado`/`fundoValorMoedasContado` só fazem sentido com `false`.
+    fundoConfirmado?: boolean | null;
+    fundoValorNotasContado?: number;
+    fundoValorMoedasContado?: number;
   }): Promise<SessaoCaixa | null> {
     erro.value = null;
+    const fundoConfirmado = dados.fundoConfirmado ?? null;
     const { data, error: erroSupabase } = await supabase
       .from('cash_sessions')
       .insert({
@@ -94,6 +102,12 @@ export function useSessaoCaixa() {
         business_date: hojeISO(),
         lacre_abertura: dados.lacreAbertura,
         maquininha_abertura: dados.maquininhaAbertura,
+        fundo_confirmado: fundoConfirmado,
+        fundo_confirmado_em: fundoConfirmado === null ? null : new Date().toISOString(),
+        fundo_valor_notas_contado:
+          fundoConfirmado === false ? ((dados.fundoValorNotasContado ?? 0) / 100).toFixed(2) : null,
+        fundo_valor_moedas_contado:
+          fundoConfirmado === false ? ((dados.fundoValorMoedasContado ?? 0) / 100).toFixed(2) : null,
       })
       .select(SELECT_SESSAO)
       .single();

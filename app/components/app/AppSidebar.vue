@@ -12,10 +12,11 @@
 //     criar um fechamento agora é pelo fluxo de Abrir Caixa (`PainelCaixaOperacional.vue`).
 //   - Sem grupo "Configuração"/"Geral": não têm destino real ainda, e o usuário pediu pra tirar
 //     o estado desabilitado "Em breve" em vez de manter como placeholder.
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useModoEscuro } from '~/composables/useModoEscuro';
 import { useSidebarMobile } from '~/composables/useSidebarMobile';
 import { usePerfil } from '~/composables/usePerfil';
+import { usePendenciasFundoCaixa } from '~/composables/usePendenciasFundoCaixa';
 
 const recolhida = ref(false);
 
@@ -62,6 +63,12 @@ interface GrupoNav {
 // levaria a uma tela vazia/redirecionada. Só admin vê o menu (e o botão "+ NOVO FECHAMENTO",
 // abaixo) por completo.
 const { isAdmin } = usePerfil();
+// Contador real de pendências de fundo de caixa (23/09/2026) — nunca fictício, mesmo espírito da
+// decisão já registrada acima de não ter pílula/badge sem dado de verdade por trás.
+const { total: totalPendencias, atualizarContagem } = usePendenciasFundoCaixa();
+onMounted(() => {
+  if (isAdmin.value) atualizarContagem();
+});
 const grupos = computed<GrupoNav[]>(() => {
   if (!isAdmin.value) return [];
   return [
@@ -92,6 +99,16 @@ const grupos = computed<GrupoNav[]>(() => {
       to: '/historico',
       icone: 'mdi-archive-clock-outline',
       cor: 'var(--cat-resultado-base)',
+    },
+    {
+      // Não é uma das 6 categorias reais do Pralís (mesmo caso de Maquininhas/Crediário em
+      // SecaoRelatorios.vue) — fica no roxo neutro da marca em vez de inventar uma cor de
+      // "warning" sem correspondência real no design system.
+      id: 'pendencias',
+      label: 'Pendências',
+      to: '/pendencias',
+      icone: 'mdi-alert-circle-outline',
+      cor: 'var(--cx-brand)',
     },
   ];
 });
@@ -148,7 +165,15 @@ const grupos = computed<GrupoNav[]>(() => {
         @click="aoNavegar"
       >
         <template #prepend>
-          <v-icon :icon="grupo.icone" size="20" class="grupo-icone" />
+          <v-badge
+            v-if="grupo.id === 'pendencias' && totalPendencias > 0"
+            :content="totalPendencias"
+            color="error"
+            floating
+          >
+            <v-icon :icon="grupo.icone" size="20" class="grupo-icone" />
+          </v-badge>
+          <v-icon v-else :icon="grupo.icone" size="20" class="grupo-icone" />
         </template>
         <v-list-item-title v-if="!recolhida || mobile" class="grupo-label">{{
           grupo.label

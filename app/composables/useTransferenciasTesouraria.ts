@@ -11,6 +11,8 @@ export interface DestinoExtra {
 export interface TransferenciaTesouraria {
   id: string;
   valorCents: number;
+  valorNotasCents: number;
+  valorMoedasCents: number;
   lacre: string;
   dataLanc: string;
   agendamento: boolean;
@@ -29,6 +31,8 @@ export interface TransferenciaTesouraria {
 interface LinhaRow {
   id: string;
   valor: string;
+  valor_notas: string;
+  valor_moedas: string;
   lacre: string;
   data_lanc: string;
   agendamento: boolean;
@@ -48,6 +52,8 @@ function linhaParaTransferencia(l: LinhaRow): TransferenciaTesouraria {
   return {
     id: l.id,
     valorCents: Math.round(Number(l.valor) * 100),
+    valorNotasCents: Math.round(Number(l.valor_notas) * 100),
+    valorMoedasCents: Math.round(Number(l.valor_moedas) * 100),
     lacre: l.lacre,
     dataLanc: l.data_lanc,
     agendamento: l.agendamento,
@@ -68,7 +74,7 @@ function linhaParaTransferencia(l: LinhaRow): TransferenciaTesouraria {
 }
 
 const SELECT_COLUNAS =
-  'id, valor, lacre, data_lanc, agendamento, data_recebimento, confirmado_em, caixa_origem, caixa_destino, ' +
+  'id, valor, valor_notas, valor_moedas, lacre, data_lanc, agendamento, data_recebimento, confirmado_em, caixa_origem, caixa_destino, ' +
   'multiplo_destino, destinos_extra, tempo_confirmacao, transferencia_retorno, observacao, criado_em';
 
 /**
@@ -104,6 +110,8 @@ export function useTransferenciasTesouraria() {
 
   async function criar(dados: {
     valorCents: number;
+    valorNotasCents: number;
+    valorMoedasCents: number;
     lacre: string;
     agendamento: boolean;
     caixaOrigem: CaixaOuCofre;
@@ -121,6 +129,8 @@ export function useTransferenciasTesouraria() {
       .from('transferencias_tesouraria')
       .insert({
         valor: (dados.valorCents / 100).toFixed(2),
+        valor_notas: (dados.valorNotasCents / 100).toFixed(2),
+        valor_moedas: (dados.valorMoedasCents / 100).toFixed(2),
         lacre: dados.lacre.trim(),
         data_lanc: hojeISO(),
         agendamento: dados.agendamento,

@@ -702,6 +702,46 @@ body {
   }
 }
 
+/* Achado real (24/09/2026): diálogos que usam v-card NATIVO do Vuetify (em vez do .lc-modal
+   customizado acima) nunca tinham esse mesmo tratamento — em telas baixas (a maioria dos
+   celulares em pé), o conteúdo do formulário empurra os botões de v-card-actions pra fora da
+   área visível, ficando por trás de botões da tela de fundo (reportado pelo usuário: "Nova
+   transferência" cortando "Salvar"/"Salvar e criar nova"). Seletor de filho direto
+   (`.v-overlay__content > .v-card`) pega só os diálogos com v-card na raiz — os que já usam
+   .lc-modal (ver acima) têm essa div como filho direto do overlay, não um .v-card, então não são
+   afetados por esta regra. */
+@media (width <= 560px) {
+  /* O wrapper que o Vuetify posiciona (`.v-overlay__content`) herda a prop `max-width` do
+     v-dialog (ex.: 560px, 480px) como estilo inline — sem isto, o .v-card 100% de largura/altura
+     abaixo ficaria preso dentro desse wrapper menor em vez de ocupar a tela toda. */
+  .v-overlay__content:has(> .v-card) {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    margin: 0 !important;
+  }
+  .v-overlay__content > .v-card {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    border-radius: 0;
+  }
+  .v-overlay__content > .v-card > .v-card-text {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+  .v-overlay__content > .v-card > .v-card-actions {
+    flex: 0 0 auto;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 /* Foco visível em todo ponto focável — nunca outline: none. */
 :focus-visible {
   outline: 2px solid var(--cx-focus);

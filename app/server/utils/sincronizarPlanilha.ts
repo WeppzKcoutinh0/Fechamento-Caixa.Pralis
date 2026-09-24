@@ -3,7 +3,7 @@ import {
   linhaVendaProdutoDiaSchema,
 } from '../../types/vendasFechamento';
 import { agregarCanceladosPorProdutoDia } from './agregarVendasCanceladas';
-import { lerAbaPlanilha } from './googleSheets';
+import { lerAbaPlanilha, lerCaudaAbaPlanilha } from './googleSheets';
 import { processarImportacao } from './importarVendas';
 import { parseDataBot } from './parseValoresBot';
 
@@ -27,6 +27,12 @@ const JANELA_DIAS = 14;
 // cobrir o suficiente pra "Vendas" do Relatório Final (que olha só a DATA do próprio fechamento,
 // quase sempre hoje/ontem), então uma janela bem mais curta já basta.
 const JANELA_DIAS_PRODUTOS = 3;
+
+// VENDAS_TIPOS lida só pela cauda (25/09/2026, achado real): 14.143 linhas no total, mas só as
+// ÚLTIMAS ~225 caíam dentro dos 3 dias de `JANELA_DIAS_PRODUTOS` — ler a aba inteira só pra
+// descartar 98% dela era o que estourava o timeout de 60s da Vercel depois de ligar essa aba.
+// Margem generosa (>10x o observado) pra sobrar folga em dias de pico sem precisar reler tudo.
+const CAUDA_VENDAS_TIPOS = 3000;
 
 function filtrarPorEmpresa<T extends { EMPRESA?: string }>(linhas: T[], empresa: string): T[] {
   return linhas.filter((linha) => String(linha.EMPRESA ?? '').trim() === empresa);
@@ -98,11 +104,12 @@ export async function sincronizarPlanilhaCreare(): Promise<ResumoSincronizacaoPl
         })
       : Promise.resolve([]),
     config.sincronizarProdutos
-      ? lerAbaPlanilha({
+      ? lerCaudaAbaPlanilha({
           credenciaisJson: config.googleServiceAccountJson,
           spreadsheetId: config.googleSpreadsheetId,
           aba: 'VENDAS_TIPOS',
           colunaInicial,
+          ultimasLinhas: CAUDA_VENDAS_TIPOS,
         })
       : Promise.resolve([]),
   ]);

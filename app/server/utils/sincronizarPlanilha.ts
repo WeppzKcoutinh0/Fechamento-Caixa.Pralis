@@ -107,83 +107,99 @@ export async function sincronizarPlanilhaCreare(): Promise<ResumoSincronizacaoPl
       : Promise.resolve([]),
   ]);
 
-  const linhasFechamentoBrutas = filtrarPorJanelaRecente(
-    filtrarPorEmpresa(todasFechamento, empresa),
-    JANELA_DIAS,
-  );
-  let fechamentoRecebidas = 0;
-  let fechamentoGravadas = 0;
-  let fechamentoInvalidas = 0;
-  for (const lote of loteEmGrupos(linhasFechamentoBrutas)) {
-    const parseadas = lote.map((linha) => linhaFechamentoCaixaDiaSchema.safeParse(linha));
-    fechamentoInvalidas += parseadas.filter((p) => !p.success).length;
-    const validas = parseadas.filter((p) => p.success).map((p) => p.data);
-    if (validas.length === 0) continue;
-    const { recebidas, gravadas } = await processarImportacao('fechamento_caixa_dia', validas);
-    fechamentoRecebidas += recebidas;
-    fechamentoGravadas += gravadas;
+  // As 3 gravações também são independentes entre si (25/09/2026, achado real: mesmo com as
+  // leituras em paralelo, a soma das 3 gravações sequenciais ainda estourava os 60s intermitente-
+  // mente) — FECHAMENTOS_CAIXAS grava em `vendas_fechamento_caixa_dia` (tabela diferente);
+  // VENDAS_PRODUTOS(F) e VENDAS_TIPOS(C) gravam em `vendas_produto_dia`, mas em hashes que nunca
+  // colidem entre si (upsert de linhas diferentes, sem disputa de lock real). `Promise.all` roda
+  // as 3 ao mesmo tempo em vez de uma atrás da outra.
+  async function processarFechamento() {
+    const linhasFechamentoBrutas = filtrarPorJanelaRecente(
+      filtrarPorEmpresa(todasFechamento, empresa),
+      JANELA_DIAS,
+    );
+    let recebidas = 0;
+    let gravadas = 0;
+    let invalidas = 0;
+    for (const lote of loteEmGrupos(linhasFechamentoBrutas)) {
+      const parseadas = lote.map((linha) => linhaFechamentoCaixaDiaSchema.safeParse(linha));
+      invalidas += parseadas.filter((p) => !p.success).length;
+      const validas = parseadas.filter((p) => p.success).map((p) => p.data);
+      if (validas.length === 0) continue;
+      const resultado = await processarImportacao('fechamento_caixa_dia', validas);
+      recebidas += resultado.recebidas;
+      gravadas += resultado.gravadas;
+    }
+    return { naPlanilha: linhasFechamentoBrutas.length, recebidas, gravadas, invalidas };
   }
 
   // VENDAS_PRODUTOS religado (21/09/2026): o Relatório Final do wizard passou a mostrar essa
   // lista (ver useVendasProdutoDia.ts) — usa `JANELA_DIAS_PRODUTOS` (bem menor que a de
   // fechamento) por causa da densidade de linhas, ver comentário na constante acima.
-  let produtosRecebidas = 0;
-  let produtosGravadas = 0;
-  let produtosInvalidas = 0;
-  let produtosNaPlanilha = 0;
-  if (config.sincronizarProdutos) {
+  async function processarProdutosFinalizados() {
+    if (!config.sincronizarProdutos) return { naPlanilha: 0, recebidas: 0, gravadas: 0, invalidas: 0 };
     const linhasProdutosBrutas = filtrarPorJanelaRecente(
       filtrarPorEmpresa(todosProdutos, empresa),
       JANELA_DIAS_PRODUTOS,
     );
-    produtosNaPlanilha += linhasProdutosBrutas.length;
+    let recebidas = 0;
+    let gravadas = 0;
+    let invalidas = 0;
     for (const lote of loteEmGrupos(linhasProdutosBrutas)) {
       const parseadas = lote.map((linha) => linhaVendaProdutoDiaSchema.safeParse(linha));
-      produtosInvalidas += parseadas.filter((p) => !p.success).length;
+      invalidas += parseadas.filter((p) => !p.success).length;
       const validas = parseadas.filter((p) => p.success).map((p) => p.data);
       if (validas.length === 0) continue;
-      const { recebidas, gravadas } = await processarImportacao('venda_produto_dia', validas);
-      produtosRecebidas += recebidas;
-      produtosGravadas += gravadas;
+      const resultado = await processarImportacao('venda_produto_dia', validas);
+      recebidas += resultado.recebidas;
+      gravadas += resultado.gravadas;
     }
+    return { naPlanilha: linhasProdutosBrutas.length, recebidas, gravadas, invalidas };
+  }
 
-    // VENDAS_TIPOS (produtos cancelados, 24/09/2026): aba nova que o robô passou a escrever, uma
-    // linha por TRANSAÇÃO cancelada (não pré-agregada como VENDAS_PRODUTOS) — fica na planilha
-    // PRIMÁRIA (não tem essa aba na secundária). Só TIPO='CANCELADA' interessa aqui (a aba também
-    // tem 'CREDIARIO', assunto de outra tela). Mesma flag/janela de VENDAS_PRODUTOS porque
-    // alimenta a mesma pergunta ("Buscar vendas canceladas" no Relatório Final).
+  // VENDAS_TIPOS (produtos cancelados, 24/09/2026): aba nova que o robô passou a escrever, uma
+  // linha por TRANSAÇÃO cancelada (não pré-agregada como VENDAS_PRODUTOS) — fica na planilha
+  // PRIMÁRIA (não tem essa aba na secundária). Só TIPO='CANCELADA' interessa aqui (a aba também
+  // tem 'CREDIARIO', assunto de outra tela). Mesma flag/janela de VENDAS_PRODUTOS porque
+  // alimenta a mesma pergunta ("Buscar vendas canceladas" no Relatório Final).
+  async function processarProdutosCancelados() {
+    if (!config.sincronizarProdutos) return { naPlanilha: 0, recebidas: 0, gravadas: 0, invalidas: 0 };
     const canceladosNaJanela = filtrarPorJanelaRecente(
       agregarCanceladosPorProdutoDia(todosTipos, empresa),
       JANELA_DIAS_PRODUTOS,
     );
-    produtosNaPlanilha += canceladosNaJanela.length;
+    let recebidas = 0;
+    let gravadas = 0;
+    let invalidas = 0;
     for (const lote of loteEmGrupos(canceladosNaJanela)) {
       const parseadas = lote.map((linha) => linhaVendaProdutoDiaSchema.safeParse(linha));
-      produtosInvalidas += parseadas.filter((p) => !p.success).length;
+      invalidas += parseadas.filter((p) => !p.success).length;
       const validas = parseadas.filter((p) => p.success).map((p) => p.data);
       if (validas.length === 0) continue;
-      const { recebidas, gravadas } = await processarImportacao('venda_produto_dia', validas, {
+      const resultado = await processarImportacao('venda_produto_dia', validas, {
         pularLimpezaSnapshots: true,
       });
-      produtosRecebidas += recebidas;
-      produtosGravadas += gravadas;
+      recebidas += resultado.recebidas;
+      gravadas += resultado.gravadas;
     }
+    return { naPlanilha: canceladosNaJanela.length, recebidas, gravadas, invalidas };
   }
+
+  const [fechamento, produtosF, produtosC] = await Promise.all([
+    processarFechamento(),
+    processarProdutosFinalizados(),
+    processarProdutosCancelados(),
+  ]);
 
   return {
     ok: true,
     executadoEm: new Date().toISOString(),
-    fechamentoCaixa: {
-      naPlanilha: linhasFechamentoBrutas.length,
-      recebidas: fechamentoRecebidas,
-      gravadas: fechamentoGravadas,
-      invalidas: fechamentoInvalidas,
-    },
+    fechamentoCaixa: fechamento,
     vendasProdutos: {
-      naPlanilha: produtosNaPlanilha,
-      recebidas: produtosRecebidas,
-      gravadas: produtosGravadas,
-      invalidas: produtosInvalidas,
+      naPlanilha: produtosF.naPlanilha + produtosC.naPlanilha,
+      recebidas: produtosF.recebidas + produtosC.recebidas,
+      gravadas: produtosF.gravadas + produtosC.gravadas,
+      invalidas: produtosF.invalidas + produtosC.invalidas,
     },
   };
 }

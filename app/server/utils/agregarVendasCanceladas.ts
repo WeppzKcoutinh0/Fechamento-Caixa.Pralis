@@ -2,6 +2,13 @@ import { createHash } from 'node:crypto';
 import { extrairHoraBot, parseDataBot } from './parseValoresBot';
 import type { LinhaVendaProdutoDia } from '../../types/vendasFechamento';
 
+// PDV real de loja segue o padrão "<EMPRESA>-PC-CXPDV-<N>" (confirmado nos dados reais: LI-PC-
+// CXPDV-1..3, TNP-PC-CXPDV-1..4) — qualquer coisa fora disso ("DESKTOP-2SJ5JIJ", "SERVIDOR-
+// PRALIS", vazio) é uma máquina de desenvolvimento/teste de quem mexeu no robô, não um caixa de
+// verdade (achado real, 24/09/2026: 2 "cancelamentos" de Coca-Cola vieram de "DESKTOP-2SJ5JIJ"
+// com operador "teste"/"GABRIEL" — o usuário confirmou que não existiram de verdade).
+const PDV_REAL = /CXPDV/i;
+
 /**
  * `VENDAS_TIPOS` (aba nova que o robô passou a escrever, 24/09/2026) manda uma linha POR
  * TRANSAÇÃO cancelada (com PDV/OPERADOR/CLIENTE/timestamp), diferente de `VENDAS_PRODUTOS` que já
@@ -24,6 +31,7 @@ export function agregarCanceladosPorProdutoDia(
   for (const linha of linhasBrutas) {
     if (String(linha.EMPRESA ?? '').trim() !== empresa) continue;
     if (String(linha.TIPO ?? '').trim().toUpperCase() !== 'CANCELADA') continue;
+    if (!PDV_REAL.test(String(linha.PDV ?? ''))) continue;
 
     const data = parseDataBot(linha.DATA_VENDA_BALCAO);
     const produto = String(linha.PRODUTO ?? '').trim();

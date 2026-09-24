@@ -81,6 +81,50 @@ describe('agregarCanceladosPorProdutoDia', () => {
     expect(linhas).toHaveLength(0);
   });
 
+  it('ignora PDV que não é um caixa real da loja (máquina de teste/dev, achado real 24/09/2026)', () => {
+    const linhas = agregarCanceladosPorProdutoDia(
+      [
+        {
+          TIPO: 'CANCELADA',
+          PRODUTO: 'COCA COLA 2L',
+          PDV: 'DESKTOP-2SJ5JIJ',
+          OPERADOR: 'teste',
+          DATA_VENDA_BALCAO: '2026-09-24 12:40:48',
+          QUANTIDADE: '1',
+          TOTAL: '15,75',
+          EMPRESA: 'TNP CENTRAL',
+          ATUALIZADO_EM: '2026-09-24 12:41:25',
+          HASH: 'h-teste',
+        },
+        {
+          TIPO: 'CANCELADA',
+          PRODUTO: 'BEBIDA LACTEA PIRAKIDS 200ML',
+          PDV: 'SERVIDOR-PRALIS',
+          DATA_VENDA_BALCAO: '2026-09-24 13:00:00',
+          QUANTIDADE: '1',
+          TOTAL: '3',
+          EMPRESA: 'TNP CENTRAL',
+          ATUALIZADO_EM: '2026-09-24 13:01:00',
+          HASH: 'h-servidor',
+        },
+        {
+          TIPO: 'CANCELADA',
+          PRODUTO: 'PAO DE SAL',
+          PDV: 'TNP-PC-CXPDV-1',
+          DATA_VENDA_BALCAO: '2026-09-24 13:34:27',
+          QUANTIDADE: '1',
+          TOTAL: '2,5',
+          EMPRESA: 'TNP CENTRAL',
+          ATUALIZADO_EM: '2026-09-24 13:40:42',
+          HASH: 'h-real',
+        },
+      ],
+      'TNP CENTRAL',
+    );
+    expect(linhas).toHaveLength(1);
+    expect(linhas[0]!.HASH).toBe('h-real');
+  });
+
   it('sem HASH na origem, deriva um hash estável pra não colidir com outra transação', () => {
     const linhas = agregarCanceladosPorProdutoDia(
       [

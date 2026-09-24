@@ -445,9 +445,10 @@ const CAT_VARS = {
               :key="`${item.produto}-${i}`"
               class="d-flex justify-space-between text-body-2"
             >
-              <span class="text-medium-emphasis"
-                >{{ item.produto }} ({{ formatarQtd(item.quantidade) }})</span
-              >
+              <span class="text-medium-emphasis">
+                {{ item.produto }} ({{ formatarQtd(item.quantidade) }})
+                <template v-if="item.horaVenda"> — {{ item.horaVenda.slice(0, 5) }}</template>
+              </span>
               <strong>R$ {{ formatCents(item.totalCents) }}</strong>
             </div>
           </div>

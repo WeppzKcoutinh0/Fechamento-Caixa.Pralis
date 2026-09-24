@@ -151,7 +151,9 @@ export async function sincronizarPlanilhaCreare(): Promise<ResumoSincronizacaoPl
       produtosInvalidas += parseadas.filter((p) => !p.success).length;
       const validas = parseadas.filter((p) => p.success).map((p) => p.data);
       if (validas.length === 0) continue;
-      const { recebidas, gravadas } = await processarImportacao('venda_produto_dia', validas);
+      const { recebidas, gravadas } = await processarImportacao('venda_produto_dia', validas, {
+        pularLimpezaSnapshots: true,
+      });
       produtosRecebidas += recebidas;
       produtosGravadas += gravadas;
     }

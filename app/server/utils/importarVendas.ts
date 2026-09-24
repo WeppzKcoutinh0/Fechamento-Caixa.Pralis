@@ -141,6 +141,14 @@ async function limparSnapshotsSuperados(
 export async function processarImportacao(
   tipo: 'fechamento_caixa_dia' | 'venda_produto_dia',
   linhasBrutas: LinhaFechamentoCaixaDia[] | LinhaVendaProdutoDia[],
+  opcoes?: {
+    // Itens cancelados (pedido do usuário, 24/09/2026): cada linha é uma TRANSAÇÃO real e
+    // distinta (não um snapshot cumulativo do dia, como as demais origens) — duas cancelações do
+    // mesmo produto no mesmo dia não são "a mesma coisa vista duas vezes", são dois eventos
+    // diferentes. Rodar `limparSnapshotsSuperados` aqui apagaria uma delas, achando que era uma
+    // versão antiga da outra. Ver agregarVendasCanceladas.ts.
+    pularLimpezaSnapshots?: boolean;
+  },
 ): Promise<{ recebidas: number; gravadas: number }> {
   const supabase = useSupabaseAdmin();
 
@@ -169,7 +177,7 @@ export async function processarImportacao(
           const { error, count } = await supabase
             .from('vendas_produto_dia')
             .upsert(linhas, { onConflict: 'hash', count: 'exact' });
-          if (!error) {
+          if (!error && !opcoes?.pularLimpezaSnapshots) {
             // `tipo` entra na chave (pedido do usuário, 24/09/2026): um produto pode ter um
             // agregado 'F' (finalizada) e um 'C' (cancelada) no mesmo dia — são coisas
             // DIFERENTES, não snapshots um do outro. Sem isso, esta limpeza apagaria um dos

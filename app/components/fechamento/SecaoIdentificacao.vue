@@ -147,6 +147,13 @@ async function buscarVendasCanceladas() {
   jaBuscouCanceladas.value = true;
   await buscarVendasCanceladasBase(dataVendas.value);
 }
+function formatarQtd(qtd: number): string {
+  return qtd.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
+}
+/** "13:34:27" -> "13:34" (só exibição, sem fuso — igual o horário que o CREARE já registra). */
+function formatarHora(hora: string | null): string {
+  return hora ? hora.slice(0, 5) : '';
+}
 
 const formasPagamento = computed(() => {
   if (!resumo.value) return [];
@@ -276,10 +283,28 @@ const ajustesPresentes = computed(() => {
           Nenhuma venda cancelada para {{ formatarDataBr(dataVendas) }}.
         </v-alert>
         <v-alert v-else type="warning" variant="tonal" density="comfortable">
-          {{ vendasCanceladas.length }} venda{{ vendasCanceladas.length === 1 ? '' : 's' }}
-          cancelada{{ vendasCanceladas.length === 1 ? '' : 's' }} em
-          {{ formatarDataBr(dataVendas) }}. Confira em "Vendas/Produtos Cancelados" no Relatório
-          Final (passo 5).
+          <div>
+            {{ vendasCanceladas.length }} venda{{ vendasCanceladas.length === 1 ? '' : 's' }}
+            cancelada{{ vendasCanceladas.length === 1 ? '' : 's' }} em
+            {{ formatarDataBr(dataVendas) }}.
+          </div>
+          <ul class="text-caption mt-2 pl-4">
+            <li
+              v-for="(item, i) in vendasCanceladas"
+              :key="`${item.produto}-${i}`"
+              class="d-flex justify-space-between ga-2"
+            >
+              <span>
+                {{ item.produto }} ({{ formatarQtd(item.quantidade) }})
+                <template v-if="item.horaVenda"> — {{ formatarHora(item.horaVenda) }}</template>
+              </span>
+              <strong class="text-no-wrap">R$ {{ formatCents(item.totalCents) }}</strong>
+            </li>
+          </ul>
+          <div class="text-caption mt-2 font-weight-bold">
+            Motivo e exportação (PDF/WhatsApp) em "Vendas/Produtos Cancelados" no Relatório Final
+            (passo 5).
+          </div>
         </v-alert>
       </template>
       <p class="text-caption text-medium-emphasis mt-n2">

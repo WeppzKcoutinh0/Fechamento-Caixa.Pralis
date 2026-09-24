@@ -1,4 +1,5 @@
 import {
+  extrairHoraBot,
   parseDataBot,
   parseDataHoraBot,
   parseInteiroBot,
@@ -61,6 +62,7 @@ export function mapearVendaProdutoDia(linha: LinhaVendaProdutoDia) {
     // 'C' só quando a origem manda exatamente isso — qualquer outra coisa (ausente, 'F', lixo) é
     // finalizada, mesmo default da coluna no banco (ver migration 20260924100000).
     tipo: linha.TIPO === 'C' ? 'C' : 'F',
+    hora_venda: extrairHoraBot(linha.HORA_VENDA),
     atualizado_em_origem: parseDataHoraBot(linha.ATUALIZADO_EM),
   };
 }

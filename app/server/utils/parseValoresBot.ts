@@ -53,6 +53,14 @@ export function parseDataBot(valor: unknown): string | null {
   return null;
 }
 
+/** "2026-08-21 14:23:00" | "2026-08-21T14:23:00" | com prefixo de aspa -> "14:23:00" (hora local, sem conversão de fuso — é só pra exibir, não pra calcular). */
+export function extrairHoraBot(valor: unknown): string | null {
+  if (valor === null || valor === undefined) return null;
+  const texto = semAspaSimples(String(valor).trim());
+  const match = /\d{4}-\d{2}-\d{2}[ T](\d{2}:\d{2}:\d{2})/.exec(texto);
+  return match ? match[1]! : null;
+}
+
 /** "2026-08-21 14:23:00" | ISO | com prefixo de aspa -> ISO (assume fuso America/Sao_Paulo se não vier offset). */
 export function parseDataHoraBot(valor: unknown): string | null {
   if (valor === null || valor === undefined) return null;

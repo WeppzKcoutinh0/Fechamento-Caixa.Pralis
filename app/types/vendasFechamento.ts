@@ -59,6 +59,10 @@ export const linhaVendaProdutoDiaSchema = z.object({
   // ainda (bot_padaria_v3 em produção não manda por enquanto) — trata como finalizada, mesmo
   // comportamento de sempre.
   TIPO: valorLivre,
+  // Horário da transação (pedido do usuário, 24/09/2026) — só vem preenchido pra itens cancelados,
+  // derivado de VENDAS_TIPOS!DATA_VENDA_BALCAO (ver agregarVendasCanceladas.ts). Ausente pra vendas
+  // normais (VENDAS_PRODUTOS não tem hora, só o dia todo já somado).
+  HORA_VENDA: valorLivre,
   EMPRESA: textoObrigatorio,
   ATUALIZADO_EM: valorLivre,
   HASH: textoObrigatorio,

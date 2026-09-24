@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { agregarCanceladosPorProdutoDia } from './agregarVendasCanceladas';
 
 describe('agregarCanceladosPorProdutoDia', () => {
-  it('agrega várias transações CANCELADA do mesmo produto/dia numa única linha, somando quantidade e total', () => {
+  it('mantém cada transação CANCELADA como sua própria linha, com data e horário separados', () => {
     const linhas = agregarCanceladosPorProdutoDia(
       [
         {
@@ -23,8 +23,8 @@ describe('agregarCanceladosPorProdutoDia', () => {
           PDV: 'TNP-PC-CXPDV-2',
           DATA_VENDA_BALCAO: '2026-09-24 13:34:27',
           VALOR_UNITARIO: '15,75',
-          QUANTIDADE: '2',
-          TOTAL: '31,50',
+          QUANTIDADE: '1',
+          TOTAL: '15,75',
           EMPRESA: 'TNP CENTRAL',
           ATUALIZADO_EM: '2026-09-24 13:40:42',
           HASH: 'transacao-2',
@@ -33,14 +33,14 @@ describe('agregarCanceladosPorProdutoDia', () => {
       'TNP CENTRAL',
     );
 
-    expect(linhas).toHaveLength(1);
-    const linha = linhas[0]!;
-    expect(linha.DATA_VENDA).toBe('2026-09-24');
-    expect(linha.PRODUTO).toBe('COCA COLA 2L');
-    expect(linha.TIPO).toBe('C');
-    expect(linha.QUANTIDADE).toBe('3');
-    expect(linha.TOTAL).toBe('47.25');
-    expect(linha.HASH).toBeTruthy();
+    expect(linhas).toHaveLength(2);
+    expect(linhas.map((l) => l.HASH)).toEqual(['transacao-1', 'transacao-2']);
+    expect(linhas[0]!.DATA_VENDA).toBe('2026-09-24');
+    // HORA_VENDA sai cru aqui (mapearVendaProdutoDia extrai a hora de verdade depois).
+    expect(linhas[0]!.HORA_VENDA).toBe('2026-09-24 12:29:47');
+    expect(linhas[1]!.HORA_VENDA).toBe('2026-09-24 13:34:27');
+    expect(linhas[0]!.TIPO).toBe('C');
+    expect(linhas[0]!.QUANTIDADE).toBe('1');
   });
 
   it('ignora linhas CREDIARIO (só cancelamento interessa aqui)', () => {
@@ -81,33 +81,24 @@ describe('agregarCanceladosPorProdutoDia', () => {
     expect(linhas).toHaveLength(0);
   });
 
-  it('duas transações do mesmo produto em dias diferentes viram duas linhas separadas', () => {
+  it('sem HASH na origem, deriva um hash estável pra não colidir com outra transação', () => {
     const linhas = agregarCanceladosPorProdutoDia(
       [
         {
           TIPO: 'CANCELADA',
           PRODUTO: 'BOLINHO DE CHUVA',
+          PDV: 'TNP-PC-CXPDV-4',
           DATA_VENDA_BALCAO: '2026-09-23 17:49:38',
           QUANTIDADE: '1',
           TOTAL: '1,2',
           EMPRESA: 'TNP CENTRAL',
           ATUALIZADO_EM: '2026-09-23 17:52:54',
-          HASH: 'h3',
-        },
-        {
-          TIPO: 'CANCELADA',
-          PRODUTO: 'BOLINHO DE CHUVA',
-          DATA_VENDA_BALCAO: '2026-09-24 09:00:00',
-          QUANTIDADE: '1',
-          TOTAL: '1,2',
-          EMPRESA: 'TNP CENTRAL',
-          ATUALIZADO_EM: '2026-09-24 09:01:00',
-          HASH: 'h4',
+          HASH: '',
         },
       ],
       'TNP CENTRAL',
     );
-    expect(linhas).toHaveLength(2);
-    expect(linhas.map((l) => l.DATA_VENDA).sort()).toEqual(['2026-09-23', '2026-09-24']);
+    expect(linhas).toHaveLength(1);
+    expect(linhas[0]!.HASH).toBeTruthy();
   });
 });

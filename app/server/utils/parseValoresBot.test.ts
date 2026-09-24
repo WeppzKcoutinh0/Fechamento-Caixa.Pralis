@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  extrairHoraBot,
   parseDataBot,
   parseDataHoraBot,
   parseInteiroBot,
@@ -95,5 +96,26 @@ describe('parseDataHoraBot', () => {
     expect(parseDataHoraBot('')).toBeNull();
     expect(parseDataHoraBot(null)).toBeNull();
     expect(parseDataHoraBot('lixo')).toBeNull();
+  });
+});
+
+describe('extrairHoraBot', () => {
+  it('extrai só o horário de "YYYY-MM-DD HH:MM:SS", sem conversão de fuso', () => {
+    expect(extrairHoraBot('2026-09-24 13:34:27')).toBe('13:34:27');
+  });
+
+  it('aceita separador "T" também', () => {
+    expect(extrairHoraBot('2026-09-24T13:34:27')).toBe('13:34:27');
+  });
+
+  it('remove o prefixo de aspa simples do Google Sheets', () => {
+    expect(extrairHoraBot("'2026-09-24 13:34:27")).toBe('13:34:27');
+  });
+
+  it('vazio/inválido/só data vira null', () => {
+    expect(extrairHoraBot('')).toBeNull();
+    expect(extrairHoraBot(null)).toBeNull();
+    expect(extrairHoraBot('2026-09-24')).toBeNull();
+    expect(extrairHoraBot('lixo')).toBeNull();
   });
 });

@@ -91,5 +91,24 @@ describe('mapearVendaProdutoDia', () => {
     expect(linha.total).toBeCloseTo(15);
     expect(linha.produto_codigo).toBe('00123');
     expect(linha.hash).toBe('xyz789');
+    expect(linha.hora_venda).toBeNull();
+  });
+
+  it('mapeia HORA_VENDA quando presente (item cancelado)', () => {
+    const linha = mapearVendaProdutoDia({
+      DATA_VENDA: '2026-09-24',
+      PRODUTO_CODIGO: null,
+      PRODUTO: 'COCA COLA 2L',
+      QUANTIDADE: '1',
+      VALOR_UNITARIO: '15,75',
+      TOTAL: '15,75',
+      TIPO: 'C',
+      HORA_VENDA: '2026-09-24 13:34:27',
+      EMPRESA: 'TNP CENTRAL',
+      ATUALIZADO_EM: '2026-09-24 13:40:42',
+      HASH: 'abc',
+    });
+    expect(linha.tipo).toBe('C');
+    expect(linha.hora_venda).toBe('13:34:27');
   });
 });

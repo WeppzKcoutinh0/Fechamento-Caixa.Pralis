@@ -30,8 +30,9 @@ export function textoWhatsappVendasCanceladas(
     linhas.push('Nenhum item cancelado sincronizado para esta data.');
   } else {
     for (const item of itens) {
+      const hora = item.horaVenda ? ` — ${item.horaVenda.slice(0, 5)}` : '';
       linhas.push(
-        `- ${item.produto} — qtd. ${item.quantidade} — R$ ${formatCents(item.totalCents)}`,
+        `- ${item.produto} — qtd. ${item.quantidade} — R$ ${formatCents(item.totalCents)}${hora}`,
       );
     }
   }

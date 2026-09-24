@@ -35,8 +35,9 @@ export function gerarPdfVendasCanceladas(draft: FechamentoDraft, itens: VendaCan
     pdf.vazio(`Nenhum item cancelado sincronizado para ${formatarDataBr(draft.data)}.`);
   } else {
     for (const item of itens) {
+      const hora = item.horaVenda ? ` — ${item.horaVenda.slice(0, 5)}` : '';
       pdf.linha(
-        `${item.produto} (qtd. ${item.quantidade})`,
+        `${item.produto} (qtd. ${item.quantidade})${hora}`,
         `R$ ${formatCents(item.totalCents)}`,
       );
     }

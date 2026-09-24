@@ -127,9 +127,14 @@ function pedirExclusao(id: string) {
 }
 async function confirmarExclusao() {
   if (!excluindoId.value) return;
-  await excluir(excluindoId.value);
-  excluindoId.value = null;
-  await carregar();
+  erro.value = null;
+  try {
+    await excluir(excluindoId.value);
+    excluindoId.value = null;
+    await carregar();
+  } catch (e) {
+    erro.value = e instanceof Error ? e.message : 'Não foi possível excluir o fechamento.';
+  }
 }
 </script>
 

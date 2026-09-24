@@ -2,6 +2,7 @@ import {
   linhaFechamentoCaixaDiaSchema,
   linhaVendaProdutoDiaSchema,
 } from '../../types/vendasFechamento';
+import { agregarCanceladosPorProdutoDia } from './agregarVendasCanceladas';
 import { lerAbaPlanilha } from './googleSheets';
 import { processarImportacao } from './importarVendas';
 import { parseDataBot } from './parseValoresBot';
@@ -118,8 +119,34 @@ export async function sincronizarPlanilhaCreare(): Promise<ResumoSincronizacaoPl
       filtrarPorEmpresa(todosProdutos, empresa),
       JANELA_DIAS_PRODUTOS,
     );
-    produtosNaPlanilha = linhasProdutosBrutas.length;
+    produtosNaPlanilha += linhasProdutosBrutas.length;
     for (const lote of loteEmGrupos(linhasProdutosBrutas)) {
+      const parseadas = lote.map((linha) => linhaVendaProdutoDiaSchema.safeParse(linha));
+      produtosInvalidas += parseadas.filter((p) => !p.success).length;
+      const validas = parseadas.filter((p) => p.success).map((p) => p.data);
+      if (validas.length === 0) continue;
+      const { recebidas, gravadas } = await processarImportacao('venda_produto_dia', validas);
+      produtosRecebidas += recebidas;
+      produtosGravadas += gravadas;
+    }
+
+    // VENDAS_TIPOS (produtos cancelados, 24/09/2026): aba nova que o robô passou a escrever, uma
+    // linha por TRANSAÇÃO cancelada (não pré-agregada como VENDAS_PRODUTOS) — fica na planilha
+    // PRIMÁRIA (não tem essa aba na secundária). Só TIPO='CANCELADA' interessa aqui (a aba também
+    // tem 'CREDIARIO', assunto de outra tela). Mesma flag/janela de VENDAS_PRODUTOS porque
+    // alimenta a mesma pergunta ("Buscar vendas canceladas" no Relatório Final).
+    const todosTipos = await lerAbaPlanilha({
+      credenciaisJson: config.googleServiceAccountJson,
+      spreadsheetId: config.googleSpreadsheetId,
+      aba: 'VENDAS_TIPOS',
+      colunaInicial,
+    });
+    const canceladosNaJanela = filtrarPorJanelaRecente(
+      agregarCanceladosPorProdutoDia(todosTipos, empresa),
+      JANELA_DIAS_PRODUTOS,
+    );
+    produtosNaPlanilha += canceladosNaJanela.length;
+    for (const lote of loteEmGrupos(canceladosNaJanela)) {
       const parseadas = lote.map((linha) => linhaVendaProdutoDiaSchema.safeParse(linha));
       produtosInvalidas += parseadas.filter((p) => !p.success).length;
       const validas = parseadas.filter((p) => p.success).map((p) => p.data);

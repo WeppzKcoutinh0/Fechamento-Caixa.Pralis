@@ -93,6 +93,10 @@ export function useSessaoCaixa() {
     fundoValorMoedasContado?: number;
   }): Promise<SessaoCaixa | null> {
     erro.value = null;
+    if (!dados.lacreAbertura.trim()) {
+      erro.value = 'Informe o número do lacre para abrir o caixa.';
+      return null;
+    }
     const fundoConfirmado = dados.fundoConfirmado ?? null;
     const { data, error: erroSupabase } = await supabase
       .from('cash_sessions')

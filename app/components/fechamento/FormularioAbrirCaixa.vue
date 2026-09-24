@@ -44,6 +44,7 @@ watch(
 );
 const lacreAbertura = ref('');
 const maquininhaAbertura = ref('');
+const lacreValido = computed(() => lacreAbertura.value.trim().length > 0);
 
 // Conferência de fundo (pedido do usuário, 23/09/2026): ao sair do campo de lacre, busca a
 // transferência cadastrada na Tesouraria pra esse lacre e mostra o valor em notas/moedas que o
@@ -106,7 +107,13 @@ const MAQUININHAS_OPCOES: string[] = [
 ];
 
 async function confirmar(): Promise<void> {
-  if (!caixaSelecionado.value || !turnoSelecionado.value || conferenciaPendente.value) return;
+  if (
+    !caixaSelecionado.value ||
+    !turnoSelecionado.value ||
+    !lacreValido.value ||
+    conferenciaPendente.value
+  )
+    return;
   const resultado = await abrirSessao({
     caixa: caixaSelecionado.value,
     turno: turnoSelecionado.value,
@@ -148,6 +155,8 @@ async function confirmar(): Promise<void> {
         />
         <v-text-field
           v-model="lacreAbertura"
+          :rules="[(valor: string) => Boolean(valor?.trim()) || 'Informe o número do lacre.']"
+          required
           label="Transf. Entrada / N° Lacre"
           hint="Identifica o lacre do malote que trouxe o fundo ao caixa — se já estiver cadastrado na Tesouraria, o valor aparece sozinho em Transferências Automáticas. Não é o lacre usado no fechamento."
           persistent-hint
@@ -227,7 +236,7 @@ async function confirmar(): Promise<void> {
           color="primary"
           prepend-icon="mdi-point-of-sale"
           :loading="carregando"
-          :disabled="!caixaSelecionado || !turnoSelecionado || conferenciaPendente"
+          :disabled="!caixaSelecionado || !turnoSelecionado || !lacreValido || conferenciaPendente"
           @click="confirmar"
         >
           Abrir Caixa

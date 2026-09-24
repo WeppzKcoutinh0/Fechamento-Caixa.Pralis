@@ -3,11 +3,13 @@
 // Pralís, ver assets/main.css). Todo o conteúdo deste menu (grupos de navegação) é admin-only —
 // ver `grupos` abaixo — porque cada um desses destinos olha o histórico de TODOS os fechamentos,
 // não o do caixa de quem está logado:
-//   - ENTRADAS/TRANSFERENCIAS/SAIDAS abrem as telas de consulta por data/horário
-//     (pages/entradas.vue, transferencias.vue, saidas.vue).
+//   - TRANSFERENCIAS abre a tela de consulta por data/horário (pages/transferencias.vue).
 //   - HISTÓRICO é a lista de sessões/fechamentos de todo mundo (pages/historico.vue).
 //   - Sem "RESULTADOS" (removido a pedido do usuário, 18/09/2026) — apontava pro painel
 //     (`/`), redundante com simplesmente ir pra home.
+//   - Sem "ENTRADAS"/"SAÍDAS" (removido a pedido do usuário, 24/09/2026) — considerado sem
+//     necessidade; pages/entradas.vue e pages/saidas.vue também saíram (eram só um wrapper fino
+//     de ConsultaPorPeriodo.vue, que continua em uso por transferencias.vue).
 //   - Sem "+ NOVO FECHAMENTO" (removido a pedido do usuário, 18/09/2026) — a única forma de
 //     criar um fechamento agora é pelo fluxo de Abrir Caixa (`PainelCaixaOperacional.vue`).
 //   - Sem grupo "Configuração"/"Geral": não têm destino real ainda, e o usuário pediu pra tirar
@@ -73,13 +75,6 @@ const grupos = computed<GrupoNav[]>(() => {
   if (!isAdmin.value) return [];
   return [
     {
-      id: 'entradas',
-      label: 'Entradas',
-      to: '/entradas',
-      icone: 'mdi-arrow-bottom-left-thick',
-      cor: 'var(--cat-venda-base)',
-    },
-    {
       id: 'transferencias',
       label: 'Transferências',
       to: '/transferencias',
@@ -94,13 +89,6 @@ const grupos = computed<GrupoNav[]>(() => {
       to: '/cofres',
       icone: 'mdi-safe-square-outline',
       cor: 'var(--cx-brand)',
-    },
-    {
-      id: 'saidas',
-      label: 'Saídas',
-      to: '/saidas',
-      icone: 'mdi-arrow-top-right-thick',
-      cor: 'var(--cat-despesas-base)',
     },
     {
       id: 'historico',

@@ -47,6 +47,44 @@ const pendentes = computed(() => transferencias.value.filter((t) => !t.dataReceb
 const confirmadas = computed(() => transferencias.value.filter((t) => !!t.dataRecebimento));
 const notificacoesAbertas = ref(false);
 
+const CONTAS_CENTRAIS = new Set(['Cofre', 'Caixa Principal', 'Caixa de Troco', 'Fluxo']);
+
+function ehRetorno(t: TransferenciaTesouraria): boolean {
+  return (
+    t.transferenciaRetorno ||
+    t.lacre.toUpperCase().startsWith('RETORNO-') ||
+    /retorno|sangria/i.test(t.observacao)
+  );
+}
+
+function ehTransferenciaEntreContas(t: TransferenciaTesouraria): boolean {
+  return CONTAS_CENTRAIS.has(t.caixaOrigem) || CONTAS_CENTRAIS.has(t.caixaDestino);
+}
+
+const gruposTransferencias = computed(() => [
+  {
+    id: 'lacres',
+    titulo: 'Lacres criados pela Tesouraria',
+    descricao: 'Transferências cadastradas pela Tesouraria para abastecer ou movimentar os caixas.',
+    icone: 'mdi-ticket-confirmation-outline',
+    itens: confirmadas.value.filter((t) => !ehRetorno(t) && !ehTransferenciaEntreContas(t)),
+  },
+  {
+    id: 'retornos',
+    titulo: 'Retornos dos caixas para o Cofre Fluxo',
+    descricao: 'Valores devolvidos automaticamente pelos caixas após o fechamento.',
+    icone: 'mdi-backup-restore',
+    itens: confirmadas.value.filter(ehRetorno),
+  },
+  {
+    id: 'contas',
+    titulo: 'Transferências entre contas',
+    descricao: 'Movimentações entre Cofre Principal, Cofre Troco, Cofre Fluxo e outras contas.',
+    icone: 'mdi-swap-horizontal-bold',
+    itens: confirmadas.value.filter((t) => !ehRetorno(t) && ehTransferenciaEntreContas(t)),
+  },
+]);
+
 async function confirmarExclusao(): Promise<void> {
   if (!paraExcluir.value) return;
   await excluir(paraExcluir.value);
@@ -131,28 +169,48 @@ async function confirmarRecebimentoDe(id: string): Promise<void> {
         Nenhuma transferência confirmada ainda.
       </v-alert>
 
-      <div v-else class="d-flex flex-column ga-2">
-        <v-card v-for="t in confirmadas" :key="t.id" variant="outlined" rounded="lg" class="pa-4">
-          <div class="d-flex align-center flex-wrap ga-3">
-            <v-icon icon="mdi-check-circle" color="success" size="20" />
-            <strong>{{ t.caixaOrigem }} → {{ t.caixaDestino }}</strong>
-            <span class="text-caption text-medium-emphasis">Lacre {{ t.lacre }}</span>
-            <span class="text-caption text-medium-emphasis">{{ formatarDataBr(t.dataLanc) }}</span>
-            <v-spacer />
-            <strong>R$ {{ formatCents(t.valorCents) }}</strong>
-            <v-btn
-              size="small"
-              variant="text"
-              color="error"
-              icon="mdi-delete-outline"
-              @click="paraExcluir = t.id"
-            />
-          </div>
-          <p v-if="t.observacao" class="text-caption text-medium-emphasis mt-2 mb-0">
-            {{ t.observacao }}
-          </p>
-        </v-card>
-      </div>
+      <v-expansion-panels v-else variant="accordion" class="transferencia-grupos">
+        <v-expansion-panel v-for="grupo in gruposTransferencias" :key="grupo.id" rounded="lg">
+          <v-expansion-panel-title>
+            <v-icon :icon="grupo.icone" color="primary" class="mr-3" />
+            <div class="flex-grow-1">
+              <strong>{{ grupo.titulo }}</strong>
+              <div class="text-caption text-medium-emphasis">{{ grupo.descricao }}</div>
+            </div>
+            <v-chip size="small" variant="tonal" color="primary" class="mr-2">
+              {{ grupo.itens.length }}
+            </v-chip>
+          </v-expansion-panel-title>
+          <v-expansion-panel-text>
+            <v-alert v-if="!grupo.itens.length" type="info" variant="tonal" density="compact">
+              Nenhum registro nesta categoria.
+            </v-alert>
+            <div v-else class="d-flex flex-column ga-2">
+              <v-card v-for="t in grupo.itens" :key="t.id" variant="outlined" rounded="lg" class="pa-4">
+                <div class="d-flex align-center flex-wrap ga-3">
+                  <v-icon icon="mdi-check-circle" color="success" size="20" />
+                  <strong>{{ t.caixaOrigem }} → {{ t.caixaDestino }}</strong>
+                  <span class="text-caption text-medium-emphasis">Lacre {{ t.lacre }}</span>
+                  <span class="text-caption text-medium-emphasis">{{ formatarDataBr(t.dataLanc) }}</span>
+                  <v-spacer />
+                  <strong>R$ {{ formatCents(t.valorCents) }}</strong>
+                  <v-btn
+                    size="small"
+                    variant="text"
+                    color="error"
+                    icon="mdi-delete-outline"
+                    aria-label="Excluir transferência"
+                    @click="paraExcluir = t.id"
+                  />
+                </div>
+                <p v-if="t.observacao" class="text-caption text-medium-emphasis mt-2 mb-0">
+                  {{ t.observacao }}
+                </p>
+              </v-card>
+            </div>
+          </v-expansion-panel-text>
+        </v-expansion-panel>
+      </v-expansion-panels>
     </div>
 
     <v-divider v-if="isAdmin" class="mb-8" />

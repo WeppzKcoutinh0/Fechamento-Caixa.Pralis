@@ -32,14 +32,12 @@ export function gerarPdfVendasCanceladas(draft: FechamentoDraft, itens: VendaCan
 
   pdf.secao(`Itens cancelados (${itens.length})`);
   if (itens.length === 0) {
-    pdf.vazio(
-      'Vendas canceladas ainda não são enviadas pelo robô de vendas — nenhum item disponível.',
-    );
+    pdf.vazio(`Nenhum item cancelado sincronizado para ${formatarDataBr(draft.data)}.`);
   } else {
     for (const item of itens) {
       pdf.linha(
-        `${item.produto}${item.horario ? ` — ${item.horario}` : ''} (qtd. ${item.quantidade})`,
-        `R$ ${formatCents(item.valorCents)}`,
+        `${item.produto} (qtd. ${item.quantidade})`,
+        `R$ ${formatCents(item.totalCents)}`,
       );
     }
   }

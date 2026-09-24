@@ -62,5 +62,10 @@ export function useFluxoLancamentos() {
     if (error) throw error;
   }
 
-  return { listar, criar, editar };
+  async function excluir(id: string): Promise<void> {
+    const { error } = await supabase.from('fluxo_lancamentos').delete().eq('id', id);
+    if (error) throw error;
+  }
+
+  return { listar, criar, editar, excluir };
 }

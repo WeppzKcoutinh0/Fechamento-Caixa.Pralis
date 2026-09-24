@@ -54,6 +54,11 @@ export const linhaVendaProdutoDiaSchema = z.object({
   QUANTIDADE: valorLivre,
   VALOR_UNITARIO: valorLivre,
   TOTAL: valorLivre,
+  // 'F' (finalizada) ou 'C' (cancelada) — pedido do usuário, 24/09/2026, ver
+  // integracoes-scripts/queries/VENDAS_PRODUTOS.sql. Ausente = planilha antiga sem essa coluna
+  // ainda (bot_padaria_v3 em produção não manda por enquanto) — trata como finalizada, mesmo
+  // comportamento de sempre.
+  TIPO: valorLivre,
   EMPRESA: textoObrigatorio,
   ATUALIZADO_EM: valorLivre,
   HASH: textoObrigatorio,

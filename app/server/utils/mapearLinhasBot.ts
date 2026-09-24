@@ -58,6 +58,9 @@ export function mapearVendaProdutoDia(linha: LinhaVendaProdutoDia) {
     quantidade: parseNumeroBot(linha.QUANTIDADE),
     valor_unitario: parseNumeroBot(linha.VALOR_UNITARIO),
     total: parseNumeroBot(linha.TOTAL),
+    // 'C' só quando a origem manda exatamente isso — qualquer outra coisa (ausente, 'F', lixo) é
+    // finalizada, mesmo default da coluna no banco (ver migration 20260924100000).
+    tipo: linha.TIPO === 'C' ? 'C' : 'F',
     atualizado_em_origem: parseDataHoraBot(linha.ATUALIZADO_EM),
   };
 }

@@ -27,11 +27,11 @@ export function textoWhatsappVendasCanceladas(
     `*Itens cancelados (${itens.length}):*`,
   ];
   if (itens.length === 0) {
-    linhas.push('Vendas canceladas ainda não são enviadas pelo robô de vendas.');
+    linhas.push('Nenhum item cancelado sincronizado para esta data.');
   } else {
     for (const item of itens) {
       linhas.push(
-        `- ${item.produto}${item.horario ? ` (${item.horario})` : ''} — qtd. ${item.quantidade} — R$ ${formatCents(item.valorCents)}`,
+        `- ${item.produto} — qtd. ${item.quantidade} — R$ ${formatCents(item.totalCents)}`,
       );
     }
   }

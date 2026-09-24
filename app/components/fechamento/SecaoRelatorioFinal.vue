@@ -117,13 +117,13 @@ function formatarQtd(qtd: number): string {
   return qtd.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
 }
 
-// Vendas/Produtos Cancelados (pedido do usuário, 23/09/2026) — CENÁRIO: mesmo padrão de
-// carregamento sob demanda de "Produtos vendidos no dia" acima, mas useVendasCanceladas ainda
-// sempre devolve vazio (ver o composable) até o robô de vendas ser adaptado.
+// Vendas/Produtos Cancelados (pedido do usuário, 23/09/2026, ligado de vez em 24/09/2026) —
+// mesmo padrão de carregamento sob demanda de "Produtos vendidos no dia" acima; useVendasCanceladas
+// já busca de verdade (tipo='C' em vendas_produto_dia, ver o composable).
 const {
   carregando: carregandoCancelados,
+  erro: erroCancelados,
   itens: itensCancelados,
-  disponivel: canceladosDisponivel,
   buscarPorData: buscarCancelados,
 } = useVendasCanceladas();
 const canceladosJaBuscados = ref(false);
@@ -133,7 +133,7 @@ async function aoAbrirCancelados(): Promise<void> {
   await buscarCancelados(props.draft.data);
 }
 const totalCanceladosCents = computed(() =>
-  itensCancelados.value.reduce((soma, i) => soma + i.valorCents, 0),
+  itensCancelados.value.reduce((soma, i) => soma + i.totalCents, 0),
 );
 function baixarPdfCancelados(): void {
   baixarPdfVendasCanceladas(props.draft, itensCancelados.value);
@@ -428,9 +428,8 @@ const CAT_VARS = {
           <div v-if="carregandoCancelados" class="d-flex justify-center py-4">
             <v-progress-circular indeterminate color="primary" size="24" />
           </div>
-          <v-alert v-else-if="!canceladosDisponivel" type="info" variant="tonal" density="comfortable">
-            Vendas canceladas ainda não são enviadas pelo robô de vendas. Assim que estiver
-            disponível, essa lista passa a trazer os dados automaticamente.
+          <v-alert v-else-if="erroCancelados" type="error" variant="tonal" density="comfortable">
+            {{ erroCancelados }}
           </v-alert>
           <v-alert
             v-else-if="!itensCancelados.length"
@@ -449,7 +448,7 @@ const CAT_VARS = {
               <span class="text-medium-emphasis"
                 >{{ item.produto }} ({{ formatarQtd(item.quantidade) }})</span
               >
-              <strong>R$ {{ formatCents(item.valorCents) }}</strong>
+              <strong>R$ {{ formatCents(item.totalCents) }}</strong>
             </div>
           </div>
 

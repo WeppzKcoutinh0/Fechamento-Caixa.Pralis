@@ -1,35 +1,31 @@
 import { ref } from 'vue';
+import { buscarVendasProdutoDiaPorTipo, type VendaProdutoDia } from './useVendasProdutoDia';
 
-export interface VendaCancelada {
-  produto: string;
-  quantidade: number;
-  valorCents: number;
-  horario: string | null;
-}
+export type VendaCancelada = VendaProdutoDia;
 
 /**
- * Vendas/produtos cancelados — CENÁRIO (pedido do usuário, 23/09/2026): o robô de vendas
- * (CREARE/Compliart) hoje só envia vendas com STATUS='F' (finalizada) — ver
- * integracoes-scripts/queries/FECHAMENTO_CAIXA.sql — então não existe fonte de dados real pra
- * vendas canceladas ainda. `buscarPorData` sempre devolve uma lista vazia com `disponivel: false`
- * até o robô ser adaptado (o usuário avisa quando estiver pronto); quando isso acontecer, troca-se
- * só a implementação aqui por uma leitura real (mesmo padrão de useVendasProdutoDia.ts), sem
- * precisar mudar nenhum componente que já consome este composable.
+ * Produtos cancelados do dia, de `vendas_produto_dia` filtrando `tipo='C'` (pedido do usuário,
+ * 24/09/2026 — o robô CREARE/Compliart passou a mandar isso, ver
+ * integracoes-scripts/queries/VENDAS_PRODUTOS.sql). Mesma busca de `useVendasProdutoDia.ts`
+ * (`buscarVendasProdutoDiaPorTipo`), só filtrando o outro tipo — loja inteira, não por caixa,
+ * mesma limitação de sempre (a tabela não tem coluna de caixa/turno).
  */
 export function useVendasCanceladas() {
   const carregando = ref(false);
+  const erro = ref<string | null>(null);
   const itens = ref<VendaCancelada[]>([]);
-  const disponivel = ref(false);
 
-  async function buscarPorData(_data: string): Promise<void> {
+  async function buscarPorData(data: string): Promise<void> {
     carregando.value = true;
+    erro.value = null;
     try {
-      itens.value = [];
-      disponivel.value = false;
+      itens.value = await buscarVendasProdutoDiaPorTipo(data, 'C');
+    } catch (e) {
+      erro.value = e instanceof Error ? e.message : 'Não foi possível buscar os produtos cancelados.';
     } finally {
       carregando.value = false;
     }
   }
 
-  return { carregando, itens, disponivel, buscarPorData };
+  return { carregando, erro, itens, buscarPorData };
 }

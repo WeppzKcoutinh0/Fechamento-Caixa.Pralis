@@ -242,11 +242,10 @@ export interface FechamentoDraft {
   // Seção 5
   discriminacoes: DiscriminacaoDraft[];
 
-  // Seção 5 — Vendas/Produtos Cancelados (pedido do usuário, 23/09/2026). CENÁRIO: o robô de
-  // vendas (CREARE/Compliart) ainda não envia vendas canceladas (só as com STATUS='F' — ver
-  // integracoes-scripts/queries/FECHAMENTO_CAIXA.sql), então só o motivo (texto ou áudio) é
-  // real/persistido hoje; a lista de itens cancelados (useVendasCanceladas.ts) fica vazia até o
-  // robô ser adaptado — trocar só a implementação do composable, sem mudar esses campos.
+  // Seção 5 — Vendas/Produtos Cancelados (pedido do usuário, 23/09/2026, ligado de vez em
+  // 24/09/2026: o robô de vendas passou a mandar itens cancelados, tipo='C' em
+  // vendas_produto_dia — ver useVendasCanceladas.ts). Motivo (texto ou áudio) continua sendo
+  // digitado/gravado manualmente pelo operador, independente do robô.
   vendasCanceladasMotivoTipo: 'texto' | 'audio';
   vendasCanceladasMotivoTexto: string;
   vendasCanceladasMotivoAudioPath: string | null;

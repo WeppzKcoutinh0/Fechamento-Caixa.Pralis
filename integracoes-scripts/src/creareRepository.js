@@ -99,6 +99,9 @@ export function montarLinhaVendaProduto(row, { empresa, agora }) {
     QUANTIDADE: numero(row.QUANTIDADE),
     VALOR_UNITARIO: numero(row.VALOR_UNITARIO),
     TOTAL: numero(row.TOTAL),
+    // 'F' (finalizada) ou 'C' (cancelada) — vem de VENDAS_PRODUTOS.sql (join com venda_balcao).
+    // NÃO entra no HASH abaixo de propósito, ver comentário no .sql.
+    TIPO: row.TIPO === 'C' ? 'C' : 'F',
     EMPRESA: empresa,
     ATUALIZADO_EM: agora,
   };

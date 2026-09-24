@@ -170,10 +170,14 @@ export async function processarImportacao(
             .from('vendas_produto_dia')
             .upsert(linhas, { onConflict: 'hash', count: 'exact' });
           if (!error) {
+            // `tipo` entra na chave (pedido do usuário, 24/09/2026): um produto pode ter um
+            // agregado 'F' (finalizada) e um 'C' (cancelada) no mesmo dia — são coisas
+            // DIFERENTES, não snapshots um do outro. Sem isso, esta limpeza apagaria um dos
+            // dois achando que era uma versão desatualizada do mesmo produto.
             await limparSnapshotsSuperados(
               supabase,
               'vendas_produto_dia',
-              ['produto_codigo', 'produto'],
+              ['produto_codigo', 'produto', 'tipo'],
               linhas,
             );
           }

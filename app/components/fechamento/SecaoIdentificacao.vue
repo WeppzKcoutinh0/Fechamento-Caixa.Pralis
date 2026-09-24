@@ -133,14 +133,13 @@ async function sincronizarAgora() {
   }
 }
 
-// Vendas canceladas (pedido do usuário, 23/09/2026) — CENÁRIO: mesmo botão espelhado de "Buscar
-// vendas", mas o robô ainda não envia vendas canceladas (ver useVendasCanceladas.ts). Por
-// enquanto sempre mostra o aviso de "ainda não disponível" — assim que o robô for adaptado, o
-// composable passa a devolver dados reais sem precisar mudar nada aqui.
+// Vendas canceladas (pedido do usuário, 23/09/2026, ligado de vez em 24/09/2026): mesmo botão
+// espelhado de "Buscar vendas" — o robô já manda os itens cancelados (tipo='C' em
+// vendas_produto_dia), ver useVendasCanceladas.ts.
 const {
   carregando: buscandoCanceladas,
+  erro: erroCanceladas,
   itens: vendasCanceladas,
-  disponivel: vendasCanceladasDisponivel,
   buscarPorData: buscarVendasCanceladasBase,
 } = useVendasCanceladas();
 const jaBuscouCanceladas = ref(false);
@@ -265,10 +264,8 @@ const ajustesPresentes = computed(() => {
       </div>
 
       <template v-if="jaBuscouCanceladas && !buscandoCanceladas">
-        <v-alert v-if="!vendasCanceladasDisponivel" type="info" variant="tonal" density="comfortable">
-          Vendas canceladas ainda não são enviadas pelo robô de vendas. Assim que estiver
-          disponível, essa busca passa a trazer os dados automaticamente — sem precisar mudar nada
-          aqui.
+        <v-alert v-if="erroCanceladas" type="error" variant="tonal" density="comfortable">
+          {{ erroCanceladas }}
         </v-alert>
         <v-alert
           v-else-if="!vendasCanceladas.length"

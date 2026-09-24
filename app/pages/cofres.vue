@@ -28,6 +28,7 @@ import { formatCents } from '~/utils/financeiro';
 import { formatarDataBr } from '~/utils/vendasFechamento';
 import AppCabecalhoTela from '~/components/app/AppCabecalhoTela.vue';
 import { useSupabase } from '~/composables/useSupabase';
+import ConfirmacaoDialog from '~/components/comum/ConfirmacaoDialog.vue';
 
 definePageMeta({ middleware: ['admin'] });
 
@@ -49,8 +50,19 @@ const NOME_COFRE: Record<CofreCentral, string> = {
   Fluxo: 'Cofre Fluxo',
 };
 
-const { listar, confirmarRecebimento, criar, editar: editarTransferencia } = useTransferenciasTesouraria();
-const { listar: listarFluxo, criar: criarFluxo, editar: editarFluxo } = useFluxoLancamentos();
+const {
+  listar,
+  confirmarRecebimento,
+  criar,
+  editar: editarTransferencia,
+  excluir: excluirTransferencia,
+} = useTransferenciasTesouraria();
+const {
+  listar: listarFluxo,
+  criar: criarFluxo,
+  editar: editarFluxo,
+  excluir: excluirFluxo,
+} = useFluxoLancamentos();
 const { listar: listarNotas, adicionar: adicionarNota, remover: removerNota } = useCofreNotas();
 const supabase = useSupabase();
 
@@ -356,6 +368,10 @@ const editorOrigem = ref<CaixaOuCofre>('Cofre');
 const editorDestino = ref<CaixaOuCofre>('Fluxo');
 const editorObservacao = ref('');
 const salvandoEdicao = ref(false);
+const exclusaoAberta = ref(false);
+const exclusaoTipo = ref<'fluxo' | 'transferencia'>('fluxo');
+const exclusaoId = ref<string | null>(null);
+const excluindo = ref(false);
 
 function abrirEdicaoFluxo(lancamento: FluxoLancamento): void {
   editorTipo.value = 'fluxo';
@@ -404,6 +420,34 @@ async function salvarEdicaoCofre(): Promise<void> {
     erro.value = e instanceof Error ? e.message : 'Não foi possível editar o lançamento.';
   } finally {
     salvandoEdicao.value = false;
+  }
+}
+
+function pedirExclusaoFluxo(id: string): void {
+  exclusaoTipo.value = 'fluxo';
+  exclusaoId.value = id;
+  exclusaoAberta.value = true;
+}
+
+function pedirExclusaoTransferencia(id: string): void {
+  exclusaoTipo.value = 'transferencia';
+  exclusaoId.value = id;
+  exclusaoAberta.value = true;
+}
+
+async function confirmarExclusaoCofre(): Promise<void> {
+  if (!exclusaoId.value) return;
+  excluindo.value = true;
+  try {
+    if (exclusaoTipo.value === 'fluxo') await excluirFluxo(exclusaoId.value);
+    else await excluirTransferencia(exclusaoId.value);
+    exclusaoAberta.value = false;
+    exclusaoId.value = null;
+    await carregar(false);
+  } catch (e) {
+    erro.value = e instanceof Error ? e.message : 'Não foi possível excluir a movimentação.';
+  } finally {
+    excluindo.value = false;
   }
 }
 </script>
@@ -634,6 +678,14 @@ async function salvarEdicaoCofre(): Promise<void> {
               <v-spacer />
               <strong class="text-caption">R$ {{ formatCents(t.valorCents) }}</strong>
               <v-btn
+                icon="mdi-delete-outline"
+                size="x-small"
+                variant="text"
+                color="error"
+                aria-label="Excluir movimentação"
+                @click="pedirExclusaoTransferencia(t.id)"
+              />
+              <v-btn
                 icon="mdi-pencil-outline"
                 size="x-small"
                 variant="text"
@@ -653,6 +705,14 @@ async function salvarEdicaoCofre(): Promise<void> {
                 <span class="text-caption text-medium-emphasis">{{ formatarDataBr(l.data) }}</span>
                 <v-spacer />
                 <strong class="text-caption">R$ {{ formatCents(l.valorCents) }}</strong>
+                <v-btn
+                  icon="mdi-delete-outline"
+                  size="x-small"
+                  variant="text"
+                  color="error"
+                  aria-label="Excluir lançamento"
+                  @click="pedirExclusaoFluxo(l.id)"
+                />
                 <v-btn
                   icon="mdi-pencil-outline"
                   size="x-small"
@@ -715,6 +775,15 @@ async function salvarEdicaoCofre(): Promise<void> {
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <ConfirmacaoDialog
+      :model-value="exclusaoAberta"
+      titulo="Excluir movimentação do cofre?"
+      mensagem="Esta movimentação será removida e o saldo será recalculado. Esta ação não pode ser desfeita."
+      texto-confirmar="Excluir"
+      @update:model-value="exclusaoAberta = false"
+      @confirmar="confirmarExclusaoCofre"
+    />
   </v-container>
 </template>
 

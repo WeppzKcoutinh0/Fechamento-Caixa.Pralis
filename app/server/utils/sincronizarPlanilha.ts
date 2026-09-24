@@ -78,12 +78,35 @@ export async function sincronizarPlanilhaCreare(): Promise<ResumoSincronizacaoPl
   const empresa = config.empresaPralis;
   const colunaInicial = config.planilhaColunaInicial || 'F';
 
-  const todasFechamento = await lerAbaPlanilha({
-    credenciaisJson: config.googleServiceAccountJson,
-    spreadsheetId: config.googleSpreadsheetId,
-    aba: 'FECHAMENTOS_CAIXAS',
-    colunaInicial,
-  });
+  // As 3 leituras da planilha são independentes entre si — disparadas em paralelo (25/09/2026,
+  // achado real: a 3ª leitura, VENDAS_TIPOS, sequencial depois das outras duas, estourou o
+  // timeout de 60s da Vercel). `Promise.all` sobrepõe as 3 idas à rede numa só janela de tempo em
+  // vez de somá-las uma atrás da outra.
+  const [todasFechamento, todosProdutos, todosTipos] = await Promise.all([
+    lerAbaPlanilha({
+      credenciaisJson: config.googleServiceAccountJson,
+      spreadsheetId: config.googleSpreadsheetId,
+      aba: 'FECHAMENTOS_CAIXAS',
+      colunaInicial,
+    }),
+    config.sincronizarProdutos
+      ? lerAbaPlanilha({
+          credenciaisJson: config.googleServiceAccountJson,
+          spreadsheetId: config.googleSpreadsheetIdSecundario || config.googleSpreadsheetId,
+          aba: 'VENDAS_PRODUTOS',
+          colunaInicial,
+        })
+      : Promise.resolve([]),
+    config.sincronizarProdutos
+      ? lerAbaPlanilha({
+          credenciaisJson: config.googleServiceAccountJson,
+          spreadsheetId: config.googleSpreadsheetId,
+          aba: 'VENDAS_TIPOS',
+          colunaInicial,
+        })
+      : Promise.resolve([]),
+  ]);
+
   const linhasFechamentoBrutas = filtrarPorJanelaRecente(
     filtrarPorEmpresa(todasFechamento, empresa),
     JANELA_DIAS,
@@ -109,12 +132,6 @@ export async function sincronizarPlanilhaCreare(): Promise<ResumoSincronizacaoPl
   let produtosInvalidas = 0;
   let produtosNaPlanilha = 0;
   if (config.sincronizarProdutos) {
-    const todosProdutos = await lerAbaPlanilha({
-      credenciaisJson: config.googleServiceAccountJson,
-      spreadsheetId: config.googleSpreadsheetIdSecundario || config.googleSpreadsheetId,
-      aba: 'VENDAS_PRODUTOS',
-      colunaInicial,
-    });
     const linhasProdutosBrutas = filtrarPorJanelaRecente(
       filtrarPorEmpresa(todosProdutos, empresa),
       JANELA_DIAS_PRODUTOS,
@@ -135,12 +152,6 @@ export async function sincronizarPlanilhaCreare(): Promise<ResumoSincronizacaoPl
     // PRIMÁRIA (não tem essa aba na secundária). Só TIPO='CANCELADA' interessa aqui (a aba também
     // tem 'CREDIARIO', assunto de outra tela). Mesma flag/janela de VENDAS_PRODUTOS porque
     // alimenta a mesma pergunta ("Buscar vendas canceladas" no Relatório Final).
-    const todosTipos = await lerAbaPlanilha({
-      credenciaisJson: config.googleServiceAccountJson,
-      spreadsheetId: config.googleSpreadsheetId,
-      aba: 'VENDAS_TIPOS',
-      colunaInicial,
-    });
     const canceladosNaJanela = filtrarPorJanelaRecente(
       agregarCanceladosPorProdutoDia(todosTipos, empresa),
       JANELA_DIAS_PRODUTOS,

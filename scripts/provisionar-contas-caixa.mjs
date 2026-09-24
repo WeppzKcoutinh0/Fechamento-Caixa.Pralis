@@ -1,44 +1,35 @@
-// Provisiona as contas reais do "Fluxo de Caixa" (pedido do usuário, 18/09/2026 — ver TASKS.md).
-// Cria as 8 contas operacionais (Caixa 1-4 × Manhã/Tarde) via Supabase Auth Admin API + o profile
+// Provisiona as contas reais do "Fluxo de Caixa" (pedido do usuário, 18/09/2026, credenciais
+// simplificadas a pedido do usuário em 24/09/2026 — Caixa 5 novo, operado pelo gerente de manhã).
+// Cria as 10 contas operacionais (Caixa 1-5 × Manhã/Tarde) via Supabase Auth Admin API + o profile
 // de cada uma (role='caixa', caixa_padrao/turno_padrao travados), e garante o profile
-// role='admin' pra rodrigo@cicluz.com.br (única conta real já existente).
+// role='admin' pra rodrigo@cicluz.com.br (única conta real já existente, NUNCA mexida aqui).
 //
 // Roda uma vez só, manualmente: `node scripts/provisionar-contas-caixa.mjs`. Idempotente — pode
 // rodar de novo sem duplicar (usa a conta/profile existente se já houver).
 //
-// Sem senha nenhuma no código-fonte (pedido explícito do usuário) — lidas de env var na hora de
-// rodar:
+// Credenciais fixas de propósito (pedido explícito do usuário: simples e fáceis de repassar pra
+// equipe, não segredos de alta entropia) — únicas variáveis de ambiente exigidas são as de acesso
+// ao próprio Supabase:
 //   SUPABASE_URL=https://<projeto>.supabase.co
 //   SUPABASE_SERVICE_ROLE_KEY=...
-//   CX_SENHA_MANHA=...   (senha inicial compartilhada das 4 contas de manhã)
-//   CX_SENHA_TARDE=...   (senha inicial compartilhada das 4 contas de tarde)
-//
-// Este arquivo em si não contém nenhum segredo e pode ir pro git — só os valores das env vars na
-// hora de executar ficam de fora.
 
 const SUPABASE_URL = obterObrigatoria('SUPABASE_URL');
 const SERVICE_KEY = obterObrigatoria('SUPABASE_SERVICE_ROLE_KEY');
-const SENHA_MANHA = obterObrigatoria('CX_SENHA_MANHA');
-const SENHA_TARDE = obterObrigatoria('CX_SENHA_TARDE');
 
 const ADMIN_EMAIL = 'rodrigo@cicluz.com.br';
 
-const CONTAS_CAIXA = [1, 2, 3, 4].flatMap((numero) => [
-  {
-    email: `caixa${numero}.manha@fechamentocaixa.local`,
-    senha: SENHA_MANHA,
-    nome: `Caixa ${numero} Manhã`,
-    caixaPadrao: `Caixa ${numero}`,
-    turnoPadrao: 'Manhã',
-  },
-  {
-    email: `caixa${numero}.tarde@fechamentocaixa.local`,
-    senha: SENHA_TARDE,
-    nome: `Caixa ${numero} Tarde`,
-    caixaPadrao: `Caixa ${numero}`,
-    turnoPadrao: 'Tarde',
-  },
-]);
+const CONTAS_CAIXA = [
+  { email: 'caixa1mtnp@fechamentocaixa.local', senha: 'caixaM1@', nome: 'Caixa 1 - Manhã', caixaPadrao: 'Caixa 1', turnoPadrao: 'Manhã' },
+  { email: 'caixa2mtnp@fechamentocaixa.local', senha: 'caixaM2@', nome: 'Caixa 2 - Manhã', caixaPadrao: 'Caixa 2', turnoPadrao: 'Manhã' },
+  { email: 'caixa3mtnp@fechamentocaixa.local', senha: 'caixaM3@', nome: 'Caixa 3 - Manhã', caixaPadrao: 'Caixa 3', turnoPadrao: 'Manhã' },
+  { email: 'caixa4mtnp@fechamentocaixa.local', senha: 'caixaM4@', nome: 'Caixa 4 - Manhã', caixaPadrao: 'Caixa 4', turnoPadrao: 'Manhã' },
+  { email: 'caixa5gtnp@fechamentocaixa.local', senha: 'caixa5GM@', nome: 'Caixa 5 - Gerente (Manhã)', caixaPadrao: 'Caixa 5', turnoPadrao: 'Manhã' },
+  { email: 'caixa1ttnp@fechamentocaixa.local', senha: 'caixaT1@', nome: 'Caixa 1 - Tarde', caixaPadrao: 'Caixa 1', turnoPadrao: 'Tarde' },
+  { email: 'caixa2ttnp@fechamentocaixa.local', senha: 'caixaT2@', nome: 'Caixa 2 - Tarde', caixaPadrao: 'Caixa 2', turnoPadrao: 'Tarde' },
+  { email: 'caixa3ttnp@fechamentocaixa.local', senha: 'caixaT3@', nome: 'Caixa 3 - Tarde', caixaPadrao: 'Caixa 3', turnoPadrao: 'Tarde' },
+  { email: 'caixa4ttnp@fechamentocaixa.local', senha: 'caixaT4@', nome: 'Caixa 4 - Tarde', caixaPadrao: 'Caixa 4', turnoPadrao: 'Tarde' },
+  { email: 'caixa5ttnp@fechamentocaixa.local', senha: 'caixa5GT@', nome: 'Caixa 5 - Tarde', caixaPadrao: 'Caixa 5', turnoPadrao: 'Tarde' },
+];
 
 function obterObrigatoria(nome) {
   const valor = process.env[nome]?.trim();

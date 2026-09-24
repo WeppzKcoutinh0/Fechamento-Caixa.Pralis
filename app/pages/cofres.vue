@@ -8,7 +8,7 @@
 // — não existe campo de saldo gravado em lugar nenhum, mesmo espírito de nunca confiar num campo
 // espelho já documentado em useFechamentos.ts.
 import { computed, onMounted, ref } from 'vue';
-import { hojeISO } from '~/types/fechamento';
+import { CAIXAS, hojeISO } from '~/types/fechamento';
 import {
   useTransferenciasTesouraria,
   COFRES_CENTRAIS,
@@ -135,7 +135,7 @@ function movimentacoesDoFluxo(): TransferenciaTesouraria[] {
   return transferencias.value
     .filter(
       (t) =>
-        /^Caixa [1-4]$/.test(t.caixaOrigem) &&
+        (CAIXAS as readonly string[]).includes(t.caixaOrigem) &&
         (t.transferenciaRetorno ||
           t.lacre.toUpperCase().startsWith('RETORNO-') ||
           /retorno|sangria/i.test(t.observacao)),
@@ -341,16 +341,7 @@ async function registrarLancamentoFluxo(): Promise<void> {
     salvandoFluxo.value = false;
   }
 }
-const OPCOES_COFRE_EDIT: CaixaOuCofre[] = [
-  'Cofre',
-  'Caixa Principal',
-  'Caixa de Troco',
-  'Fluxo',
-  'Caixa 1',
-  'Caixa 2',
-  'Caixa 3',
-  'Caixa 4',
-];
+const OPCOES_COFRE_EDIT: CaixaOuCofre[] = ['Cofre', 'Caixa Principal', 'Caixa de Troco', 'Fluxo', ...CAIXAS];
 function rotuloCofreEdit(valor: CaixaOuCofre): string {
   if (valor === 'Caixa Principal') return 'Cofre Principal';
   if (valor === 'Caixa de Troco') return 'Cofre Troco';

@@ -5,7 +5,9 @@
  * só na hora de chamar `salvar_fechamento`.
  */
 
-export const CAIXAS = ['Caixa 1', 'Caixa 2', 'Caixa 3', 'Caixa 4'] as const;
+// Caixa 5 (pedido do usuário, 24/09/2026) — operado pelo gerente no turno da manhã, e como um
+// caixa normal no turno da tarde. Mesmo tratamento dos outros 4 em todo o resto do app.
+export const CAIXAS = ['Caixa 1', 'Caixa 2', 'Caixa 3', 'Caixa 4', 'Caixa 5'] as const;
 export type Caixa = (typeof CAIXAS)[number];
 
 export const TURNOS = ['Manhã', 'Tarde'] as const;

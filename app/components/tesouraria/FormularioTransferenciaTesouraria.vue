@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { hojeISO } from '~/types/fechamento';
+import { CAIXAS, hojeISO } from '~/types/fechamento';
 import { formatarDataBr } from '~/utils/vendasFechamento';
 import {
   useTransferenciasTesouraria,
@@ -14,16 +14,7 @@ const emit = defineEmits<{ criada: [] }>();
 
 const { criar } = useTransferenciasTesouraria();
 
-const OPCOES_CAIXA: CaixaOuCofre[] = [
-  'Cofre',
-  'Caixa Principal',
-  'Caixa de Troco',
-  'Fluxo',
-  'Caixa 1',
-  'Caixa 2',
-  'Caixa 3',
-  'Caixa 4',
-];
+const OPCOES_CAIXA: CaixaOuCofre[] = ['Cofre', 'Caixa Principal', 'Caixa de Troco', 'Fluxo', ...CAIXAS];
 
 function rotuloCaixa(valor: CaixaOuCofre): string {
   if (valor === 'Caixa Principal') return 'Cofre Principal';

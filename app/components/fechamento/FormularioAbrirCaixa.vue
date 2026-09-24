@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import type { Caixa, Turno } from '~/types/fechamento';
-import { hojeISO } from '~/types/fechamento';
+import { CAIXAS, hojeISO } from '~/types/fechamento';
 import { formatCents } from '~/utils/financeiro';
 import { formatarDataBr } from '~/utils/vendasFechamento';
 import { usePerfil } from '~/composables/usePerfil';
@@ -92,7 +92,6 @@ const conferenciaPendente = computed(
   () => !!transferenciaEncontrada.value && fundoConfirmado.value === null,
 );
 
-const CAIXAS_OPCOES = ['Caixa 1', 'Caixa 2', 'Caixa 3', 'Caixa 4'] as const;
 const TURNOS_OPCOES = ['Manhã', 'Tarde'] as const;
 
 // Enum fixo das 5 maquininhas físicas da loja (pedido do usuário, 22/09/2026) — só visual/
@@ -133,7 +132,7 @@ async function confirmar(): Promise<void> {
       <v-card-text class="d-flex flex-column ga-4">
         <v-select
           v-model="caixaSelecionado"
-          :items="[...CAIXAS_OPCOES]"
+          :items="[...CAIXAS]"
           label="Ponto de Venda"
           :readonly="caixaTravado"
           :hint="caixaTravado ? 'Travado — esta conta é dedicada a este caixa.' : undefined"

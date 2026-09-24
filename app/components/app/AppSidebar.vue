@@ -3,13 +3,16 @@
 // Pralís, ver assets/main.css). Todo o conteúdo deste menu (grupos de navegação) é admin-only —
 // ver `grupos` abaixo — porque cada um desses destinos olha o histórico de TODOS os fechamentos,
 // não o do caixa de quem está logado:
-//   - TRANSFERENCIAS abre a tela de consulta por data/horário (pages/transferencias.vue).
+//   - TRANSFERENCIAS abre a tela da Tesouraria (pages/transferencias.vue).
 //   - HISTÓRICO é a lista de sessões/fechamentos de todo mundo (pages/historico.vue).
 //   - Sem "RESULTADOS" (removido a pedido do usuário, 18/09/2026) — apontava pro painel
 //     (`/`), redundante com simplesmente ir pra home.
 //   - Sem "ENTRADAS"/"SAÍDAS" (removido a pedido do usuário, 24/09/2026) — considerado sem
 //     necessidade; pages/entradas.vue e pages/saidas.vue também saíram (eram só um wrapper fino
-//     de ConsultaPorPeriodo.vue, que continua em uso por transferencias.vue).
+//     de ConsultaPorPeriodo.vue). A consulta por período de transferências (24/09/2026, mesmo
+//     pedido) também saiu de pages/transferencias.vue — só a parte de Tesouraria (lacres/
+//     retornos/transferências entre contas) ficou —, então ConsultaPorPeriodo.vue não tem mais
+//     nenhum uso e foi removido junto.
 //   - Sem "+ NOVO FECHAMENTO" (removido a pedido do usuário, 18/09/2026) — a única forma de
 //     criar um fechamento agora é pelo fluxo de Abrir Caixa (`PainelCaixaOperacional.vue`).
 //   - Sem grupo "Configuração"/"Geral": não têm destino real ainda, e o usuário pediu pra tirar
@@ -53,8 +56,8 @@ interface GrupoNav {
   cor: string;
 }
 
-// Mesmo ícone usado no cabeçalho de cada tela de consulta (ConsultaPorPeriodo) — o menu recolhido
-// (rail) só mostra o ícone, então ele precisa já dizer sozinho do que se trata.
+// Mesmo ícone usado no cabeçalho de cada tela de destino — o menu recolhido (rail) só mostra o
+// ícone, então ele precisa já dizer sozinho do que se trata.
 //
 // Fluxo de Caixa (18/09/2026, atualizado por pedido do usuário): uma conta CAIXA só faz uma
 // coisa neste app — abrir o próprio caixa e preencher o fechamento dele (fluxo todo dentro de

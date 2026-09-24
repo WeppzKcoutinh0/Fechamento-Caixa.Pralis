@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import ConsultaPorPeriodo from '~/components/consulta/ConsultaPorPeriodo.vue';
 import FormularioTransferenciaTesouraria from '~/components/tesouraria/FormularioTransferenciaTesouraria.vue';
 import ConfirmacaoDialog from '~/components/comum/ConfirmacaoDialog.vue';
 import { usePerfil } from '~/composables/usePerfil';
@@ -212,15 +211,6 @@ async function confirmarRecebimentoDe(id: string): Promise<void> {
         </v-expansion-panel>
       </v-expansion-panels>
     </div>
-
-    <v-divider v-if="isAdmin" class="mb-8" />
-
-    <ConsultaPorPeriodo
-      tipo="transferencias"
-      titulo="Transferências entre caixas por fechamento"
-      icone="mdi-swap-horizontal-bold"
-      cor="var(--cat-transferencias-base)"
-    />
 
     <FormularioTransferenciaTesouraria v-model="modalAberto" @criada="carregar" />
     <ConfirmacaoDialog

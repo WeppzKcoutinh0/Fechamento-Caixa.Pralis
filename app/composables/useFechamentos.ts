@@ -21,6 +21,7 @@ import type {
   FechamentoDraft,
   FechamentoListItem,
   LancamentoDraft,
+  MotivoVendaCanceladaDraft,
   PdvEntradaDraft,
   SangriaDraft,
   TipoContaEntrada,
@@ -131,6 +132,7 @@ interface FechamentoRow {
   dinheiro_contado_notas: string | null;
   dinheiro_contado_moedas: string | null;
   lacre_fechamento: string;
+  dinheiro_contado_confirmado: boolean;
   vendas_canceladas_motivo_tipo: string;
   vendas_canceladas_motivo_texto: string;
   vendas_canceladas_motivo_audio_path: string | null;
@@ -178,6 +180,28 @@ function detalhesMaquininhaParaBanco(detalhes: DetalhesMaquininhaDraft) {
 
 function ordenado<T extends { ordem: number }>(itens: T[]): T[] {
   return [...itens].sort((a, b) => a.ordem - b.ordem);
+}
+
+function motivosCanceladosDoBanco(valor: string | null | undefined): Record<string, MotivoVendaCanceladaDraft> {
+  if (!valor?.trim()) return {};
+  try {
+    const bruto = JSON.parse(valor) as unknown;
+    if (!bruto || typeof bruto !== 'object' || Array.isArray(bruto)) return {};
+    return Object.fromEntries(
+      Object.entries(bruto as Record<string, unknown>).flatMap(([id, motivo]) => {
+        if (!motivo || typeof motivo !== 'object') return [];
+        const item = motivo as Record<string, unknown>;
+        const tipo = item.tipo === 'audio' ? 'audio' : 'texto';
+        return [[id, {
+          tipo,
+          texto: typeof item.texto === 'string' ? item.texto : '',
+          audioPath: typeof item.audioPath === 'string' ? item.audioPath : null,
+        }]];
+      }),
+    ) as Record<string, MotivoVendaCanceladaDraft>;
+  } catch {
+    return {};
+  }
 }
 
 /** Linha do banco pro deck — só os campos usados no card e na busca. */
@@ -343,10 +367,12 @@ function linhaParaDraft(row: FechamentoRow): FechamentoDraft {
     dinheiroContadoNotasCents: toCents(row.dinheiro_contado_notas ?? 0),
     dinheiroContadoMoedasCents: toCents(row.dinheiro_contado_moedas ?? 0),
     lacreFechamento: row.lacre_fechamento,
+    dinheiroContadoConfirmado: row.dinheiro_contado_confirmado ?? false,
     vendasCanceladasMotivoTipo:
       row.vendas_canceladas_motivo_tipo === 'audio' ? 'audio' : 'texto',
     vendasCanceladasMotivoTexto: row.vendas_canceladas_motivo_texto ?? '',
     vendasCanceladasMotivoAudioPath: row.vendas_canceladas_motivo_audio_path,
+    vendasCanceladasMotivos: motivosCanceladosDoBanco(row.vendas_canceladas_motivo_texto),
     cashSessionId: row.cash_session_id,
     // Só existe pro fluxo de abertura (ver criarFechamentoVazio) — reabrir um fechamento já
     // salvo pra edição não deve disparar o lookup de novo com um valor de Tesouraria que já
@@ -541,8 +567,12 @@ export function useFechamentos() {
         dinheiro_contado_notas: cents(draft.dinheiroContadoNotasCents),
         dinheiro_contado_moedas: cents(draft.dinheiroContadoMoedasCents),
         lacre_fechamento: draft.lacreFechamento,
+        dinheiro_contado_confirmado: draft.dinheiroContadoConfirmado,
         vendas_canceladas_motivo_tipo: draft.vendasCanceladasMotivoTipo,
-        vendas_canceladas_motivo_texto: draft.vendasCanceladasMotivoTexto,
+        vendas_canceladas_motivo_texto:
+          Object.keys(draft.vendasCanceladasMotivos).length > 0
+            ? JSON.stringify(draft.vendasCanceladasMotivos)
+            : draft.vendasCanceladasMotivoTexto,
         vendas_canceladas_motivo_audio_path: draft.vendasCanceladasMotivoAudioPath,
         saldo_fisico_esperado: cents(fisico.expectedCents),
         cash_session_id: draft.cashSessionId,

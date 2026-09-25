@@ -175,6 +175,12 @@ export interface CrediarioItemDraft {
   fotoPath: string | null;
 }
 
+export interface MotivoVendaCanceladaDraft {
+  tipo: 'texto' | 'audio';
+  texto: string;
+  audioPath: string | null;
+}
+
 /**
  * Um PDV do Relatório PDV — vira lista (pedido do usuário, 15/09/2026) porque um fechamento pode
  * ter mais de um caixa/máquina reportando vendas no mesmo dia. `id` gerado no client, mesmo
@@ -251,6 +257,7 @@ export interface FechamentoDraft {
   vendasCanceladasMotivoTipo: 'texto' | 'audio';
   vendasCanceladasMotivoTexto: string;
   vendasCanceladasMotivoAudioPath: string | null;
+  vendasCanceladasMotivos: Record<string, MotivoVendaCanceladaDraft>;
 
   // Seção 6 — card aditivo esperado × contado (decisão do plano). Notas/Moedas (pedido do
   // usuário, 23/09/2026): dinheiroContadoCents passa a ser SEMPRE a soma automática dos dois —
@@ -263,6 +270,11 @@ export interface FechamentoDraft {
   // automático pra Tesouraria (ver WizardFechamento.vue/useTransferenciasTesouraria.ts), pra
   // identificar esse malote específico na notificação do admin.
   lacreFechamento: string;
+  // "Transferência Final" (pedido do usuário, 25/09/2026): Notas/Moedas/Lacre só podem ser
+  // editados até o operador confirmar — depois disso ficam travados (readonly) e só então o
+  // botão "Salvar" do wizard libera (ver SecaoRelatorioFinal.vue/WizardFechamento.vue). Contar
+  // "às cegas" antes de revelar a diferença é o ponto: confirmar primeiro, comparar depois.
+  dinheiroContadoConfirmado: boolean;
 
   // Fluxo de Caixa (18/09/2026): liga este fechamento à sessão de caixa que o originou —
   // `null` quando não veio de uma sessão (ex.: fechamento criado direto pelo admin). Quando
@@ -376,10 +388,12 @@ export function criarFechamentoVazio(contexto?: ContextoSessaoCaixa): Fechamento
     vendasCanceladasMotivoTipo: 'texto',
     vendasCanceladasMotivoTexto: '',
     vendasCanceladasMotivoAudioPath: null,
+    vendasCanceladasMotivos: {},
     dinheiroContadoCents: 0,
     dinheiroContadoNotasCents: 0,
     dinheiroContadoMoedasCents: 0,
     lacreFechamento: '',
+    dinheiroContadoConfirmado: false,
     cashSessionId: contexto?.id ?? null,
     lacreAbertura: contexto?.lacreAbertura ?? '',
     arquivosPendentes: {},

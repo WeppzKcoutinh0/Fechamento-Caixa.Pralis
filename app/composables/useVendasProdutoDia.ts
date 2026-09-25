@@ -2,6 +2,7 @@ import { ref } from 'vue';
 import { useSupabase } from './useSupabase';
 
 export interface VendaProdutoDia {
+  id: string;
   produto: string;
   produtoCodigo: string | null;
   quantidade: number;
@@ -12,6 +13,7 @@ export interface VendaProdutoDia {
 }
 
 interface LinhaRow {
+  id: string;
   produto: string;
   produto_codigo: string | null;
   quantidade: string;
@@ -37,7 +39,7 @@ export async function buscarVendasProdutoDiaPorTipo(
   const supabase = useSupabase();
   let query = supabase
     .from('vendas_produto_dia')
-    .select('produto, produto_codigo, quantidade, valor_unitario, total, hora_venda')
+    .select('id, produto, produto_codigo, quantidade, valor_unitario, total, hora_venda')
     .eq('data_venda', data)
     .eq('tipo', tipo);
   query =
@@ -47,6 +49,7 @@ export async function buscarVendasProdutoDiaPorTipo(
   const { data: linhas, error } = await query;
   if (error) throw error;
   return ((linhas as LinhaRow[] | null) ?? []).map((l) => ({
+    id: l.id,
     produto: l.produto,
     produtoCodigo: l.produto_codigo,
     quantidade: Number(l.quantidade),

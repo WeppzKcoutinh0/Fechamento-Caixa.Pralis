@@ -195,11 +195,23 @@ async function onSalvar() {
           >{{ erro }}</v-alert
         >
 
+        <p
+          v-if="mostrarSalvar && !draft.dinheiroContadoConfirmado"
+          class="text-caption text-medium-emphasis text-right mb-2"
+        >
+          Confirme a "Transferência Final" (Notas/Moedas/Lacre) no fim do Relatório Final pra
+          liberar o Salvar.
+        </p>
         <div class="d-flex justify-space-between">
           <v-btn v-if="mostrarVoltar" variant="text" @click="voltar">Voltar</v-btn>
           <v-spacer />
           <v-btn v-if="mostrarAvancar" color="primary" @click="avancar">Avançar</v-btn>
-          <v-btn v-if="mostrarSalvar" color="primary" :loading="salvando" @click="onSalvar"
+          <v-btn
+            v-if="mostrarSalvar"
+            color="primary"
+            :loading="salvando"
+            :disabled="!draft.dinheiroContadoConfirmado"
+            @click="onSalvar"
             >Salvar</v-btn
           >
         </div>

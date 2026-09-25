@@ -506,6 +506,63 @@ body {
   font-size: var(--cx-fs-micro);
   margin: -6px 0 10px;
 }
+.lc-grupo-titulo {
+  margin: 0;
+  color: var(--cx-ink-soft);
+  font-size: var(--cx-fs-micro);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Card clicável que abre um .lc-modal (pedido do usuário, 18/09/2026) — movido pra cá de
+   SecaoTransferencias.vue (24/09/2026): SecaoRelatorioFinal.vue passou a precisar do mesmo card
+   ("Transferência Final") e um `<style scoped>` só valia no arquivo original — mesmo bug já
+   corrigido uma vez com .lc-painel/.lc-painel-corpo, centralizando aqui de novo. */
+.lc-resumo-item {
+  display: flex;
+  align-items: center;
+  gap: var(--cx-sp-3);
+  width: 100%;
+  padding: var(--cx-sp-3) var(--cx-sp-4);
+  border: 1px solid var(--cat);
+  border-radius: var(--cx-r-lg);
+  background: var(--cat-soft);
+  cursor: pointer;
+  text-align: left;
+  transition: box-shadow var(--cx-dur-1) var(--cx-ease);
+}
+.lc-resumo-item:hover {
+  box-shadow: var(--cx-e-1);
+}
+.lc-resumo-ic {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--cx-r-sm);
+  background: var(--cat);
+  color: #fff;
+}
+.lc-resumo-corpo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.lc-resumo-titulo {
+  overflow: hidden;
+  color: var(--cat-tinta);
+  font-size: var(--cx-fs-micro);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lc-resumo-valor {
+  color: var(--cx-ink);
+  font-size: var(--cx-fs-body);
+  font-weight: 600;
+}
 .lc-chips {
   display: flex;
   flex-wrap: wrap;

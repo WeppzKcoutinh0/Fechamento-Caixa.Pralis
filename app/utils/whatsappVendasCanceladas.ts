@@ -30,9 +30,13 @@ export function textoWhatsappVendasCanceladas(
     linhas.push('Nenhum item cancelado sincronizado para esta data.');
   } else {
     for (const item of itens) {
+      const motivo = draft.vendasCanceladasMotivos[item.id];
       const hora = item.horaVenda ? ` — ${item.horaVenda.slice(0, 5)}` : '';
       linhas.push(
         `- ${item.produto} — qtd. ${item.quantidade} — R$ ${formatCents(item.totalCents)}${hora}`,
+      );
+      linhas.push(
+        `  Motivo deste produto: ${motivo?.tipo === 'audio' ? (motivo.audioPath ? 'registrado em audio no fechamento' : 'nenhum audio gravado ainda') : motivo?.texto || 'nenhum motivo informado ainda'}`,
       );
     }
   }

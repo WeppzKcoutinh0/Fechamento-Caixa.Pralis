@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, toRef } from 'vue';
-import type { FechamentoDraft } from '~/types/fechamento';
-import CampoDinheiro from '~/components/comum/CampoDinheiro.vue';
+import type { FechamentoDraft, MotivoVendaCanceladaDraft } from '~/types/fechamento';
 import CartaoValor from '~/components/comum/CartaoValor.vue';
 import { useRelatorioCalculado } from '~/composables/useRelatorioCalculado';
-import { useVendasCanceladas } from '~/composables/useVendasCanceladas';
+import { useVendasCanceladas, type VendaCancelada } from '~/composables/useVendasCanceladas';
 import { useVendasProdutoDia } from '~/composables/useVendasProdutoDia';
 import GravadorAudio from '~/components/comum/GravadorAudio.vue';
 import { formatCents } from '~/utils/financeiro';
@@ -42,6 +41,38 @@ function aoAlterarMoedasContadas(cents: number): void {
   props.draft.dinheiroContadoMoedasCents = cents;
   props.draft.dinheiroContadoCents = props.draft.dinheiroContadoNotasCents + cents;
 }
+function aoDigitarCentavos(valorBruto: string | number | null): number {
+  const digitos = String(valorBruto ?? '').replace(/\D/g, '');
+  return digitos ? parseInt(digitos, 10) : 0;
+}
+
+// "Transferência Final" (pedido do usuário, 25/09/2026): mesmo formato visual do modal de
+// Transferências (.lc-modal laranja, ver SecaoTransferencias.vue) — contar o dinheiro físico e
+// informar o lacre ANTES de revelar o valor esperado/diferença é o ponto: confirmar primeiro,
+// comparar depois. Depois de confirmado (dinheiroContadoConfirmado), os campos ficam travados
+// (sem botão de reabrir de propósito — pedido explícito do usuário) e só então o "Salvar" do
+// wizard libera (ver WizardFechamento.vue).
+const modalDinheiroAberto = ref(false);
+const DINHEIRO_FINAL_VARS = {
+  '--cat': 'var(--cat-transferencias-base)',
+  '--cat-soft': 'var(--cat-transferencias-soft)',
+  '--cat-faixa': 'var(--cat-transferencias-faixa)',
+  '--cat-tinta': 'var(--cat-transferencias-tinta)',
+};
+const lacreFinalVazio = computed(() => !props.draft.lacreFechamento.trim());
+function confirmarDinheiroFinal(): void {
+  if (lacreFinalVazio.value) return;
+  props.draft.dinheiroContadoConfirmado = true;
+}
+const tomDiferenca = computed<'neutro' | 'positivo' | 'negativo'>(() => {
+  const d = fisico.value.differenceCents;
+  return d === 0 ? 'neutro' : d > 0 ? 'positivo' : 'negativo';
+});
+const rotuloDiferenca = computed(() => {
+  const d = fisico.value.differenceCents;
+  if (d === 0) return 'Igualado (sem diferença)';
+  return d > 0 ? 'Sobra (contado − esperado)' : 'Falta (contado − esperado)';
+});
 
 // Geração 100% client-side (jsPDF) — reusa os mesmos valores já calculados acima, não recalcula
 // nada por conta própria (ver utils/gerarPdfFechamento.ts).
@@ -131,6 +162,58 @@ async function aoAbrirCancelados(): Promise<void> {
   if (canceladosJaBuscados.value) return;
   canceladosJaBuscados.value = true;
   await buscarCancelados(props.draft.data);
+  inicializarMotivosCancelados(itensCancelados.value);
+}
+function novoMotivoCancelado(): MotivoVendaCanceladaDraft {
+  return { tipo: 'texto', texto: '', audioPath: null };
+}
+function inicializarMotivosCancelados(itens: VendaCancelada[]): void {
+  const motivos = props.draft.vendasCanceladasMotivos;
+  for (const item of itens) {
+    if (!motivos[item.id]) motivos[item.id] = novoMotivoCancelado();
+  }
+  // Compatibilidade: um fechamento antigo com motivo único transfere esse motivo para
+  // o primeiro item cancelado quando a seção for aberta.
+  const primeiro = itens[0];
+  if (
+    primeiro &&
+    props.draft.vendasCanceladasMotivoTexto.trim() &&
+    Object.values(motivos).every((motivo) => !motivo.texto.trim() && !motivo.audioPath)
+  ) {
+    motivos[primeiro.id] = {
+      tipo: props.draft.vendasCanceladasMotivoTipo,
+      texto: props.draft.vendasCanceladasMotivoTexto,
+      audioPath: props.draft.vendasCanceladasMotivoAudioPath,
+    };
+  }
+}
+function motivoDoItem(item: VendaCancelada): MotivoVendaCanceladaDraft {
+  if (!props.draft.vendasCanceladasMotivos[item.id]) {
+    props.draft.vendasCanceladasMotivos[item.id] = novoMotivoCancelado();
+  }
+  return props.draft.vendasCanceladasMotivos[item.id]!;
+}
+const textoMotivoAbertoId = ref<string | null>(null);
+const audioMotivoAbertoId = ref<string | null>(null);
+const textoMotivoEdicao = ref('');
+
+function abrirTextoMotivo(item: VendaCancelada): void {
+  audioMotivoAbertoId.value = null;
+  textoMotivoEdicao.value = motivoDoItem(item).texto;
+  textoMotivoAbertoId.value = textoMotivoAbertoId.value === item.id ? null : item.id;
+}
+
+function salvarTextoMotivo(item: VendaCancelada): void {
+  const motivo = motivoDoItem(item);
+  motivo.tipo = 'texto';
+  motivo.texto = textoMotivoEdicao.value.trim();
+  textoMotivoAbertoId.value = null;
+}
+
+function abrirAudioMotivo(item: VendaCancelada): void {
+  textoMotivoAbertoId.value = null;
+  audioMotivoAbertoId.value = audioMotivoAbertoId.value === item.id ? null : item.id;
+  motivoDoItem(item).tipo = 'audio';
 }
 const totalCanceladosCents = computed(() =>
   itensCancelados.value.reduce((soma, i) => soma + i.totalCents, 0),
@@ -389,8 +472,8 @@ const CAT_VARS = {
           <strong class="cat-valor">R$ {{ formatCents(totalCanceladosCents) }}</strong>
         </v-expansion-panel-title>
         <v-expansion-panel-text>
-          <p class="cat-subgrupo">Motivo</p>
-          <div class="d-flex ga-2 mb-3">
+          <p v-if="false" class="cat-subgrupo">Motivo</p>
+          <div v-if="false" class="d-flex ga-2 mb-3">
             <v-btn
               size="small"
               :color="draft.vendasCanceladasMotivoTipo === 'texto' ? 'primary' : undefined"
@@ -409,7 +492,7 @@ const CAT_VARS = {
             </v-btn>
           </div>
           <v-textarea
-            v-if="draft.vendasCanceladasMotivoTipo === 'texto'"
+            v-if="false && draft.vendasCanceladasMotivoTipo === 'texto'"
             v-model="draft.vendasCanceladasMotivoTexto"
             label="Motivo do(s) cancelamento(s)"
             rows="2"
@@ -417,7 +500,7 @@ const CAT_VARS = {
             class="mb-4"
           />
           <GravadorAudio
-            v-else
+            v-else-if="false"
             v-model="draft.vendasCanceladasMotivoAudioPath"
             :fechamento-id="draft.id"
             campo="vendas-canceladas-motivo"
@@ -439,17 +522,90 @@ const CAT_VARS = {
           >
             Nenhum item cancelado para {{ draft.data }}.
           </v-alert>
-          <div v-else class="d-flex flex-column ga-2 mb-2">
+          <div v-else class="d-flex flex-column ga-3 mb-2">
             <div
-              v-for="(item, i) in itensCancelados"
-              :key="`${item.produto}-${i}`"
-              class="d-flex justify-space-between text-body-2"
+              v-for="item in itensCancelados"
+              :key="item.id"
+              class="cancelado-item"
             >
-              <span class="text-medium-emphasis">
-                {{ item.produto }} ({{ formatarQtd(item.quantidade) }})
-                <template v-if="item.horaVenda"> — {{ item.horaVenda.slice(0, 5) }}</template>
-              </span>
-              <strong>R$ {{ formatCents(item.totalCents) }}</strong>
+              <div class="d-flex justify-space-between text-body-2 mb-2">
+                <span class="text-medium-emphasis">
+                  {{ item.produto }} ({{ formatarQtd(item.quantidade) }})
+                  <template v-if="item.horaVenda"> — {{ item.horaVenda.slice(0, 5) }}</template>
+                </span>
+                <strong>R$ {{ formatCents(item.totalCents) }}</strong>
+                <div class="d-flex align-center ga-1 ml-2">
+                  <v-badge
+                    :model-value="Boolean(motivoDoItem(item).texto)"
+                    content="1"
+                    color="primary"
+                    offset-x="5"
+                    offset-y="5"
+                  >
+                    <v-btn
+                      icon="mdi-chat-outline"
+                      size="x-small"
+                      variant="text"
+                      :color="motivoDoItem(item).texto ? 'primary' : undefined"
+                      aria-label="Informar motivo em texto"
+                      @click.stop="abrirTextoMotivo(item)"
+                    />
+                  </v-badge>
+                  <v-btn
+                    icon="mdi-microphone-outline"
+                    size="x-small"
+                    variant="text"
+                    :color="motivoDoItem(item).audioPath ? 'primary' : undefined"
+                    aria-label="Informar motivo em áudio"
+                    @click.stop="abrirAudioMotivo(item)"
+                  />
+                  <span v-if="motivoDoItem(item).audioPath" class="motivo-notificacao" aria-label="Áudio registrado">1</span>
+                </div>
+              </div>
+              <div v-if="textoMotivoAbertoId === item.id" class="motivo-editor mt-2">
+                <v-textarea
+                  v-model="textoMotivoEdicao"
+                  label="Escreva o motivo deste produto"
+                  rows="2"
+                  auto-grow
+                  autofocus
+                  hide-details
+                />
+                <div class="d-flex justify-end ga-2 mt-2">
+                  <v-btn size="small" variant="text" @click="textoMotivoAbertoId = null"
+                    >Cancelar</v-btn
+                  >
+                  <v-btn size="small" color="primary" variant="flat" @click="salvarTextoMotivo(item)"
+                    >Salvar</v-btn
+                  >
+                </div>
+              </div>
+              <div v-if="audioMotivoAbertoId === item.id" class="motivo-editor mt-2">
+                <GravadorAudio
+                  :model-value="motivoDoItem(item).audioPath"
+                  @update:model-value="motivoDoItem(item).audioPath = $event"
+                  :fechamento-id="draft.id"
+                  :campo="`vendas-canceladas-motivo-${item.id}`"
+                />
+                <v-btn size="small" variant="text" class="mt-2" @click="audioMotivoAbertoId = null"
+                  >Fechar</v-btn
+                >
+              </div>
+              <p v-if="false" class="cat-subgrupo mb-2">Motivo deste produto</p>
+              <div v-if="false" class="d-flex ga-2 mb-2">
+                <v-btn
+                  size="small"
+                  :color="motivoDoItem(item).tipo === 'texto' ? 'primary' : undefined"
+                  :variant="motivoDoItem(item).tipo === 'texto' ? 'flat' : 'outlined'"
+                  @click="motivoDoItem(item).tipo = 'texto'"
+                >Texto</v-btn>
+                <v-btn
+                  size="small"
+                  :color="motivoDoItem(item).tipo === 'audio' ? 'primary' : undefined"
+                  :variant="motivoDoItem(item).tipo === 'audio' ? 'flat' : 'outlined'"
+                  @click="motivoDoItem(item).tipo = 'audio'"
+                >Áudio</v-btn>
+              </div>
             </div>
           </div>
 
@@ -723,49 +879,154 @@ const CAT_VARS = {
     </v-expansion-panels>
 
     <v-divider />
-    <div class="text-subtitle-2">Dinheiro esperado × contado</div>
-    <p class="text-caption text-medium-emphasis">
-      Informativo — não altera a Diferença Geral acima. Esperado = dinheiro do PDV + entradas +
-      transferências recebidas − sangrias − despesas − mercadorias − retiradas − transferências
-      enviadas.
+    <p class="lc-grupo-titulo">Transferência Final</p>
+    <p class="text-caption text-medium-emphasis mt-n1">
+      Conte o dinheiro físico da gaveta e informe o lacre — o valor esperado só aparece depois de
+      confirmar, pra não influenciar a contagem.
     </p>
+
+    <button
+      type="button"
+      class="lc-resumo-item"
+      :style="DINHEIRO_FINAL_VARS"
+      @click="modalDinheiroAberto = true"
+    >
+      <span class="lc-resumo-ic"><v-icon icon="mdi-cash-check" size="18" /></span>
+      <span class="lc-resumo-corpo">
+        <span class="lc-resumo-titulo">
+          Transferência Final
+          <template v-if="draft.dinheiroContadoConfirmado"
+            >— Lacre {{ draft.lacreFechamento }}</template
+          >
+        </span>
+        <span class="lc-resumo-valor">
+          <template v-if="draft.dinheiroContadoConfirmado">
+            R$ {{ formatCents(draft.dinheiroContadoCents) }}
+          </template>
+          <template v-else>Toque para informar o lacre final e os valores contados</template>
+        </span>
+      </span>
+    </button>
+
     <CartaoValor
-      rotulo="Dinheiro esperado na gaveta"
-      :valor="`R$ ${formatCents(fisico.expectedCents)}`"
-      class="mb-3"
-    />
-    <div class="d-flex flex-column flex-sm-row ga-3">
-      <CampoDinheiro
-        :model-value="draft.dinheiroContadoNotasCents"
-        label="Valor Notas"
-        @update:model-value="aoAlterarNotasContadas"
-      />
-      <CampoDinheiro
-        :model-value="draft.dinheiroContadoMoedasCents"
-        label="Valor Moedas"
-        @update:model-value="aoAlterarMoedasContadas"
-      />
-      <CampoDinheiro :model-value="draft.dinheiroContadoCents" label="Valor Total" readonly />
-    </div>
-    <v-text-field
-      v-model="draft.lacreFechamento"
-      label="N° Lacre do malote"
+      v-if="draft.dinheiroContadoConfirmado"
       class="mt-3"
-      hint="Identifica o malote que leva esse dinheiro contado de volta ao cofre — sobe junto com esses valores pro administrador conferir."
-      persistent-hint
-    />
-    <CartaoValor
-      v-if="draft.dinheiroContadoCents"
-      rotulo="Diferença (contado − esperado)"
+      :rotulo="rotuloDiferenca"
       :valor="`R$ ${formatCents(fisico.differenceCents)}`"
-      :tom="
-        fisico.differenceCents === 0
-          ? 'neutro'
-          : fisico.differenceCents > 0
-            ? 'positivo'
-            : 'negativo'
-      "
+      :tom="tomDiferenca"
     />
+
+    <v-dialog v-model="modalDinheiroAberto" max-width="480">
+      <div class="lc-modal" :style="DINHEIRO_FINAL_VARS">
+        <div class="lc-faixa">
+          <div class="lc-head">
+            <span class="lc-ic"><v-icon size="19">mdi-cash-check</v-icon></span>
+            <span class="lc-titulo">Transferência Final</span>
+            <v-icon class="lc-x" size="19" @click="modalDinheiroAberto = false">mdi-close</v-icon>
+          </div>
+        </div>
+
+        <div class="lc-corpo">
+          <p class="text-caption text-medium-emphasis mb-3">
+            Conte o dinheiro físico da gaveta e informe o lacre do malote antes de confirmar — o
+            valor esperado só aparece depois, pra não influenciar a contagem.
+          </p>
+
+          <div class="lc-hero">
+            <span class="lc-cifra">R$</span>
+            <span class="lc-valor">
+              <input
+                :value="formatCents(draft.dinheiroContadoCents)"
+                readonly
+                aria-label="Valor total contado"
+              />
+            </span>
+          </div>
+
+          <div class="lc-dois">
+            <label class="lc-campo">
+              <span class="lc-campo-lbl">Valor em Notas</span>
+              <input
+                :value="formatCents(draft.dinheiroContadoNotasCents)"
+                class="lc-input"
+                :class="{ 'lc-input-ro': draft.dinheiroContadoConfirmado }"
+                :readonly="draft.dinheiroContadoConfirmado"
+                inputmode="decimal"
+                @input="
+                  aoAlterarNotasContadas(
+                    aoDigitarCentavos(($event.target as HTMLInputElement).value),
+                  )
+                "
+              />
+            </label>
+            <label class="lc-campo">
+              <span class="lc-campo-lbl">Valor em Moedas</span>
+              <input
+                :value="formatCents(draft.dinheiroContadoMoedasCents)"
+                class="lc-input"
+                :class="{ 'lc-input-ro': draft.dinheiroContadoConfirmado }"
+                :readonly="draft.dinheiroContadoConfirmado"
+                inputmode="decimal"
+                @input="
+                  aoAlterarMoedasContadas(
+                    aoDigitarCentavos(($event.target as HTMLInputElement).value),
+                  )
+                "
+              />
+            </label>
+          </div>
+
+          <label class="lc-campo">
+            <span class="lc-campo-lbl">N° Lacre final</span>
+            <input
+              v-model="draft.lacreFechamento"
+              class="lc-input"
+              :class="{
+                'lc-input-erro': lacreFinalVazio,
+                'lc-input-ro': draft.dinheiroContadoConfirmado,
+              }"
+              :readonly="draft.dinheiroContadoConfirmado"
+              placeholder="000000"
+            />
+          </label>
+          <p v-if="lacreFinalVazio" class="lc-erro-campo">
+            Informe o N° do lacre do malote pra poder confirmar.
+          </p>
+          <p v-else class="text-caption text-medium-emphasis" style="margin: -6px 0 10px">
+            Identifica o malote que leva esse dinheiro de volta ao cofre — sobe junto pro
+            administrador conferir.
+          </p>
+
+          <template v-if="draft.dinheiroContadoConfirmado">
+            <v-divider class="my-3" />
+            <div class="d-flex justify-space-between text-body-2 mb-2">
+              <span class="text-medium-emphasis">Esperado na gaveta</span>
+              <strong>R$ {{ formatCents(fisico.expectedCents) }}</strong>
+            </div>
+            <CartaoValor
+              :rotulo="rotuloDiferenca"
+              :valor="`R$ ${formatCents(fisico.differenceCents)}`"
+              :tom="tomDiferenca"
+            />
+          </template>
+        </div>
+
+        <div class="lc-acoes">
+          <button
+            v-if="!draft.dinheiroContadoConfirmado"
+            type="button"
+            class="lc-salvar"
+            :disabled="lacreFinalVazio"
+            @click="confirmarDinheiroFinal"
+          >
+            Confirmar
+          </button>
+          <button v-else type="button" class="lc-salvar" @click="modalDinheiroAberto = false">
+            Fechar
+          </button>
+        </div>
+      </div>
+    </v-dialog>
   </div>
 </template>
 
@@ -795,4 +1056,31 @@ const CAT_VARS = {
   border-bottom: 1px solid var(--cx-border, rgba(0, 0, 0, 0.08));
   white-space: nowrap;
 }
+
+.cancelado-item {
+  padding: var(--cx-sp-3);
+  border: 1px solid var(--cx-border, rgba(0, 0, 0, 0.12));
+  border-radius: var(--cx-r-md, 10px);
+}
+
+.motivo-editor {
+  padding: var(--cx-sp-3);
+  border-radius: var(--cx-r-md, 10px);
+  background: var(--cx-surface-sunken, rgba(0, 0, 0, 0.03));
+}
+
+.motivo-notificacao {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: -6px;
+  border-radius: 999px;
+  background: var(--v-theme-primary);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+}
+
 </style>

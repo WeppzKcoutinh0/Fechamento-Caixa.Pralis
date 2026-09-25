@@ -594,14 +594,8 @@ const totalTransferenciasAutomaticasCents = computed(() =>
 </template>
 
 <style scoped>
-.lc-grupo-titulo {
-  margin: 0;
-  color: var(--cx-ink-soft);
-  font-size: var(--cx-fs-micro);
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
+/* .lc-grupo-titulo agora vive em assets/main.css (25/09/2026) — SecaoRelatorioFinal.vue passou a
+   precisar dela também. */
 
 /* Bloco Automático como zona própria (pedido do usuário, 21/09/2026): antes ficava solto na
    mesma lista dos painéis manuais, sem separação visual clara entre "editável" e "só leitura".
@@ -617,48 +611,6 @@ const totalTransferenciasAutomaticasCents = computed(() =>
   border-radius: var(--cx-r-lg);
   background: var(--cx-surface-sunken);
 }
-.lc-resumo-item {
-  display: flex;
-  align-items: center;
-  gap: var(--cx-sp-3);
-  width: 100%;
-  padding: var(--cx-sp-3) var(--cx-sp-4);
-  border: 1px solid var(--cat);
-  border-radius: var(--cx-r-lg);
-  background: var(--cat-soft);
-  cursor: pointer;
-  text-align: left;
-  transition: box-shadow var(--cx-dur-1) var(--cx-ease);
-}
-.lc-resumo-item:hover {
-  box-shadow: var(--cx-e-1);
-}
-.lc-resumo-ic {
-  display: grid;
-  flex: 0 0 auto;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--cx-r-sm);
-  background: var(--cat);
-  color: #fff;
-}
-.lc-resumo-corpo {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.lc-resumo-titulo {
-  overflow: hidden;
-  color: var(--cat-tinta);
-  font-size: var(--cx-fs-micro);
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.lc-resumo-valor {
-  color: var(--cx-ink);
-  font-size: var(--cx-fs-body);
-  font-weight: 600;
-}
+/* .lc-resumo-* agora vive em assets/main.css (24/09/2026) — SecaoRelatorioFinal.vue passou a
+   precisar do mesmo card, um `<style scoped>` só valia aqui. */
 </style>

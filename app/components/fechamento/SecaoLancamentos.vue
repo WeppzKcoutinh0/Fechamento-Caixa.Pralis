@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type {
   DiscriminacaoDraft,
   FechamentoDraft,
@@ -17,6 +17,7 @@ import CampoFoto from '~/components/comum/CampoFoto.vue';
 import CartaoValor from '~/components/comum/CartaoValor.vue';
 import GravadorAudio from '~/components/comum/GravadorAudio.vue';
 import { useLeituraNotaFiscal } from '~/composables/useLeituraNotaFiscal';
+import { usePerfil } from '~/composables/usePerfil';
 import {
   calculateDiscrimination,
   calculateValorTotalLancamento,
@@ -24,6 +25,8 @@ import {
 } from '~/utils/financeiro';
 
 const props = defineProps<{ draft: FechamentoDraft }>();
+const { perfil } = usePerfil();
+const ehUsuarioCaixa = computed(() => perfil.value?.role === 'caixa');
 
 // A foto do lançamento só pode ir pro Storage depois que o fechamento existir no banco (RLS de
 // `anexos_insert` exige `fechamento_editavel`, que checa a linha em `fechamentos` — ver migration
@@ -354,6 +357,26 @@ function totalItemDiscriminacao(item: DiscriminacaoDraft): number {
 const totalGeralDiscriminacao = computed(() =>
   itensDiscriminacao.value.reduce((soma, item) => soma + totalItemDiscriminacao(item), 0),
 );
+
+// Para o operador de caixa, os itens discriminados são a origem do valor da despesa.
+// Assim o valor salvo no fechamento não pode divergir da soma dos itens revisados.
+watch(
+  [ehUsuarioCaixa, tipoAtual, totalGeralDiscriminacao, () => itensDiscriminacao.value.length],
+  () => {
+    const lancamento = lancamentoAtual.value;
+    if (
+      !lancamento ||
+      !ehUsuarioCaixa.value ||
+      tipoAtual.value !== 'despesa' ||
+      itensDiscriminacao.value.length === 0
+    )
+      return;
+
+    lancamento.valorCents = totalGeralDiscriminacao.value;
+    lancamento.valorAcrescimoCents = 0;
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
@@ -513,6 +536,7 @@ const totalGeralDiscriminacao = computed(() =>
                 :value="formatCents(lancamentoAtual.valorCents)"
                 inputmode="decimal"
                 aria-label="Valor"
+                :readonly="ehUsuarioCaixa && tipoAtual === 'despesa' && itensDiscriminacao.length > 0"
                 @input="
                   lancamentoAtual.valorCents = aoDigitarCentavos(
                     ($event.target as HTMLInputElement).value,
@@ -530,6 +554,7 @@ const totalGeralDiscriminacao = computed(() =>
                 class="lc-input"
                 :value="formatCents(lancamentoAtual.valorAcrescimoCents)"
                 inputmode="decimal"
+                :readonly="ehUsuarioCaixa && tipoAtual === 'despesa' && itensDiscriminacao.length > 0"
                 @input="
                   lancamentoAtual.valorAcrescimoCents = aoDigitarCentavos(
                     ($event.target as HTMLInputElement).value,
@@ -613,6 +638,16 @@ const totalGeralDiscriminacao = computed(() =>
           </button>
 
           <div v-if="discriminando" class="disc">
+            <v-alert
+              v-if="ehUsuarioCaixa && tipoAtual === 'despesa' && itensDiscriminacao.length > 0"
+              type="info"
+              variant="tonal"
+              density="compact"
+              class="mb-3"
+            >
+              Para usuários de caixa, o valor da despesa é calculado automaticamente pela soma dos
+              itens discriminados.
+            </v-alert>
             <div v-if="itensDiscriminacao.length" class="disc-scroll">
               <table class="disc-tabela">
                 <thead>

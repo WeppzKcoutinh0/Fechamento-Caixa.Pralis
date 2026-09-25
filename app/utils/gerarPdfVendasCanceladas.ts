@@ -19,26 +19,19 @@ export function gerarPdfVendasCanceladas(draft: FechamentoDraft, itens: VendaCan
     `${formatarDataBr(draft.data)} — ${draft.caixa || '—'} / ${draft.turno || '—'} — Responsável: ${draft.responsavel || '—'}`,
   );
 
-  pdf.secao('Motivo');
-  if (draft.vendasCanceladasMotivoTipo === 'audio') {
-    pdf.vazio(
-      draft.vendasCanceladasMotivoAudioPath
-        ? 'Registrado em áudio (ver anexo no fechamento) — sem transcrição em texto.'
-        : 'Nenhum áudio gravado ainda.',
-    );
-  } else {
-    pdf.vazio(draft.vendasCanceladasMotivoTexto || 'Nenhum motivo informado ainda.');
-  }
-
   pdf.secao(`Itens cancelados (${itens.length})`);
   if (itens.length === 0) {
     pdf.vazio(`Nenhum item cancelado sincronizado para ${formatarDataBr(draft.data)}.`);
   } else {
     for (const item of itens) {
+      const motivo = draft.vendasCanceladasMotivos[item.id];
       const hora = item.horaVenda ? ` — ${item.horaVenda.slice(0, 5)}` : '';
       pdf.linha(
         `${item.produto} (qtd. ${item.quantidade})${hora}`,
         `R$ ${formatCents(item.totalCents)}`,
+      );
+      pdf.vazio(
+        `Motivo deste produto: ${motivo?.tipo === 'audio' ? (motivo.audioPath ? 'registrado em audio (ver anexo).' : 'nenhum audio gravado ainda.') : motivo?.texto || 'nenhum motivo informado ainda.'}`,
       );
     }
   }

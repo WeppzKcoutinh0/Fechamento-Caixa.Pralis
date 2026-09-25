@@ -27,6 +27,7 @@ const {
   crediarioTotais,
   lancamentosPorTipo,
   relatorio,
+  fisico,
 } = useRelatorioCalculado(toRef(draft, 'value'));
 
 onMounted(async () => {
@@ -253,6 +254,49 @@ function totalPdvEntrada(p: FechamentoDraft['pdvEntradas'][number]): number {
             {{ d.produto || 'Sem nome' }} — {{ d.qtd }}x
           </span>
           <strong>R$ {{ formatCents(totalDiscriminacao(d)) }}</strong>
+        </div>
+      </v-card>
+
+      <v-card v-if="draft.dinheiroContadoConfirmado" variant="outlined" rounded="lg" class="pa-4">
+        <div class="text-subtitle-2 mb-2">Transferência Final</div>
+        <div class="d-flex justify-space-between text-body-2">
+          <span class="text-medium-emphasis">N° Lacre final</span>
+          <strong>{{ draft.lacreFechamento || '—' }}</strong>
+        </div>
+        <div class="d-flex justify-space-between text-body-2">
+          <span class="text-medium-emphasis">Valor em Notas</span>
+          <strong>R$ {{ formatCents(draft.dinheiroContadoNotasCents) }}</strong>
+        </div>
+        <div class="d-flex justify-space-between text-body-2">
+          <span class="text-medium-emphasis">Valor em Moedas</span>
+          <strong>R$ {{ formatCents(draft.dinheiroContadoMoedasCents) }}</strong>
+        </div>
+        <div class="d-flex justify-space-between text-body-2">
+          <span class="text-medium-emphasis">Contado na gaveta</span>
+          <strong>R$ {{ formatCents(draft.dinheiroContadoCents) }}</strong>
+        </div>
+        <v-divider class="my-2" />
+        <div class="d-flex justify-space-between text-body-2">
+          <span class="text-medium-emphasis">Esperado na gaveta</span>
+          <strong>R$ {{ formatCents(fisico.expectedCents) }}</strong>
+        </div>
+        <div class="d-flex justify-space-between text-body-2">
+          <span class="text-medium-emphasis">
+            {{
+              fisico.differenceCents === 0
+                ? 'Igualado'
+                : fisico.differenceCents > 0
+                  ? 'Sobra (contado − esperado)'
+                  : 'Falta (contado − esperado)'
+            }}
+          </span>
+          <strong
+            :class="{
+              'text-success': fisico.differenceCents > 0,
+              'text-error': fisico.differenceCents < 0,
+            }"
+            >R$ {{ formatCents(fisico.differenceCents) }}</strong
+          >
         </div>
       </v-card>
 

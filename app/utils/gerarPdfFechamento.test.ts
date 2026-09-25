@@ -241,4 +241,46 @@ describe('gerarPdfFechamento', () => {
     expect(texto).toContain('13:34');
     expect(texto).toContain('Cliente desistiu');
   });
+
+  it('não lança erro e mostra textos padrão pra item cancelado sem motivo e sem hora de venda', () => {
+    const draft = criarFechamentoVazio();
+    const dados = dadosVazios();
+    dados.produtosCancelados = [
+      {
+        id: 'c-2',
+        produto: 'Bolo de Chocolate',
+        produtoCodigo: null,
+        quantidade: 1,
+        valorUnitarioCents: 3000,
+        totalCents: 3000,
+        horaVenda: null,
+        motivo: undefined,
+      },
+    ];
+    expect(() => gerarPdfFechamento(draft, dados)).not.toThrow();
+    const texto = textoDoPdf(gerarPdfFechamento(draft, dados));
+    expect(texto).toContain('Bolo de Chocolate');
+    expect(texto).toContain('Hor');
+    expect(texto).toContain('Nenhum motivo informado');
+  });
+
+  it('mostra "Áudio registrado" quando o motivo é só áudio (sem transcrição em texto)', () => {
+    const draft = criarFechamentoVazio();
+    const dados = dadosVazios();
+    dados.produtosCancelados = [
+      {
+        id: 'c-3',
+        produto: 'Suco Natural',
+        produtoCodigo: null,
+        quantidade: 1,
+        valorUnitarioCents: 800,
+        totalCents: 800,
+        horaVenda: '09:15:00',
+        motivo: { tipo: 'audio', texto: '', audioPath: 'audios/c-3.webm' },
+      },
+    ];
+    const texto = textoDoPdf(gerarPdfFechamento(draft, dados));
+    expect(texto).toContain('Suco Natural');
+    expect(texto).toContain('Áudio registrado');
+  });
 });

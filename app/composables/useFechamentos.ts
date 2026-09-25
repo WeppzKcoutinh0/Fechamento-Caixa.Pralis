@@ -182,11 +182,23 @@ function ordenado<T extends { ordem: number }>(itens: T[]): T[] {
   return [...itens].sort((a, b) => a.ordem - b.ordem);
 }
 
-function motivosCanceladosDoBanco(valor: string | null | undefined): Record<string, MotivoVendaCanceladaDraft> {
-  if (!valor?.trim()) return {};
+/** `vendas_canceladas_motivo_texto` guarda ou um texto legado (fechamento antigo, motivo único)
+ * ou um JSON serializado (fechamento novo, motivo por item — ver `salvar()` abaixo). Só dá pra
+ * saber qual é tentando o parse. */
+function colunaMotivoEhJsonDeItens(valor: string | null | undefined): boolean {
+  if (!valor?.trim()) return false;
   try {
     const bruto = JSON.parse(valor) as unknown;
-    if (!bruto || typeof bruto !== 'object' || Array.isArray(bruto)) return {};
+    return Boolean(bruto) && typeof bruto === 'object' && !Array.isArray(bruto);
+  } catch {
+    return false;
+  }
+}
+
+function motivosCanceladosDoBanco(valor: string | null | undefined): Record<string, MotivoVendaCanceladaDraft> {
+  if (!colunaMotivoEhJsonDeItens(valor)) return {};
+  try {
+    const bruto = JSON.parse(valor as string) as unknown;
     return Object.fromEntries(
       Object.entries(bruto as Record<string, unknown>).flatMap(([id, motivo]) => {
         if (!motivo || typeof motivo !== 'object') return [];
@@ -373,7 +385,13 @@ function linhaParaDraft(row: FechamentoRow): FechamentoDraft {
     dinheiroContadoValoresConfirmados: row.dinheiro_contado_confirmado ?? false,
     vendasCanceladasMotivoTipo:
       row.vendas_canceladas_motivo_tipo === 'audio' ? 'audio' : 'texto',
-    vendasCanceladasMotivoTexto: row.vendas_canceladas_motivo_texto ?? '',
+    // Bug real corrigido (25/09/2026): quando a coluna já guarda o JSON por item (ver
+    // `salvar()`), este campo legado tem que ficar vazio — senão a migração de compatibilidade
+    // em `inicializarMotivosCancelados` (SecaoRelatorioFinal.vue) acha que é texto livre antigo
+    // e despeja o JSON bruto dentro do "motivo" do primeiro item cancelado.
+    vendasCanceladasMotivoTexto: colunaMotivoEhJsonDeItens(row.vendas_canceladas_motivo_texto)
+      ? ''
+      : (row.vendas_canceladas_motivo_texto ?? ''),
     vendasCanceladasMotivoAudioPath: row.vendas_canceladas_motivo_audio_path,
     vendasCanceladasMotivos: motivosCanceladosDoBanco(row.vendas_canceladas_motivo_texto),
     cashSessionId: row.cash_session_id,

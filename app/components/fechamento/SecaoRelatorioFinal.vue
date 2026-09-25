@@ -570,41 +570,6 @@ const CAT_VARS = {
           <strong class="cat-valor">R$ {{ formatCents(totalCanceladosCents) }}</strong>
         </v-expansion-panel-title>
         <v-expansion-panel-text>
-          <p v-if="false" class="cat-subgrupo">Motivo</p>
-          <div v-if="false" class="d-flex ga-2 mb-3">
-            <v-btn
-              size="small"
-              :color="draft.vendasCanceladasMotivoTipo === 'texto' ? 'primary' : undefined"
-              :variant="draft.vendasCanceladasMotivoTipo === 'texto' ? 'flat' : 'outlined'"
-              @click="draft.vendasCanceladasMotivoTipo = 'texto'"
-            >
-              Texto
-            </v-btn>
-            <v-btn
-              size="small"
-              :color="draft.vendasCanceladasMotivoTipo === 'audio' ? 'primary' : undefined"
-              :variant="draft.vendasCanceladasMotivoTipo === 'audio' ? 'flat' : 'outlined'"
-              @click="draft.vendasCanceladasMotivoTipo = 'audio'"
-            >
-              Áudio
-            </v-btn>
-          </div>
-          <v-textarea
-            v-if="false && draft.vendasCanceladasMotivoTipo === 'texto'"
-            v-model="draft.vendasCanceladasMotivoTexto"
-            label="Motivo do(s) cancelamento(s)"
-            rows="2"
-            auto-grow
-            class="mb-4"
-          />
-          <GravadorAudio
-            v-else-if="false"
-            v-model="draft.vendasCanceladasMotivoAudioPath"
-            :fechamento-id="draft.id"
-            campo="vendas-canceladas-motivo"
-            class="mb-4"
-          />
-
           <p class="cat-subgrupo">Itens cancelados</p>
           <div v-if="carregandoCancelados" class="d-flex justify-center py-4">
             <v-progress-circular indeterminate color="primary" size="24" />
@@ -686,11 +651,11 @@ const CAT_VARS = {
               <div v-if="audioMotivoAbertoId === item.id" class="motivo-editor mt-2">
                 <GravadorAudio
                   :model-value="motivoDoItem(item).audioPath"
-                  @update:model-value="motivoDoItem(item).audioPath = $event"
                   :transcricao="motivoDoItem(item).texto"
-                  @update:transcricao="motivoDoItem(item).texto = $event"
                   :fechamento-id="draft.id"
                   :campo="`vendas-canceladas-motivo-${item.id}`"
+                  @update:model-value="motivoDoItem(item).audioPath = $event"
+                  @update:transcricao="motivoDoItem(item).texto = $event"
                 />
                 <v-textarea
                   v-if="motivoDoItem(item).texto"
@@ -704,23 +669,6 @@ const CAT_VARS = {
                 />
                 <v-btn size="small" variant="text" class="mt-2" @click="audioMotivoAbertoId = null"
                   >Fechar</v-btn
-                >
-              </div>
-              <p v-if="false" class="cat-subgrupo mb-2">Motivo deste produto</p>
-              <div v-if="false" class="d-flex ga-2 mb-2">
-                <v-btn
-                  size="small"
-                  :color="motivoDoItem(item).tipo === 'texto' ? 'primary' : undefined"
-                  :variant="motivoDoItem(item).tipo === 'texto' ? 'flat' : 'outlined'"
-                  @click="motivoDoItem(item).tipo = 'texto'"
-                  >Texto</v-btn
-                >
-                <v-btn
-                  size="small"
-                  :color="motivoDoItem(item).tipo === 'audio' ? 'primary' : undefined"
-                  :variant="motivoDoItem(item).tipo === 'audio' ? 'flat' : 'outlined'"
-                  @click="motivoDoItem(item).tipo = 'audio'"
-                  >Áudio</v-btn
                 >
               </div>
             </div>

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { CAIXAS, hojeISO } from '~/types/fechamento';
-import { formatarDataBr } from '~/utils/vendasFechamento';
 import {
   useTransferenciasTesouraria,
   type CaixaOuCofre,
@@ -14,7 +13,13 @@ const emit = defineEmits<{ criada: [] }>();
 
 const { criar } = useTransferenciasTesouraria();
 
-const OPCOES_CAIXA: CaixaOuCofre[] = ['Cofre', 'Caixa Principal', 'Caixa de Troco', 'Fluxo', ...CAIXAS];
+const OPCOES_CAIXA: CaixaOuCofre[] = [
+  'Cofre',
+  'Caixa Principal',
+  'Caixa de Troco',
+  'Fluxo',
+  ...CAIXAS,
+];
 
 function rotuloCaixa(valor: CaixaOuCofre): string {
   if (valor === 'Caixa Principal') return 'Cofre Principal';
@@ -39,6 +44,7 @@ function aoAlterarMoedas(cents: number): void {
   valorCents.value = valorNotasCents.value + cents;
 }
 const lacre = ref('');
+const dataLanc = ref(hojeISO());
 const agendamento = ref(false);
 const caixaOrigem = ref<CaixaOuCofre | null>(null);
 const caixaDestino = ref<CaixaOuCofre | null>(null);
@@ -83,6 +89,7 @@ function resetar(): void {
   valorNotasCents.value = 0;
   valorMoedasCents.value = 0;
   lacre.value = '';
+  dataLanc.value = hojeISO();
   agendamento.value = false;
   caixaOrigem.value = null;
   caixaDestino.value = null;
@@ -97,7 +104,12 @@ function resetar(): void {
 // Soma dos destinos extras tem que bater com o Valor total (pedido do usuário, 18/09/2026) —
 // sem isso o dinheiro "sobra ou falta" silenciosamente entre os destinos.
 const valido = computed(
-  () => valorCents.value > 0 && !!lacre.value.trim() && !!caixaOrigem.value && !!caixaDestino.value,
+  () =>
+    valorCents.value > 0 &&
+    !!lacre.value.trim() &&
+    /^\d{4}-\d{2}-\d{2}$/.test(dataLanc.value) &&
+    !!caixaOrigem.value &&
+    !!caixaDestino.value,
 );
 
 // 25/09/2026 (bug real reportado pelo usuário): clicar em Salvar com o formulário incompleto
@@ -106,6 +118,7 @@ const valido = computed(
 function mensagemFaltando(): string | null {
   if (valorCents.value <= 0) return 'Informe o valor da transferência (Notas + Moedas).';
   if (!lacre.value.trim()) return 'Informe o N° Lacre / Doc.';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dataLanc.value)) return 'Informe a data do lançamento.';
   if (!caixaOrigem.value) return 'Selecione a Origem / Saída.';
   if (!caixaDestino.value) return 'Selecione o Destino / Entrada.';
   return null;
@@ -124,6 +137,7 @@ async function salvar(criarNova: boolean): Promise<void> {
       valorNotasCents: valorNotasCents.value,
       valorMoedasCents: valorMoedasCents.value,
       lacre: lacre.value,
+      dataLanc: dataLanc.value,
       agendamento: agendamento.value,
       caixaOrigem: caixaOrigem.value,
       caixaDestino: caixaDestino.value,
@@ -183,8 +197,20 @@ watch(modelValue, (aberto) => {
         </p>
 
         <div class="d-flex flex-column flex-sm-row ga-3">
-          <v-text-field v-model="lacre" label="N° Lacre / Doc" placeholder="Ex.: 000123" required />
-          <v-text-field :model-value="formatarDataBr(hojeISO())" label="Data Lanç." readonly />
+          <v-text-field
+            v-model="lacre"
+            class="lacre-field"
+            label="N° Lacre / Doc"
+            placeholder="Ex.: 000123"
+            required
+          />
+          <v-text-field
+            v-model="dataLanc"
+            class="data-lanc-field"
+            type="date"
+            label="Data Lanç."
+            required
+          />
         </div>
 
         <div class="d-flex flex-column flex-sm-row ga-3">
@@ -287,3 +313,14 @@ watch(modelValue, (aberto) => {
     </v-card>
   </v-dialog>
 </template>
+
+<style scoped>
+@media (min-width: 600px) {
+  .lacre-field,
+  .data-lanc-field {
+    flex: 1 1 0;
+    width: 0;
+    min-width: 0;
+  }
+}
+</style>

@@ -97,6 +97,7 @@ describe('mapearVendaProdutoDia', () => {
   it('mapeia HORA_VENDA quando presente (item cancelado)', () => {
     const linha = mapearVendaProdutoDia({
       DATA_VENDA: '2026-09-24',
+      ID_VENDA_BALCAO: '599539',
       PRODUTO_CODIGO: null,
       PRODUTO: 'COCA COLA 2L',
       QUANTIDADE: '1',
@@ -110,5 +111,6 @@ describe('mapearVendaProdutoDia', () => {
     });
     expect(linha.tipo).toBe('C');
     expect(linha.hora_venda).toBe('13:34:27');
+    expect(linha.venda_creare_id).toBe('599539');
   });
 });

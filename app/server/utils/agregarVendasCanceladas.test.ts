@@ -10,6 +10,7 @@ describe('agregarCanceladosPorProdutoDia', () => {
           PRODUTO: 'COCA COLA 2L',
           PDV: 'TNP-PC-CXPDV-1',
           DATA_VENDA_BALCAO: '2026-09-24 12:29:47',
+          ID_VENDA_BALCAO: '599538',
           VALOR_UNITARIO: '15,75',
           QUANTIDADE: '1',
           TOTAL: '15,75',
@@ -22,6 +23,7 @@ describe('agregarCanceladosPorProdutoDia', () => {
           PRODUTO: 'COCA COLA 2L',
           PDV: 'TNP-PC-CXPDV-2',
           DATA_VENDA_BALCAO: '2026-09-24 13:34:27',
+          ID_VENDA_BALCAO: '599539',
           VALOR_UNITARIO: '15,75',
           QUANTIDADE: '1',
           TOTAL: '15,75',
@@ -40,6 +42,7 @@ describe('agregarCanceladosPorProdutoDia', () => {
     expect(linhas[0]!.HORA_VENDA).toBe('2026-09-24 12:29:47');
     expect(linhas[1]!.HORA_VENDA).toBe('2026-09-24 13:34:27');
     expect(linhas[0]!.TIPO).toBe('C');
+    expect(linhas[1]!.VENDA_CREARE_ID).toBe('599539');
     expect(linhas[0]!.QUANTIDADE).toBe('1');
   });
 

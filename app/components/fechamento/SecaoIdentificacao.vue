@@ -284,7 +284,9 @@ const ajustesPresentes = computed(() => {
         </v-alert>
         <v-alert v-else type="warning" variant="tonal" density="comfortable">
           <div>
-            {{ vendasCanceladas.length }} venda{{ vendasCanceladas.length === 1 ? '' : 's' }}
+            {{ vendasCanceladas.length }} venda{{
+              vendasCanceladas.length === 1 ? '' : 's'
+            }}
             cancelada{{ vendasCanceladas.length === 1 ? '' : 's' }} em
             {{ formatarDataBr(dataVendas) }}.
           </div>
@@ -295,6 +297,9 @@ const ajustesPresentes = computed(() => {
               class="d-flex justify-space-between ga-2"
             >
               <span>
+                <span v-if="item.vendaCreareId" class="d-block text-caption font-weight-bold">
+                  Venda CREARE: {{ item.vendaCreareId }}
+                </span>
                 {{ item.produto }} ({{ formatarQtd(item.quantidade) }})
                 <template v-if="item.horaVenda"> — {{ formatarHora(item.horaVenda) }}</template>
               </span>

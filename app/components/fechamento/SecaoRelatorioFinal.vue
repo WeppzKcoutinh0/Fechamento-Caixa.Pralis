@@ -572,6 +572,8 @@ const CAT_VARS = {
                     <thead>
                       <tr>
                         <th>Produto</th>
+                        <th>ID CREARE</th>
+                        <th>Pagamento</th>
                         <th class="text-right">Quant.</th>
                         <th class="text-right">V. Unit.</th>
                         <th class="text-right">V. Total</th>
@@ -580,6 +582,8 @@ const CAT_VARS = {
                     <tbody>
                       <tr v-for="(p, i) in produtos" :key="`${p.produtoCodigo}-${i}`">
                         <td>{{ p.produto }}</td>
+                        <td>{{ p.vendaCreareId || '—' }}</td>
+                        <td>{{ p.formaPagamento || '—' }}</td>
                         <td class="text-right">{{ formatarQtd(p.quantidade) }}</td>
                         <td class="text-right">R$ {{ formatCents(p.valorUnitarioCents) }}</td>
                         <td class="text-right">R$ {{ formatCents(p.totalCents) }}</td>
@@ -622,6 +626,9 @@ const CAT_VARS = {
             <div v-for="item in itensCancelados" :key="item.id" class="cancelado-item">
               <div class="d-flex justify-space-between text-body-2 mb-2">
                 <span class="text-medium-emphasis">
+                  <span v-if="item.vendaCreareId" class="d-block text-caption font-weight-bold">
+                    Venda CREARE: {{ item.vendaCreareId }}
+                  </span>
                   {{ item.produto }} ({{ formatarQtd(item.quantidade) }})
                   <template v-if="item.horaVenda"> — {{ item.horaVenda.slice(0, 5) }}</template>
                 </span>

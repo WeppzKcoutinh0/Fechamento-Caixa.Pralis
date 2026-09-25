@@ -9,6 +9,18 @@ import type { LinhaVendaProdutoDia } from '../../types/vendasFechamento';
 // com operador "teste"/"GABRIEL" — o usuário confirmou que não existiram de verdade).
 const PDV_REAL = /CXPDV/i;
 
+function idVendaCreare(linha: Record<string, string>): string | null {
+  const candidatos = [
+    linha.ID_VENDA_BALCAO,
+    linha.ID_VENDA,
+    linha.ID_VENDA_CREARE,
+    linha.VENDA_CREARE_ID,
+    linha.CREARE_ID,
+  ];
+  const id = candidatos.find((valor) => String(valor ?? '').trim() !== '');
+  return id ? String(id).trim() : null;
+}
+
 /**
  * `VENDAS_TIPOS` (aba nova que o robô passou a escrever, 24/09/2026) manda uma linha POR
  * TRANSAÇÃO cancelada (com PDV/OPERADOR/CLIENTE/timestamp), diferente de `VENDAS_PRODUTOS` que já
@@ -30,7 +42,12 @@ export function agregarCanceladosPorProdutoDia(
 
   for (const linha of linhasBrutas) {
     if (String(linha.EMPRESA ?? '').trim() !== empresa) continue;
-    if (String(linha.TIPO ?? '').trim().toUpperCase() !== 'CANCELADA') continue;
+    if (
+      String(linha.TIPO ?? '')
+        .trim()
+        .toUpperCase() !== 'CANCELADA'
+    )
+      continue;
     if (!PDV_REAL.test(String(linha.PDV ?? ''))) continue;
 
     const data = parseDataBot(linha.DATA_VENDA_BALCAO);
@@ -46,11 +63,21 @@ export function agregarCanceladosPorProdutoDia(
     const hash =
       hashOrigem ||
       createHash('sha256')
-        .update(`cancelado_transacao|${empresa}|${data}|${hora}|${produto}|${linha.PDV ?? ''}|${linha.TOTAL ?? ''}`)
+        .update(
+          `cancelado_transacao|${empresa}|${data}|${hora}|${produto}|${linha.PDV ?? ''}|${linha.TOTAL ?? ''}`,
+        )
         .digest('hex');
 
     resultado.push({
       DATA_VENDA: data,
+      VENDA_CREARE_ID: idVendaCreare(linha),
+      FORMA_PAGAMENTO:
+        linha.FORMA_PAGAMENTO ||
+        linha.FORMAS_PAGAMENTO ||
+        linha.FORMA ||
+        linha.PAGAMENTO ||
+        linha.DESCRICAO_PAGAMENTO ||
+        null,
       PRODUTO_CODIGO: null,
       PRODUTO: produto,
       QUANTIDADE: linha.QUANTIDADE ?? '0',

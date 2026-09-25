@@ -215,6 +215,7 @@ describe('gerarPdfFechamento', () => {
     dados.produtos = [
       {
         id: 'p-1',
+        vendaCreareId: null,
         produto: 'Pão Francês',
         produtoCodigo: '001',
         quantidade: 12.5,
@@ -226,6 +227,7 @@ describe('gerarPdfFechamento', () => {
     dados.produtosCancelados = [
       {
         id: 'c-1',
+        vendaCreareId: null,
         produto: 'Coca-Cola 2L',
         produtoCodigo: null,
         quantidade: 1,
@@ -248,6 +250,7 @@ describe('gerarPdfFechamento', () => {
     dados.produtosCancelados = [
       {
         id: 'c-2',
+        vendaCreareId: null,
         produto: 'Bolo de Chocolate',
         produtoCodigo: null,
         quantidade: 1,
@@ -270,6 +273,7 @@ describe('gerarPdfFechamento', () => {
     dados.produtosCancelados = [
       {
         id: 'c-3',
+        vendaCreareId: null,
         produto: 'Suco Natural',
         produtoCodigo: null,
         quantidade: 1,

@@ -54,6 +54,19 @@ export function mapearVendaProdutoDia(linha: LinhaVendaProdutoDia) {
     hash: linha.HASH,
     empresa: linha.EMPRESA,
     data_venda: parseDataBot(linha.DATA_VENDA),
+    venda_creare_id:
+      textoOuNulo(linha.IDS_VENDA_CREARE) ??
+      textoOuNulo(linha.VENDA_CREARE_ID) ??
+      textoOuNulo(linha.ID_VENDA_BALCAO) ??
+      textoOuNulo(linha.ID_VENDA) ??
+      textoOuNulo(linha.ID_VENDA_CREARE) ??
+      textoOuNulo(linha.CREARE_ID),
+    forma_pagamento:
+      textoOuNulo(linha.FORMA_PAGAMENTO) ??
+      textoOuNulo(linha.FORMAS_PAGAMENTO) ??
+      textoOuNulo(linha.FORMA) ??
+      textoOuNulo(linha.PAGAMENTO) ??
+      textoOuNulo(linha.DESCRICAO_PAGAMENTO),
     produto_codigo: textoOuNulo(linha.PRODUTO_CODIGO),
     produto: linha.PRODUTO,
     quantidade: parseNumeroBot(linha.QUANTIDADE),

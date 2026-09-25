@@ -49,6 +49,19 @@ export const linhaFechamentoCaixaDiaSchema = z.object({
 
 export const linhaVendaProdutoDiaSchema = z.object({
   DATA_VENDA: textoObrigatorio,
+  // Em VENDAS_TIPOS o CREARE envia o identificador da venda original. Os aliases abaixo
+  // mantêm compatibilidade com as versões do bot/planilha que usaram nomes diferentes.
+  ID_VENDA_BALCAO: valorLivre,
+  ID_VENDA: valorLivre,
+  ID_VENDA_CREARE: valorLivre,
+  VENDA_CREARE_ID: valorLivre,
+  CREARE_ID: valorLivre,
+  FORMA_PAGAMENTO: valorLivre,
+  FORMA: valorLivre,
+  PAGAMENTO: valorLivre,
+  DESCRICAO_PAGAMENTO: valorLivre,
+  FORMAS_PAGAMENTO: valorLivre,
+  IDS_VENDA_CREARE: valorLivre,
   PRODUTO_CODIGO: valorLivre,
   PRODUTO: textoObrigatorio,
   QUANTIDADE: valorLivre,

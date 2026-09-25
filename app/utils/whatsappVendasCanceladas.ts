@@ -33,6 +33,7 @@ export function textoWhatsappVendasCanceladas(
           ? 'Áudio registrado (transcrição não disponível)'
           : 'Nenhum motivo informado';
       linhas.push(`- *${item.produto}* — R$ ${formatCents(item.totalCents)} — ${hora}`);
+      if (item.vendaCreareId) linhas.push(`  Venda CREARE: ${item.vendaCreareId}`);
       linhas.push(`  Motivo: ${explicacao}`);
     }
   }

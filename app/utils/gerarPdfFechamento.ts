@@ -343,15 +343,16 @@ export function gerarPdfFechamento(draft: FechamentoDraft, dados: DadosRelatorio
         : fisico.differenceCents > 0
           ? [22, 163, 74]
           : [220, 38, 38];
-    pdf.linha(
-      'Diferença (contado − esperado)',
-      `R$ ${formatCents(fisico.differenceCents)}`,
-      { negrito: true, corValor: corDiferencaFinal },
-    );
+    pdf.linha('Diferença (contado − esperado)', `R$ ${formatCents(fisico.differenceCents)}`, {
+      negrito: true,
+      corValor: corDiferencaFinal,
+    });
   }
 
   pdf.secao(`Produtos vendidos no dia (${dados.produtos.length})`);
-  pdf.vazio('Loja inteira — não separado por caixa (a origem dos dados não liga produto a caixa/turno).');
+  pdf.vazio(
+    'Loja inteira — não separado por caixa (a origem dos dados não liga produto a caixa/turno).',
+  );
   if (dados.produtos.length === 0) {
     pdf.vazio('Nenhum produto sincronizado para esta data.');
   } else {
@@ -360,6 +361,8 @@ export function gerarPdfFechamento(draft: FechamentoDraft, dados: DadosRelatorio
         `${p.produto} (qtd. ${formatarQtd(p.quantidade)})`,
         `R$ ${formatCents(p.totalCents)}`,
       );
+      if (p.vendaCreareId) pdf.vazio(`Venda CREARE: ${p.vendaCreareId}`);
+      if (p.formaPagamento) pdf.vazio(`Forma de pagamento: ${p.formaPagamento}`);
     }
   }
 

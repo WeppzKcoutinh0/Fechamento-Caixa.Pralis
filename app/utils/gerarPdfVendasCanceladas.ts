@@ -36,6 +36,7 @@ export function gerarPdfVendasCanceladas(draft: FechamentoDraft, itens: VendaCan
         `${item.produto} — ${hora} (qtd. ${item.quantidade})`,
         `R$ ${formatCents(item.totalCents)}`,
       );
+      if (item.vendaCreareId) pdf.vazio(`Venda CREARE: ${item.vendaCreareId}`);
       pdf.vazio(`Motivo: ${explicacao}`);
     }
   }

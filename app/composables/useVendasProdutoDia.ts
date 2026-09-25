@@ -3,6 +3,8 @@ import { useSupabase } from './useSupabase';
 
 export interface VendaProdutoDia {
   id: string;
+  vendaCreareId: string | null;
+  formaPagamento?: string | null;
   produto: string;
   produtoCodigo: string | null;
   quantidade: number;
@@ -14,6 +16,8 @@ export interface VendaProdutoDia {
 
 interface LinhaRow {
   id: string;
+  venda_creare_id: string | null;
+  forma_pagamento: string | null;
   produto: string;
   produto_codigo: string | null;
   quantidade: string;
@@ -39,7 +43,9 @@ export async function buscarVendasProdutoDiaPorTipo(
   const supabase = useSupabase();
   let query = supabase
     .from('vendas_produto_dia')
-    .select('id, produto, produto_codigo, quantidade, valor_unitario, total, hora_venda')
+    .select(
+      'id, venda_creare_id, forma_pagamento, produto, produto_codigo, quantidade, valor_unitario, total, hora_venda',
+    )
     .eq('data_venda', data)
     .eq('tipo', tipo);
   query =
@@ -50,6 +56,8 @@ export async function buscarVendasProdutoDiaPorTipo(
   if (error) throw error;
   return ((linhas as LinhaRow[] | null) ?? []).map((l) => ({
     id: l.id,
+    vendaCreareId: l.venda_creare_id,
+    formaPagamento: l.forma_pagamento,
     produto: l.produto,
     produtoCodigo: l.produto_codigo,
     quantidade: Number(l.quantidade),

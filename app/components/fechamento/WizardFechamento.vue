@@ -66,8 +66,22 @@ async function onSalvar() {
       'img-pdv': 'imgPdvPath',
     };
     let houveUploadPendente = false;
+    // 25/09/2026 (bug real em produção): um anexo pendente que falhe ao enviar (rede instável,
+    // foto grande, etc.) NÃO PODE travar o fechamento — ele já foi salvo pelo `salvar()` acima.
+    // Antes, um erro aqui pulava pro catch geral e o usuário via "não salvou" mesmo com os dados
+    // já gravados, e a sessão nunca fechava (ficava ABERTA pra sempre, travando o caixa do dia).
+    // Agora: cada anexo que falhar fica pendente pra uma nova tentativa (mensagem no aviso), mas o
+    // fechamento inteiro segue seu fluxo normal — fechar a sessão nunca fica refém de uma foto.
+    const falhasAnexos: string[] = [];
     for (const [chave, arquivo] of Object.entries(arquivosPendentes) as [string, File][]) {
-      const path = await enviarAnexo(fechamentoId, chave, arquivo);
+      let path: string;
+      try {
+        path = await enviarAnexo(fechamentoId, chave, arquivo);
+      } catch (e) {
+        falhasAnexos.push(chave);
+        console.error(`[fechamento] falha ao enviar anexo "${chave}":`, e);
+        continue;
+      }
       // Chaves fixas (maquininha) vão direto pro draft; chaves de lançamento
       // (`lancamento-foto[-nota]-{id}`, ver SecaoLancamentos.vue) precisam achar o lançamento certo
       // na lista, já que pode haver vários no mesmo fechamento.
@@ -124,6 +138,8 @@ async function onSalvar() {
     // Sistema Inteligente Pralís faz): melhor esforço, depois do fechamento já salvo — uma falha
     // aqui não desfaz o salvamento, só deixa de gerar o retorno automático desta vez.
     const falhasPosFechamento: string[] = [];
+    if (falhasAnexos.length === 1) falhasPosFechamento.push('1 anexo (foto/áudio)');
+    else if (falhasAnexos.length > 1) falhasPosFechamento.push(`${falhasAnexos.length} anexos (foto/áudio)`);
     if (draft.value.caixa && draft.value.dinheiroContadoCents > 0) {
       try {
         await criarRetornoAutomatico({

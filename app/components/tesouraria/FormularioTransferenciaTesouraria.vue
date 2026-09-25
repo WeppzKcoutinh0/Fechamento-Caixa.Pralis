@@ -100,8 +100,22 @@ const valido = computed(
   () => valorCents.value > 0 && !!lacre.value.trim() && !!caixaOrigem.value && !!caixaDestino.value,
 );
 
+// 25/09/2026 (bug real reportado pelo usuário): clicar em Salvar com o formulário incompleto
+// não fazia NADA — sem mensagem nenhuma, parecia que o botão tinha travado. Agora mostra o que
+// falta preencher em vez de silenciosamente não salvar.
+function mensagemFaltando(): string | null {
+  if (valorCents.value <= 0) return 'Informe o valor da transferência (Notas + Moedas).';
+  if (!lacre.value.trim()) return 'Informe o N° Lacre / Doc.';
+  if (!caixaOrigem.value) return 'Selecione a Origem / Saída.';
+  if (!caixaDestino.value) return 'Selecione o Destino / Entrada.';
+  return null;
+}
+
 async function salvar(criarNova: boolean): Promise<void> {
-  if (!valido.value || !caixaOrigem.value || !caixaDestino.value) return;
+  if (!valido.value || !caixaOrigem.value || !caixaDestino.value) {
+    erro.value = mensagemFaltando();
+    return;
+  }
   erro.value = null;
   salvando.value = true;
   try {

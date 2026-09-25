@@ -1,5 +1,6 @@
 import { ErroImportacaoVendas } from '../../utils/importarVendas';
 import { sincronizarPlanilhaCreare } from '../../utils/sincronizarPlanilha';
+import { mensagemDeErro } from '../../../utils/erros';
 
 /**
  * Sync automático: lê a MESMA planilha Google Sheets que o `bot_padaria_v3` já preenche (rodando
@@ -40,7 +41,7 @@ export default defineEventHandler(async (event) => {
     console.error('[cron/importar-planilha] erro inesperado:', erro);
     throw createError({
       statusCode: 500,
-      statusMessage: erro instanceof Error ? erro.message : 'Erro interno.',
+      statusMessage: mensagemDeErro(erro, 'Erro interno.'),
     });
   }
 });

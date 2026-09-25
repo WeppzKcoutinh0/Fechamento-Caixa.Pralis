@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { CAIXAS, hojeISO } from '~/types/fechamento';
+import { CAIXAS, TURNOS, type Turno, hojeISO } from '~/types/fechamento';
 import {
   useTransferenciasTesouraria,
   type CaixaOuCofre,
   type DestinoExtra,
 } from '~/composables/useTransferenciasTesouraria';
 import CampoDinheiro from '~/components/comum/CampoDinheiro.vue';
+import { mensagemDeErro } from '~/utils/erros';
 
 const modelValue = defineModel<boolean>({ default: false });
 const emit = defineEmits<{ criada: [] }>();
@@ -48,6 +49,18 @@ const dataLanc = ref(hojeISO());
 const agendamento = ref(false);
 const caixaOrigem = ref<CaixaOuCofre | null>(null);
 const caixaDestino = ref<CaixaOuCofre | null>(null);
+// Pedido do usuário (25/09/2026): "Caixa 1" sozinho é ambíguo — de qual turno? Só aparece/importa
+// quando o lado correspondente é um Caixa de verdade (não Cofre/Fluxo/Caixa Principal/Troco).
+const turnoOrigem = ref<Turno | null>(null);
+const turnoDestino = ref<Turno | null>(null);
+const ehCaixaOrigem = computed(() => (CAIXAS as readonly string[]).includes(caixaOrigem.value ?? ''));
+const ehCaixaDestino = computed(() => (CAIXAS as readonly string[]).includes(caixaDestino.value ?? ''));
+watch(ehCaixaOrigem, (ehCaixa) => {
+  if (!ehCaixa) turnoOrigem.value = null;
+});
+watch(ehCaixaDestino, (ehCaixa) => {
+  if (!ehCaixa) turnoDestino.value = null;
+});
 const multiploDestino = ref(false);
 const destinosExtra = ref<DestinoExtra[]>([]);
 const tempoConfirmacao = ref(false);
@@ -93,6 +106,8 @@ function resetar(): void {
   agendamento.value = false;
   caixaOrigem.value = null;
   caixaDestino.value = null;
+  turnoOrigem.value = null;
+  turnoDestino.value = null;
   multiploDestino.value = false;
   destinosExtra.value = [];
   tempoConfirmacao.value = false;
@@ -109,7 +124,9 @@ const valido = computed(
     !!lacre.value.trim() &&
     /^\d{4}-\d{2}-\d{2}$/.test(dataLanc.value) &&
     !!caixaOrigem.value &&
-    !!caixaDestino.value,
+    !!caixaDestino.value &&
+    (!ehCaixaOrigem.value || !!turnoOrigem.value) &&
+    (!ehCaixaDestino.value || !!turnoDestino.value),
 );
 
 // 25/09/2026 (bug real reportado pelo usuário): clicar em Salvar com o formulário incompleto
@@ -121,6 +138,8 @@ function mensagemFaltando(): string | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dataLanc.value)) return 'Informe a data do lançamento.';
   if (!caixaOrigem.value) return 'Selecione a Origem / Saída.';
   if (!caixaDestino.value) return 'Selecione o Destino / Entrada.';
+  if (ehCaixaOrigem.value && !turnoOrigem.value) return 'Selecione o turno da Origem.';
+  if (ehCaixaDestino.value && !turnoDestino.value) return 'Selecione o turno do Destino.';
   return null;
 }
 
@@ -141,6 +160,8 @@ async function salvar(criarNova: boolean): Promise<void> {
       agendamento: agendamento.value,
       caixaOrigem: caixaOrigem.value,
       caixaDestino: caixaDestino.value,
+      turnoOrigem: turnoOrigem.value,
+      turnoDestino: turnoDestino.value,
       multiploDestino: multiploDestino.value,
       destinosExtra: multiploDestino.value ? destinosExtra.value : [],
       tempoConfirmacao: tempoConfirmacao.value,
@@ -154,12 +175,10 @@ async function salvar(criarNova: boolean): Promise<void> {
       modelValue.value = false;
     }
   } catch (e) {
-    erro.value =
-      e instanceof Error && e.message.includes('duplicate')
-        ? `Já existe uma transferência com o lacre "${lacre.value}".`
-        : e instanceof Error
-          ? e.message
-          : 'Não foi possível salvar a transferência.';
+    const mensagem = mensagemDeErro(e, 'Não foi possível salvar a transferência.');
+    erro.value = mensagem.includes('duplicate')
+      ? `Já existe uma transferência com o lacre "${lacre.value}".`
+      : mensagem;
   } finally {
     salvando.value = false;
   }
@@ -222,10 +241,26 @@ watch(modelValue, (aberto) => {
             placeholder="Selecione..."
           />
           <v-select
+            v-if="ehCaixaOrigem"
+            v-model="turnoOrigem"
+            :items="TURNOS"
+            label="Turno (Origem)"
+            placeholder="Selecione..."
+          />
+        </div>
+        <div class="d-flex flex-column flex-sm-row ga-3">
+          <v-select
             v-model="caixaDestino"
             :items="opcoesDestino"
             :item-title="rotuloCaixa"
             label="Destino / Entrada"
+            placeholder="Selecione..."
+          />
+          <v-select
+            v-if="ehCaixaDestino"
+            v-model="turnoDestino"
+            :items="TURNOS"
+            label="Turno (Destino)"
             placeholder="Selecione..."
           />
         </div>

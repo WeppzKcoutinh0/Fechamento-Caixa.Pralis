@@ -19,6 +19,7 @@ import {
   formatarDataBr,
   turnoParaLetra,
 } from '~/utils/vendasFechamento';
+import { mensagemDeErro } from '~/utils/erros';
 
 const props = defineProps<{ draft: FechamentoDraft }>();
 
@@ -295,8 +296,7 @@ async function lerFotoMaquininha(
     // $fetch embrulha a mensagem amigável que a rota manda (createError statusMessage) dentro de
     // um texto técnico verboso ("[POST] ... 502 ..."); erro.data.statusMessage é o texto limpo.
     const mensagemServidor = (erro as { data?: { statusMessage?: string } })?.data?.statusMessage;
-    erroLeituraMaquininha.value =
-      mensagemServidor || (erro instanceof Error ? erro.message : 'Não foi possível ler a foto.');
+    erroLeituraMaquininha.value = mensagemServidor || mensagemDeErro(erro, 'Não foi possível ler a foto.');
   } finally {
     lendoMaquininha.value = null;
   }

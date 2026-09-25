@@ -9,6 +9,7 @@ import { draftDoRegistroAntigo, lerRegistrosAntigos } from '~/utils/importadorAn
 import { calcularResumoPainel } from '~/utils/painel';
 import { hojeISO } from '~/types/fechamento';
 import type { FechamentoListItem } from '~/types/fechamento';
+import { mensagemDeErro } from '~/utils/erros';
 
 const { listar, excluir, salvar } = useFechamentos();
 const router = useRouter();
@@ -25,7 +26,7 @@ async function carregar() {
   try {
     fechamentos.value = await listar();
   } catch (e) {
-    erro.value = e instanceof Error ? e.message : 'Não foi possível carregar os fechamentos.';
+    erro.value = mensagemDeErro(e, 'Não foi possível carregar os fechamentos.');
   } finally {
     carregando.value = false;
   }
@@ -55,7 +56,7 @@ async function importarAntigos() {
     registrosAntigos.value = [];
     await carregar();
   } catch (e) {
-    erroImportacao.value = e instanceof Error ? e.message : 'Não foi possível importar.';
+    erroImportacao.value = mensagemDeErro(e, 'Não foi possível importar.');
   } finally {
     importando.value = false;
   }
@@ -133,7 +134,7 @@ async function confirmarExclusao() {
     excluindoId.value = null;
     await carregar();
   } catch (e) {
-    erro.value = e instanceof Error ? e.message : 'Não foi possível excluir o fechamento.';
+    erro.value = mensagemDeErro(e, 'Não foi possível excluir o fechamento.');
   }
 }
 </script>

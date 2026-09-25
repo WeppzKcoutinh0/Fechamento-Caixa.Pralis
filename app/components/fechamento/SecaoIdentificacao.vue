@@ -12,6 +12,7 @@ import {
   formatarDataBr,
   turnoParaLetra,
 } from '~/utils/vendasFechamento';
+import { mensagemDeErro } from '~/utils/erros';
 
 const props = defineProps<{ draft: FechamentoDraft }>();
 
@@ -127,7 +128,7 @@ async function sincronizarAgora() {
     // Re-busca automaticamente pro filtro atual, pra já mostrar se algo novo chegou.
     if (jaBuscou.value) await buscarVendas();
   } catch (erro) {
-    sincronizacaoErro.value = erro instanceof Error ? erro.message : 'Falha ao sincronizar.';
+    sincronizacaoErro.value = mensagemDeErro(erro, 'Falha ao sincronizar.');
   } finally {
     sincronizando.value = false;
   }

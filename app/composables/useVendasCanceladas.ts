@@ -1,6 +1,7 @@
 import { ref } from 'vue';
 import { buscarVendasCrearePorStatus } from './useVendasCreare';
 import { buscarVendasProdutoDiaPorTipo } from './useVendasProdutoDia';
+import { mensagemDeErro } from '~/utils/erros';
 
 /**
  * Compatível por estrutura com `VendaProdutoDia` (mesmos campos, mesmos nomes) — quem já espera
@@ -71,7 +72,7 @@ export function useVendasCanceladas() {
         (a.horaVenda ?? '').localeCompare(b.horaVenda ?? ''),
       );
     } catch (e) {
-      erro.value = e instanceof Error ? e.message : 'Não foi possível buscar os produtos cancelados.';
+      erro.value = mensagemDeErro(e, 'Não foi possível buscar os produtos cancelados.');
     } finally {
       carregando.value = false;
     }

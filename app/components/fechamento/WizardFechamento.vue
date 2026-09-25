@@ -13,6 +13,7 @@ import SecaoRelatorios from '~/components/fechamento/SecaoRelatorios.vue';
 import SecaoRelatorioFinal from '~/components/fechamento/SecaoRelatorioFinal.vue';
 import AppCabecalhoTela from '~/components/app/AppCabecalhoTela.vue';
 import EtapasWizard from '~/components/fechamento/EtapasWizard.vue';
+import { mensagemDeErro } from '~/utils/erros';
 
 defineProps<{ titulo: string }>();
 
@@ -181,7 +182,7 @@ async function onSalvar() {
     }
     await router.push('/');
   } catch (e) {
-    erro.value = e instanceof Error ? e.message : 'Não foi possível salvar o fechamento.';
+    erro.value = mensagemDeErro(e, 'Não foi possível salvar o fechamento.');
   } finally {
     salvando.value = false;
   }

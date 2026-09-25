@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { useAnexos } from '~/composables/useAnexos';
+import { mensagemDeErro } from '~/utils/erros';
 
 const props = defineProps<{
   fechamentoId: string;
@@ -113,7 +114,7 @@ async function alternarGravacao(): Promise<void> {
       try {
         modelValue.value = await enviar(props.fechamentoId, props.campo, arquivo);
       } catch (e) {
-        erro.value = e instanceof Error ? e.message : 'Não foi possível enviar o áudio.';
+        erro.value = mensagemDeErro(e, 'Não foi possível enviar o áudio.');
       } finally {
         enviando.value = false;
       }

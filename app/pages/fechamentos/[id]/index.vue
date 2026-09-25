@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router';
 import { useFechamentoForm } from '~/composables/useFechamentoForm';
 import { useFechamentos } from '~/composables/useFechamentos';
 import WizardFechamento from '~/components/fechamento/WizardFechamento.vue';
+import { mensagemDeErro } from '~/utils/erros';
 
 const route = useRoute();
 const { carregarFechamento } = useFechamentoForm();
@@ -17,7 +18,7 @@ onMounted(async () => {
     const draft = await obter(String(route.params.id));
     carregarFechamento(draft);
   } catch (e) {
-    erro.value = e instanceof Error ? e.message : 'Não foi possível carregar o fechamento.';
+    erro.value = mensagemDeErro(e, 'Não foi possível carregar o fechamento.');
   } finally {
     carregando.value = false;
   }

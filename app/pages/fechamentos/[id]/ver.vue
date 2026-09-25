@@ -5,6 +5,7 @@ import { useFechamentos } from '~/composables/useFechamentos';
 import { useRelatorioCalculado } from '~/composables/useRelatorioCalculado';
 import { criarFechamentoVazio, type FechamentoDraft } from '~/types/fechamento';
 import { calculateDiscrimination, formatCents } from '~/utils/financeiro';
+import { mensagemDeErro } from '~/utils/erros';
 import AppCabecalhoTela from '~/components/app/AppCabecalhoTela.vue';
 import CockpitCategorias from '~/components/fechamento/CockpitCategorias.vue';
 
@@ -34,7 +35,7 @@ onMounted(async () => {
   try {
     draft.value = await obter(String(route.params.id));
   } catch (e) {
-    erro.value = e instanceof Error ? e.message : 'Não foi possível carregar o fechamento.';
+    erro.value = mensagemDeErro(e, 'Não foi possível carregar o fechamento.');
   } finally {
     carregando.value = false;
   }

@@ -1,6 +1,7 @@
 import { ErroImportacaoVendas } from '../../utils/importarVendas';
 import { sincronizarPlanilhaCreare } from '../../utils/sincronizarPlanilha';
 import { exigirUsuarioAutenticado } from '../../utils/usuarioAutenticado';
+import { mensagemDeErro } from '../../../utils/erros';
 
 /**
  * Sync manual: mesmo `sincronizarPlanilhaCreare()` do cron automático (1x/dia), mas disparado na
@@ -33,7 +34,7 @@ export default defineEventHandler(async (event) => {
     console.error('[vendas/sincronizar] erro inesperado:', erro);
     throw createError({
       statusCode: 500,
-      statusMessage: erro instanceof Error ? erro.message : 'Erro interno.',
+      statusMessage: mensagemDeErro(erro, 'Erro interno.'),
     });
   }
 });

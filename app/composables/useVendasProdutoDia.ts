@@ -1,5 +1,6 @@
 import { ref } from 'vue';
 import { useSupabase } from './useSupabase';
+import { mensagemDeErro } from '~/utils/erros';
 
 export interface VendaProdutoDia {
   id: string;
@@ -85,7 +86,7 @@ export function useVendasProdutoDia() {
     try {
       produtos.value = await buscarVendasProdutoDiaPorTipo(data, 'F');
     } catch (e) {
-      erro.value = e instanceof Error ? e.message : 'Não foi possível buscar os produtos vendidos.';
+      erro.value = mensagemDeErro(e, 'Não foi possível buscar os produtos vendidos.');
     } finally {
       carregando.value = false;
     }

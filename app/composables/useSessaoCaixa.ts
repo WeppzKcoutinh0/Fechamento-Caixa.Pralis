@@ -2,6 +2,7 @@ import { useSupabase } from './useSupabase';
 import { useAuth } from './useAuth';
 import type { Caixa, Turno } from '~/types/fechamento';
 import { hojeISO } from '~/types/fechamento';
+import { mensagemDeErro } from '~/utils/erros';
 
 export interface SessaoCaixa {
   id: string;
@@ -68,7 +69,7 @@ export function useSessaoCaixa() {
       if (erroSupabase) throw erroSupabase;
       sessaoAtual.value = data ? linhaParaSessao(data as SessaoRow) : null;
     } catch (e) {
-      erro.value = e instanceof Error ? e.message : 'Não foi possível carregar a sessão de caixa.';
+      erro.value = mensagemDeErro(e, 'Não foi possível carregar a sessão de caixa.');
     } finally {
       carregando.value = false;
     }

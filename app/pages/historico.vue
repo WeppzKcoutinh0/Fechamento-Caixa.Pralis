@@ -6,6 +6,7 @@ import { useSupabase } from '~/composables/useSupabase';
 import { useSessaoCaixa } from '~/composables/useSessaoCaixa';
 import { formatCents, toCents } from '~/utils/financeiro';
 import { formatarDataBr } from '~/utils/vendasFechamento';
+import { mensagemDeErro } from '~/utils/erros';
 import AppCabecalhoTela from '~/components/app/AppCabecalhoTela.vue';
 import ConfirmacaoDialog from '~/components/comum/ConfirmacaoDialog.vue';
 
@@ -118,7 +119,7 @@ async function carregar(): Promise<void> {
       };
     });
   } catch (e) {
-    erro.value = e instanceof Error ? e.message : 'Não foi possível carregar o histórico.';
+    erro.value = mensagemDeErro(e, 'Não foi possível carregar o histórico.');
   } finally {
     carregando.value = false;
   }
@@ -157,7 +158,7 @@ async function confirmarEncerrar(): Promise<void> {
     await encerrarSemFechamento(sessaoId);
     await carregar();
   } catch (e) {
-    erro.value = e instanceof Error ? e.message : 'Não foi possível encerrar a sessão.';
+    erro.value = mensagemDeErro(e, 'Não foi possível encerrar a sessão.');
   }
 }
 </script>

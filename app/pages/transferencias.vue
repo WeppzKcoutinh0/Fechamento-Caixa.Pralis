@@ -9,6 +9,7 @@ import {
 } from '~/composables/useTransferenciasTesouraria';
 import { formatCents } from '~/utils/financeiro';
 import { formatarDataBr } from '~/utils/vendasFechamento';
+import { mensagemDeErro } from '~/utils/erros';
 
 definePageMeta({ middleware: ['admin'] });
 
@@ -28,7 +29,7 @@ async function carregar(): Promise<void> {
   try {
     transferencias.value = await listar();
   } catch (e) {
-    erro.value = e instanceof Error ? e.message : 'Não foi possível carregar as transferências.';
+    erro.value = mensagemDeErro(e, 'Não foi possível carregar as transferências.');
   } finally {
     carregando.value = false;
   }
@@ -60,6 +61,11 @@ function ehRetorno(t: TransferenciaTesouraria): boolean {
 
 function ehTransferenciaEntreContas(t: TransferenciaTesouraria): boolean {
   return CONTAS_CENTRAIS.has(t.caixaOrigem) || CONTAS_CENTRAIS.has(t.caixaDestino);
+}
+
+/** "Caixa 1 (Manhã)" quando tem turno registrado (pedido do usuário, 25/09/2026); senão só o nome. */
+function rotuloComTurno(caixa: string, turno: string | null): string {
+  return turno ? `${caixa} (${turno})` : caixa;
 }
 
 const gruposTransferencias = computed(() => [
@@ -99,7 +105,7 @@ async function confirmarRecebimentoDe(id: string): Promise<void> {
     await confirmarRecebimento(id);
     await carregar();
   } catch (e) {
-    erro.value = e instanceof Error ? e.message : 'Não foi possível confirmar o recebimento.';
+    erro.value = mensagemDeErro(e, 'Não foi possível confirmar o recebimento.');
   } finally {
     confirmando.value = null;
   }
@@ -129,7 +135,10 @@ async function confirmarRecebimentoDe(id: string): Promise<void> {
               <v-list-item v-for="t in pendentes" :key="t.id" class="py-3">
                 <div class="d-flex flex-column ga-1">
                   <div class="d-flex align-center ga-2">
-                    <strong>{{ t.caixaOrigem }} → {{ t.caixaDestino }}</strong>
+                    <strong
+                      >{{ rotuloComTurno(t.caixaOrigem, t.turnoOrigem) }} →
+                      {{ rotuloComTurno(t.caixaDestino, t.turnoDestino) }}</strong
+                    >
                     <v-spacer />
                     <strong>R$ {{ formatCents(t.valorCents) }}</strong>
                   </div>
@@ -196,7 +205,10 @@ async function confirmarRecebimentoDe(id: string): Promise<void> {
               >
                 <div class="d-flex align-center flex-wrap ga-3">
                   <v-icon icon="mdi-check-circle" color="success" size="20" />
-                  <strong>{{ t.caixaOrigem }} → {{ t.caixaDestino }}</strong>
+                  <strong
+                    >{{ rotuloComTurno(t.caixaOrigem, t.turnoOrigem) }} →
+                    {{ rotuloComTurno(t.caixaDestino, t.turnoDestino) }}</strong
+                  >
                   <span class="text-caption text-medium-emphasis">Lacre {{ t.lacre }}</span>
                   <span class="text-caption text-medium-emphasis">{{
                     formatarDataBr(t.dataLanc)

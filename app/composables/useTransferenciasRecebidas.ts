@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue';
 import { useSupabase } from './useSupabase';
+import { mensagemDeErro } from '~/utils/erros';
 
 export interface TransferenciaRecebida {
   caixaOrigem: string;
@@ -41,8 +42,7 @@ export function useTransferenciasRecebidas() {
         valorCents: Number(l.valor_total_cents),
       }));
     } catch (e) {
-      erro.value =
-        e instanceof Error ? e.message : 'Não foi possível buscar transferências recebidas.';
+      erro.value = mensagemDeErro(e, 'Não foi possível buscar transferências recebidas.');
     } finally {
       carregando.value = false;
     }

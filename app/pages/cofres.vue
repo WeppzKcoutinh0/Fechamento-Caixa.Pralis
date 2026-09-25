@@ -26,6 +26,7 @@ import {
 import CampoDinheiro from '~/components/comum/CampoDinheiro.vue';
 import { formatCents } from '~/utils/financeiro';
 import { formatarDataBr } from '~/utils/vendasFechamento';
+import { mensagemDeErro } from '~/utils/erros';
 import AppCabecalhoTela from '~/components/app/AppCabecalhoTela.vue';
 import { useSupabase } from '~/composables/useSupabase';
 import ConfirmacaoDialog from '~/components/comum/ConfirmacaoDialog.vue';
@@ -105,7 +106,7 @@ async function carregar(mostrarSpinner = true): Promise<void> {
       }
     }
   } catch (e) {
-    erro.value = e instanceof Error ? e.message : 'Não foi possível carregar os cofres.';
+    erro.value = mensagemDeErro(e, 'Não foi possível carregar os cofres.');
   } finally {
     if (mostrarSpinner) carregando.value = false;
   }
@@ -170,7 +171,7 @@ async function confirmar(t: TransferenciaTesouraria): Promise<void> {
     await confirmarRecebimento(t.id);
     await carregar(false);
   } catch (e) {
-    erro.value = e instanceof Error ? e.message : 'Não foi possível confirmar o recebimento.';
+    erro.value = mensagemDeErro(e, 'Não foi possível confirmar o recebimento.');
   } finally {
     confirmandoId.value = null;
   }
@@ -201,7 +202,7 @@ async function aoAbrirCofre(cofre: CofreCentral): Promise<void> {
   try {
     notasPorCofre.value[cofre] = await listarNotas(cofre);
   } catch (e) {
-    erro.value = e instanceof Error ? e.message : 'Não foi possível carregar as anotações.';
+    erro.value = mensagemDeErro(e, 'Não foi possível carregar as anotações.');
   }
 }
 async function salvarNota(cofre: CofreCentral): Promise<void> {
@@ -213,7 +214,7 @@ async function salvarNota(cofre: CofreCentral): Promise<void> {
     novaNotaTexto.value[cofre] = '';
     notasPorCofre.value[cofre] = await listarNotas(cofre);
   } catch (e) {
-    erro.value = e instanceof Error ? e.message : 'Não foi possível salvar a anotação.';
+    erro.value = mensagemDeErro(e, 'Não foi possível salvar a anotação.');
   } finally {
     salvandoNota.value = null;
   }
@@ -223,7 +224,7 @@ async function excluirNota(cofre: CofreCentral, id: string): Promise<void> {
     await removerNota(id);
     notasPorCofre.value[cofre] = notasPorCofre.value[cofre].filter((n) => n.id !== id);
   } catch (e) {
-    erro.value = e instanceof Error ? e.message : 'Não foi possível excluir a anotação.';
+    erro.value = mensagemDeErro(e, 'Não foi possível excluir a anotação.');
   }
 }
 
@@ -275,7 +276,7 @@ async function registrarEntradaPrincipal(): Promise<void> {
     entradaData.value = hojeISO();
     await carregar(false);
   } catch (e) {
-    erro.value = e instanceof Error ? e.message : 'Não foi possível registrar a entrada.';
+    erro.value = mensagemDeErro(e, 'Não foi possível registrar a entrada.');
   } finally {
     salvandoEntrada.value = false;
   }
@@ -315,7 +316,7 @@ async function registrarSaidaParaTroco(): Promise<void> {
     saidaAberta.value = false;
     await carregar(false);
   } catch (e) {
-    erro.value = e instanceof Error ? e.message : 'Não foi possível registrar a saída.';
+    erro.value = mensagemDeErro(e, 'Não foi possível registrar a saída.');
   } finally {
     salvandoSaida.value = false;
   }
@@ -336,7 +337,7 @@ async function registrarLancamentoFluxo(): Promise<void> {
     fluxoConta.value = 'Conta Cofre';
     await carregar(false);
   } catch (e) {
-    erro.value = e instanceof Error ? e.message : 'Não foi possível registrar o lançamento do Fluxo.';
+    erro.value = mensagemDeErro(e, 'Não foi possível registrar o lançamento do Fluxo.');
   } finally {
     salvandoFluxo.value = false;
   }
@@ -408,7 +409,7 @@ async function salvarEdicaoCofre(): Promise<void> {
     editorAberto.value = false;
     await carregar(false);
   } catch (e) {
-    erro.value = e instanceof Error ? e.message : 'Não foi possível editar o lançamento.';
+    erro.value = mensagemDeErro(e, 'Não foi possível editar o lançamento.');
   } finally {
     salvandoEdicao.value = false;
   }
@@ -436,7 +437,7 @@ async function confirmarExclusaoCofre(): Promise<void> {
     exclusaoId.value = null;
     await carregar(false);
   } catch (e) {
-    erro.value = e instanceof Error ? e.message : 'Não foi possível excluir a movimentação.';
+    erro.value = mensagemDeErro(e, 'Não foi possível excluir a movimentação.');
   } finally {
     excluindo.value = false;
   }

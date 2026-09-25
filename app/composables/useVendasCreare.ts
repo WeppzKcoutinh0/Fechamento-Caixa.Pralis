@@ -1,5 +1,6 @@
 import { ref } from 'vue';
 import { useSupabase } from './useSupabase';
+import { mensagemDeErro } from '~/utils/erros';
 
 export interface VendaCreareItem {
   id: string;
@@ -124,7 +125,7 @@ export function useVendasCanceladasCreare() {
     try {
       itens.value = await buscarVendasCrearePorStatus(data, 'CANCELADA');
     } catch (e) {
-      erro.value = e instanceof Error ? e.message : 'Não foi possível buscar as vendas canceladas.';
+      erro.value = mensagemDeErro(e, 'Não foi possível buscar as vendas canceladas.');
     } finally {
       carregando.value = false;
     }

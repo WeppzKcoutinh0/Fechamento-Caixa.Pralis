@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useAuth } from '~/composables/useAuth';
+import { mensagemDeErro } from '~/utils/erros';
 
 // Única tela pública (ver middleware/auth.global.ts) — sem sidebar/topbar do app.
 definePageMeta({ layout: false });
@@ -19,7 +20,7 @@ async function entrar() {
     await signIn(email.value, password.value);
     await router.replace('/');
   } catch (e) {
-    erro.value = e instanceof Error ? e.message : 'Não foi possível entrar.';
+    erro.value = mensagemDeErro(e, 'Não foi possível entrar.');
   } finally {
     carregando.value = false;
   }

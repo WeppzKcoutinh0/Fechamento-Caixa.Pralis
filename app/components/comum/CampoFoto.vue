@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useAnexos } from '~/composables/useAnexos';
+import { mensagemDeErro } from '~/utils/erros';
 
 const props = defineProps<{
   fechamentoId: string;
@@ -37,7 +38,7 @@ async function aoEscolherArquivo(event: Event): Promise<void> {
   try {
     modelValue.value = await enviar(props.fechamentoId, props.campo, arquivo);
   } catch (e) {
-    erro.value = e instanceof Error ? e.message : 'Não foi possível enviar a foto.';
+    erro.value = mensagemDeErro(e, 'Não foi possível enviar a foto.');
   } finally {
     enviando.value = false;
     input.value = '';

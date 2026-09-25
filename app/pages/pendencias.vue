@@ -8,6 +8,7 @@
 import { computed, onMounted, ref } from 'vue';
 import { useSupabase } from '~/composables/useSupabase';
 import { usePendenciasFundoCaixa } from '~/composables/usePendenciasFundoCaixa';
+import { mensagemDeErro } from '~/utils/erros';
 import { formatCents, toCents } from '~/utils/financeiro';
 import { formatarDataBr } from '~/utils/vendasFechamento';
 import AppCabecalhoTela from '~/components/app/AppCabecalhoTela.vue';
@@ -112,7 +113,7 @@ async function carregar(): Promise<void> {
       };
     });
   } catch (e) {
-    erro.value = e instanceof Error ? e.message : 'Não foi possível carregar as pendências.';
+    erro.value = mensagemDeErro(e, 'Não foi possível carregar as pendências.');
   } finally {
     carregando.value = false;
   }
@@ -140,7 +141,7 @@ async function resolver(sessaoId: string): Promise<void> {
     linhas.value = linhas.value.filter((l) => l.sessaoId !== sessaoId);
     await atualizarContagem();
   } catch (e) {
-    erro.value = e instanceof Error ? e.message : 'Não foi possível marcar como resolvida.';
+    erro.value = mensagemDeErro(e, 'Não foi possível marcar como resolvida.');
   } finally {
     resolvendo.value = null;
   }

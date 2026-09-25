@@ -23,6 +23,7 @@ import {
   calculateValorTotalLancamento,
   formatCents,
 } from '~/utils/financeiro';
+import { mensagemDeErro } from '~/utils/erros';
 
 const props = defineProps<{ draft: FechamentoDraft }>();
 const { perfil } = usePerfil();
@@ -381,8 +382,7 @@ async function lerItensNota(): Promise<void> {
     if (resultado.avisos.length) avisoLeituraNotaFiscal.value += ` ${resultado.avisos.join(' ')}`;
   } catch (erro) {
     const mensagemServidor = (erro as { data?: { statusMessage?: string } })?.data?.statusMessage;
-    erroLeituraNotaFiscal.value =
-      mensagemServidor || (erro instanceof Error ? erro.message : 'Não foi possível ler a nota.');
+    erroLeituraNotaFiscal.value = mensagemServidor || mensagemDeErro(erro, 'Não foi possível ler a nota.');
   } finally {
     lendoNotaFiscal.value = false;
   }

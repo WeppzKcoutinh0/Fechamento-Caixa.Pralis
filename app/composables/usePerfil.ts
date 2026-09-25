@@ -1,5 +1,6 @@
 import { useSupabase } from './useSupabase';
 import { useAuth } from './useAuth';
+import { mensagemDeErro } from '~/utils/erros';
 
 export type Papel = 'admin' | 'caixa';
 
@@ -81,8 +82,7 @@ export function usePerfil() {
       if (session.value?.user.id === userId) {
         perfil.value = null;
         perfilUserId.value = null;
-        erro.value =
-          e instanceof Error ? e.message : 'Não foi possível carregar o perfil do usuário.';
+        erro.value = mensagemDeErro(e, 'Não foi possível carregar o perfil do usuário.');
       }
     } finally {
       if (requisicaoUserId.value === userId) {

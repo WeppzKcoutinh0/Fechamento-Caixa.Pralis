@@ -1,5 +1,5 @@
 import { useSupabase } from './useSupabase';
-import { hojeISO, type Caixa } from '~/types/fechamento';
+import { hojeISO, type Caixa, type Turno } from '~/types/fechamento';
 
 // Caixa Principal / Caixa de Troco / Fluxo (pedido do usuário, 23/09/2026): três cofres centrais
 // NOVOS, independentes do "Cofre" genérico que já existia — decisão explícita do usuário de não
@@ -29,6 +29,10 @@ export interface TransferenciaTesouraria {
   confirmadoEm: string | null;
   caixaOrigem: CaixaOuCofre;
   caixaDestino: CaixaOuCofre;
+  // Pedido do usuário (25/09/2026): "Caixa 1" sozinho é ambíguo (manhã ou tarde?) — só faz
+  // sentido quando caixaOrigem/caixaDestino é um Caixa de verdade (não Cofre/Fluxo/etc).
+  turnoOrigem: Turno | null;
+  turnoDestino: Turno | null;
   multiploDestino: boolean;
   destinosExtra: DestinoExtra[];
   tempoConfirmacao: boolean;
@@ -49,6 +53,8 @@ interface LinhaRow {
   confirmado_em: string | null;
   caixa_origem: CaixaOuCofre;
   caixa_destino: CaixaOuCofre;
+  turno_origem: Turno | null;
+  turno_destino: Turno | null;
   multiplo_destino: boolean;
   destinos_extra: { caixa: CaixaOuCofre; valor?: number }[];
   tempo_confirmacao: boolean;
@@ -70,6 +76,8 @@ function linhaParaTransferencia(l: LinhaRow): TransferenciaTesouraria {
     confirmadoEm: l.confirmado_em,
     caixaOrigem: l.caixa_origem,
     caixaDestino: l.caixa_destino,
+    turnoOrigem: l.turno_origem,
+    turnoDestino: l.turno_destino,
     multiploDestino: l.multiplo_destino,
     destinosExtra: (l.destinos_extra ?? []).map((d) => ({
       caixa: d.caixa,
@@ -84,7 +92,7 @@ function linhaParaTransferencia(l: LinhaRow): TransferenciaTesouraria {
 
 const SELECT_COLUNAS =
   'id, valor, valor_notas, valor_moedas, lacre, data_lanc, agendamento, data_recebimento, confirmado_em, caixa_origem, caixa_destino, ' +
-  'multiplo_destino, destinos_extra, tempo_confirmacao, transferencia_retorno, observacao, criado_em';
+  'turno_origem, turno_destino, multiplo_destino, destinos_extra, tempo_confirmacao, transferencia_retorno, observacao, criado_em';
 
 /**
  * Tesouraria central (18/09/2026, pedido do usuário) — transferências independentes de qualquer
@@ -125,6 +133,10 @@ export function useTransferenciasTesouraria() {
     agendamento: boolean;
     caixaOrigem: CaixaOuCofre;
     caixaDestino: CaixaOuCofre;
+    // Só fazem sentido quando o respectivo caixaOrigem/caixaDestino é um Caixa (não
+    // Cofre/Fluxo/etc) — pedido do usuário (25/09/2026): "Caixa 1" sozinho não diz de qual turno.
+    turnoOrigem?: Turno | null;
+    turnoDestino?: Turno | null;
     multiploDestino: boolean;
     destinosExtra: DestinoExtra[];
     tempoConfirmacao: boolean;
@@ -149,6 +161,8 @@ export function useTransferenciasTesouraria() {
         agendamento: dados.agendamento,
         caixa_origem: dados.caixaOrigem,
         caixa_destino: dados.caixaDestino,
+        turno_origem: dados.turnoOrigem ?? null,
+        turno_destino: dados.turnoDestino ?? null,
         multiplo_destino: dados.multiploDestino,
         destinos_extra: destinosExtras,
         tempo_confirmacao: dados.tempoConfirmacao,

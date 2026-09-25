@@ -161,8 +161,11 @@ export function useTransferenciasTesouraria() {
         agendamento: dados.agendamento,
         caixa_origem: dados.caixaOrigem,
         caixa_destino: dados.caixaDestino,
-        turno_origem: dados.turnoOrigem ?? null,
-        turno_destino: dados.turnoDestino ?? null,
+        // `||` de propósito (não `??`): string vazia do v-select "sem seleção" tem que virar null
+        // igual undefined/null — a coluna só aceita 'Manhã'/'Tarde'/null (achado real, 25/09/2026:
+        // string vazia violava o check constraint em vez de ser tratada como "sem turno").
+        turno_origem: dados.turnoOrigem || null,
+        turno_destino: dados.turnoDestino || null,
         multiplo_destino: dados.multiploDestino,
         destinos_extra: destinosExtras,
         tempo_confirmacao: dados.tempoConfirmacao,

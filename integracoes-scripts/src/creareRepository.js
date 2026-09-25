@@ -102,6 +102,13 @@ export function montarLinhaVendaProduto(row, { empresa, agora }) {
     // 'F' (finalizada) ou 'C' (cancelada) — vem de VENDAS_PRODUTOS.sql (join com venda_balcao).
     // NÃO entra no HASH abaixo de propósito, ver comentário no .sql.
     TIPO: row.TIPO === 'C' ? 'C' : 'F',
+    // 25/09/2026: a query já devolve os IDs de venda do CREARE e as formas de pagamento
+    // (GROUP_CONCAT, pode haver mais de uma venda/forma agregada no mesmo produto/dia) — só não
+    // entravam aqui, então o app nunca recebia (mesma causa em ambos: rastreabilidade e forma de
+    // pagamento sumiam tanto nos produtos vendidos quanto nos cancelados). NÃO entram no HASH:
+    // aparecer/mudar não deve forçar reimportar a linha inteira.
+    IDS_VENDA_CREARE: row.IDS_VENDA_CREARE ?? null,
+    FORMAS_PAGAMENTO: row.FORMAS_PAGAMENTO ?? null,
     EMPRESA: empresa,
     ATUALIZADO_EM: agora,
   };

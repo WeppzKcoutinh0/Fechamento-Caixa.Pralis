@@ -84,3 +84,30 @@ test('montarLinhaVendaProduto: monta e calcula HASH', () => {
   assert.equal(linha.QUANTIDADE, 12.5);
   assert.ok(linha.HASH && linha.HASH.length === 64);
 });
+
+test('montarLinhaVendaProduto: repassa IDS_VENDA_CREARE e FORMAS_PAGAMENTO da query (rastreabilidade)', () => {
+  const linha = montarLinhaVendaProduto(
+    {
+      DATA_VENDA: '21/08/2026',
+      PRODUTO_CODIGO: '123',
+      PRODUTO: 'Pão Francês',
+      QUANTIDADE: 1,
+      VALOR_UNITARIO: 15,
+      TOTAL: 15,
+      IDS_VENDA_CREARE: '599538, 599539',
+      FORMAS_PAGAMENTO: 'DINHEIRO, PIX',
+    },
+    { empresa: 'TNP CENTRAL', agora: '2026-08-22 22:10:03' },
+  );
+  assert.equal(linha.IDS_VENDA_CREARE, '599538, 599539');
+  assert.equal(linha.FORMAS_PAGAMENTO, 'DINHEIRO, PIX');
+});
+
+test('montarLinhaVendaProduto: sem IDS_VENDA_CREARE/FORMAS_PAGAMENTO na linha, fica null (não quebra)', () => {
+  const linha = montarLinhaVendaProduto(
+    { DATA_VENDA: '21/08/2026', PRODUTO_CODIGO: '123', PRODUTO: 'Pão Francês', QUANTIDADE: 1, VALOR_UNITARIO: 15, TOTAL: 15 },
+    { empresa: 'TNP CENTRAL', agora: '2026-08-22 22:10:03' },
+  );
+  assert.equal(linha.IDS_VENDA_CREARE, null);
+  assert.equal(linha.FORMAS_PAGAMENTO, null);
+});

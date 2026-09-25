@@ -368,6 +368,9 @@ function linhaParaDraft(row: FechamentoRow): FechamentoDraft {
     dinheiroContadoMoedasCents: toCents(row.dinheiro_contado_moedas ?? 0),
     lacreFechamento: row.lacre_fechamento,
     dinheiroContadoConfirmado: row.dinheiro_contado_confirmado ?? false,
+    // Sem coluna própria no banco (ver types/fechamento.ts) — se a confirmação final já
+    // aconteceu, o passo intermediário (Notas/Moedas) necessariamente também já aconteceu.
+    dinheiroContadoValoresConfirmados: row.dinheiro_contado_confirmado ?? false,
     vendasCanceladasMotivoTipo:
       row.vendas_canceladas_motivo_tipo === 'audio' ? 'audio' : 'texto',
     vendasCanceladasMotivoTexto: row.vendas_canceladas_motivo_texto ?? '',

@@ -15,14 +15,9 @@ export function textoWhatsappVendasCanceladas(
 ): string {
   const linhas = [
     `*Vendas/Produtos Cancelados*`,
-    `${draft.codigo} — ${formatarDataBr(draft.data)} — ${draft.caixa || '—'} / ${draft.turno || '—'}`,
-    '',
-    '*Motivo:*',
-    draft.vendasCanceladasMotivoTipo === 'audio'
-      ? draft.vendasCanceladasMotivoAudioPath
-        ? '(registrado em áudio no fechamento — sem transcrição em texto)'
-        : '(nenhum áudio gravado ainda)'
-      : draft.vendasCanceladasMotivoTexto || '(nenhum motivo informado ainda)',
+    `*Responsável:* ${draft.responsavel || 'Não informado'}`,
+    `*Data:* ${formatarDataBr(draft.data)}`,
+    `*Caixa:* ${draft.caixa || 'Não informado'} — *Turno:* ${draft.turno || 'Não informado'}`,
     '',
     `*Itens cancelados (${itens.length}):*`,
   ];
@@ -31,19 +26,23 @@ export function textoWhatsappVendasCanceladas(
   } else {
     for (const item of itens) {
       const motivo = draft.vendasCanceladasMotivos[item.id];
-      const hora = item.horaVenda ? ` — ${item.horaVenda.slice(0, 5)}` : '';
-      linhas.push(
-        `- ${item.produto} — qtd. ${item.quantidade} — R$ ${formatCents(item.totalCents)}${hora}`,
-      );
-      linhas.push(
-        `  Motivo deste produto: ${motivo?.tipo === 'audio' ? (motivo.audioPath ? 'registrado em audio no fechamento' : 'nenhum audio gravado ainda') : motivo?.texto || 'nenhum motivo informado ainda'}`,
-      );
+      const hora = item.horaVenda ? item.horaVenda.slice(0, 5) : 'Horário não informado';
+      const explicacao = motivo?.texto?.trim()
+        ? motivo.texto.trim()
+        : motivo?.tipo === 'audio' && motivo.audioPath
+          ? 'Áudio registrado (transcrição não disponível)'
+          : 'Nenhum motivo informado';
+      linhas.push(`- *${item.produto}* — R$ ${formatCents(item.totalCents)} — ${hora}`);
+      linhas.push(`  Motivo: ${explicacao}`);
     }
   }
   return linhas.join('\n');
 }
 
-export function abrirWhatsappVendasCanceladas(draft: FechamentoDraft, itens: VendaCancelada[]): void {
+export function abrirWhatsappVendasCanceladas(
+  draft: FechamentoDraft,
+  itens: VendaCancelada[],
+): void {
   const texto = textoWhatsappVendasCanceladas(draft, itens);
   window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank', 'noopener');
 }

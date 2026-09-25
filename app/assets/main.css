@@ -506,6 +506,27 @@ body {
   font-size: var(--cx-fs-micro);
   margin: -6px 0 10px;
 }
+/* Checkbox + mensagem (pedido do usuário, 25/09/2026, ver SecaoRelatorioFinal.vue "Confirma
+   esses valores contados?") — trava um par de campos assim que marcado, sem precisar do modal
+   inteiro pra revelar isso. */
+.lc-confirmar-valores {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -4px 0 14px;
+  color: var(--cx-ink);
+  font-size: var(--cx-fs-caption);
+  cursor: pointer;
+}
+.lc-confirmar-valores input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--cat);
+  cursor: pointer;
+}
+.lc-confirmar-valores input[type='checkbox']:disabled {
+  cursor: default;
+}
 .lc-grupo-titulo {
   margin: 0;
   color: var(--cx-ink-soft);

@@ -275,6 +275,12 @@ export interface FechamentoDraft {
   // botão "Salvar" do wizard libera (ver SecaoRelatorioFinal.vue/WizardFechamento.vue). Contar
   // "às cegas" antes de revelar a diferença é o ponto: confirmar primeiro, comparar depois.
   dinheiroContadoConfirmado: boolean;
+  // Passo intermediário (pedido do usuário, 25/09/2026): depois de preencher Notas E Moedas,
+  // aparece um checkbox "Confirma esses valores contados?" — marcar trava só esses dois campos
+  // (o Lacre final continua editável). Não precisa ir pro banco: uma vez que
+  // `dinheiroContadoConfirmado` também fica true (confirmação final, com o lacre), esse
+  // intermediário já fica implícito/redundante — só existe em memória no client.
+  dinheiroContadoValoresConfirmados: boolean;
 
   // Fluxo de Caixa (18/09/2026): liga este fechamento à sessão de caixa que o originou —
   // `null` quando não veio de uma sessão (ex.: fechamento criado direto pelo admin). Quando
@@ -394,6 +400,7 @@ export function criarFechamentoVazio(contexto?: ContextoSessaoCaixa): Fechamento
     dinheiroContadoMoedasCents: 0,
     lacreFechamento: '',
     dinheiroContadoConfirmado: false,
+    dinheiroContadoValoresConfirmados: false,
     cashSessionId: contexto?.id ?? null,
     lacreAbertura: contexto?.lacreAbertura ?? '',
     arquivosPendentes: {},

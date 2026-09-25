@@ -4,6 +4,7 @@ import { useAnexos } from '~/composables/useAnexos';
 
 const props = defineProps<{ fechamentoId: string; campo: string }>();
 const modelValue = defineModel<string | null>({ default: null });
+const transcricao = defineModel<string>('transcricao', { default: '' });
 
 const { enviar, urlAssinada } = useAnexos();
 const gravando = ref(false);
@@ -14,6 +15,62 @@ const urlReproducao = ref<string | null>(null);
 let mediaRecorder: MediaRecorder | null = null;
 let chunks: Blob[] = [];
 
+interface ReconhecimentoEvento {
+  results: ArrayLike<ArrayLike<{ transcript?: string }>>;
+}
+
+interface ReconhecimentoVoz {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((event: ReconhecimentoEvento) => void) | null;
+  onerror: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+
+interface JanelaComReconhecimento extends Window {
+  SpeechRecognition?: new () => ReconhecimentoVoz;
+  webkitSpeechRecognition?: new () => ReconhecimentoVoz;
+}
+
+let reconhecimento: ReconhecimentoVoz | null = null;
+
+function iniciarTranscricao(): void {
+  if (typeof window === 'undefined') return;
+  const janela = window as JanelaComReconhecimento;
+  const Construtor = janela.SpeechRecognition ?? janela.webkitSpeechRecognition;
+  if (!Construtor) return;
+
+  reconhecimento = new Construtor();
+  reconhecimento.lang = 'pt-BR';
+  reconhecimento.continuous = true;
+  reconhecimento.interimResults = false;
+  reconhecimento.onresult = (event) => {
+    const partes: string[] = [];
+    for (let i = 0; i < event.results.length; i += 1) {
+      const texto = event.results[i]?.[0]?.transcript?.trim();
+      if (texto) partes.push(texto);
+    }
+    if (partes.length > 0) {
+      transcricao.value = [transcricao.value.trim(), partes.join(' ')].filter(Boolean).join(' ');
+    }
+  };
+  reconhecimento.onerror = () => {
+    // A gravação do áudio continua mesmo quando o navegador não oferece reconhecimento de voz.
+  };
+  try {
+    reconhecimento.start();
+  } catch {
+    reconhecimento = null;
+  }
+}
+
+function pararTranscricao(): void {
+  reconhecimento?.stop();
+  reconhecimento = null;
+}
+
 async function atualizarUrlReproducao(): Promise<void> {
   urlReproducao.value = modelValue.value ? await urlAssinada(modelValue.value) : null;
 }
@@ -21,6 +78,7 @@ watch(() => modelValue.value, atualizarUrlReproducao, { immediate: true });
 
 async function alternarGravacao(): Promise<void> {
   if (gravando.value) {
+    pararTranscricao();
     mediaRecorder?.stop();
     return;
   }
@@ -46,6 +104,7 @@ async function alternarGravacao(): Promise<void> {
       }
     };
     mediaRecorder.start();
+    iniciarTranscricao();
     gravando.value = true;
   } catch {
     erro.value = 'Microfone não disponível';

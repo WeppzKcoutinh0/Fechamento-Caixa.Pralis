@@ -59,9 +59,25 @@ const DINHEIRO_FINAL_VARS = {
   '--cat-faixa': 'var(--cat-transferencias-faixa)',
   '--cat-tinta': 'var(--cat-transferencias-tinta)',
 };
+// Passo intermediário (pedido do usuário, 25/09/2026): só aparece depois que os DOIS campos
+// (Notas e Moedas) forem preenchidos — "tocado" fica true no primeiro input, mesmo que o valor
+// final seja 0 (moedas contadas pode legitimamente ser zero). Marcar o checkbox trava só esses
+// dois campos; o Lacre final continua editável até a confirmação final (botão lá embaixo).
+const notasTocada = ref(false);
+const moedasTocada = ref(false);
+const mostrarConfirmarValores = computed(
+  () => props.draft.dinheiroContadoValoresConfirmados || (notasTocada.value && moedasTocada.value),
+);
+const valoresContadosTravados = computed(() => props.draft.dinheiroContadoValoresConfirmados);
+function confirmarValoresContados(marcado: boolean): void {
+  // Só liga — nunca desliga por aqui (pedido explícito do usuário: uma vez marcado, não pode
+  // mais mexer). O :disabled no checkbox já impede o clique depois de marcado; isto é reforço.
+  if (marcado) props.draft.dinheiroContadoValoresConfirmados = true;
+}
+
 const lacreFinalVazio = computed(() => !props.draft.lacreFechamento.trim());
 function confirmarDinheiroFinal(): void {
-  if (lacreFinalVazio.value) return;
+  if (lacreFinalVazio.value || !props.draft.dinheiroContadoValoresConfirmados) return;
   props.draft.dinheiroContadoConfirmado = true;
 }
 const tomDiferenca = computed<'neutro' | 'positivo' | 'negativo'>(() => {
@@ -238,7 +254,8 @@ const totalTransferidoEntreCaixasCents = computed(() =>
 
 // Mesma soma de draft.pdvEntradas usada em SecaoTransferencias.vue — não repete busca nenhuma,
 // só lê o que "Buscar vendas" já gravou (idempotente, nunca duplica).
-type CampoPdv = 'dinheiroCents' | 'creditoCents' | 'debitoCents' | 'pixCents' | 'voucherCents' | 'crediarioCents';
+type CampoPdv =
+  'dinheiroCents' | 'creditoCents' | 'debitoCents' | 'pixCents' | 'voucherCents' | 'crediarioCents';
 function somaPdv(campo: CampoPdv): number {
   return props.draft.pdvEntradas.reduce((soma, p) => soma + p[campo], 0);
 }
@@ -248,18 +265,39 @@ function detalhesPorPdv(campo: CampoPdv): { rotulo: string; valorCents: number }
   return props.draft.pdvEntradas.map((p, i) => ({ rotulo: `PDV ${i + 1}`, valorCents: p[campo] }));
 }
 const transferenciasAutomaticas = computed(() => [
-  { rotulo: 'CREDITO', valorCents: somaPdv('creditoCents'), detalhes: detalhesPorPdv('creditoCents') },
+  {
+    rotulo: 'CREDITO',
+    valorCents: somaPdv('creditoCents'),
+    detalhes: detalhesPorPdv('creditoCents'),
+  },
   { rotulo: 'DEBITO', valorCents: somaPdv('debitoCents'), detalhes: detalhesPorPdv('debitoCents') },
   { rotulo: 'PIX', valorCents: somaPdv('pixCents'), detalhes: detalhesPorPdv('pixCents') },
-  { rotulo: 'VOUCHER', valorCents: somaPdv('voucherCents'), detalhes: detalhesPorPdv('voucherCents') },
-  { rotulo: 'DINHEIRO', valorCents: somaPdv('dinheiroCents'), detalhes: detalhesPorPdv('dinheiroCents') },
-  { rotulo: 'CREDIARIO', valorCents: somaPdv('crediarioCents'), detalhes: detalhesPorPdv('crediarioCents') },
+  {
+    rotulo: 'VOUCHER',
+    valorCents: somaPdv('voucherCents'),
+    detalhes: detalhesPorPdv('voucherCents'),
+  },
+  {
+    rotulo: 'DINHEIRO',
+    valorCents: somaPdv('dinheiroCents'),
+    detalhes: detalhesPorPdv('dinheiroCents'),
+  },
+  {
+    rotulo: 'CREDIARIO',
+    valorCents: somaPdv('crediarioCents'),
+    detalhes: detalhesPorPdv('crediarioCents'),
+  },
   ...(lacreAberturaValorCents.value > 0
     ? [
         {
           rotulo: 'TRANSFERÊNCIAS DE ENTRADA',
           valorCents: lacreAberturaValorCents.value,
-          detalhes: [{ rotulo: `Lacre ${props.draft.lacreAbertura}`, valorCents: lacreAberturaValorCents.value }],
+          detalhes: [
+            {
+              rotulo: `Lacre ${props.draft.lacreAbertura}`,
+              valorCents: lacreAberturaValorCents.value,
+            },
+          ],
         },
       ]
     : []),
@@ -303,12 +341,28 @@ function observacaoPorAjuste(chave: string): string {
   return lancamento?.obsTexto || 'Nenhum ajuste sincronizado ainda para esta categoria.';
 }
 const despesasAutomaticas = computed(() => [
-  { rotulo: 'COLABORADOR', valorCents: valorPorAjuste('colaboradores'), observacao: observacaoPorAjuste('colaboradores') },
-  { rotulo: 'LANCHES', valorCents: valorPorAjuste('alimentacao'), observacao: observacaoPorAjuste('alimentacao') },
+  {
+    rotulo: 'COLABORADOR',
+    valorCents: valorPorAjuste('colaboradores'),
+    observacao: observacaoPorAjuste('colaboradores'),
+  },
+  {
+    rotulo: 'LANCHES',
+    valorCents: valorPorAjuste('alimentacao'),
+    observacao: observacaoPorAjuste('alimentacao'),
+  },
 ]);
 const mercadoriasAutomaticas = computed(() => [
-  { rotulo: 'SOBRA/PERDA', valorCents: valorPorAjuste('sobraPerda'), observacao: observacaoPorAjuste('sobraPerda') },
-  { rotulo: 'FURTO/ROUBO', valorCents: valorPorAjuste('rouboFurto'), observacao: observacaoPorAjuste('rouboFurto') },
+  {
+    rotulo: 'SOBRA/PERDA',
+    valorCents: valorPorAjuste('sobraPerda'),
+    observacao: observacaoPorAjuste('sobraPerda'),
+  },
+  {
+    rotulo: 'FURTO/ROUBO',
+    valorCents: valorPorAjuste('rouboFurto'),
+    observacao: observacaoPorAjuste('rouboFurto'),
+  },
 ]);
 
 const CAT_VARS = {
@@ -523,11 +577,7 @@ const CAT_VARS = {
             Nenhum item cancelado para {{ draft.data }}.
           </v-alert>
           <div v-else class="d-flex flex-column ga-3 mb-2">
-            <div
-              v-for="item in itensCancelados"
-              :key="item.id"
-              class="cancelado-item"
-            >
+            <div v-for="item in itensCancelados" :key="item.id" class="cancelado-item">
               <div class="d-flex justify-space-between text-body-2 mb-2">
                 <span class="text-medium-emphasis">
                   {{ item.produto }} ({{ formatarQtd(item.quantidade) }})
@@ -559,7 +609,12 @@ const CAT_VARS = {
                     aria-label="Informar motivo em áudio"
                     @click.stop="abrirAudioMotivo(item)"
                   />
-                  <span v-if="motivoDoItem(item).audioPath" class="motivo-notificacao" aria-label="Áudio registrado">1</span>
+                  <span
+                    v-if="motivoDoItem(item).audioPath"
+                    class="motivo-notificacao"
+                    aria-label="Áudio registrado"
+                    >1</span
+                  >
                 </div>
               </div>
               <div v-if="textoMotivoAbertoId === item.id" class="motivo-editor mt-2">
@@ -575,7 +630,11 @@ const CAT_VARS = {
                   <v-btn size="small" variant="text" @click="textoMotivoAbertoId = null"
                     >Cancelar</v-btn
                   >
-                  <v-btn size="small" color="primary" variant="flat" @click="salvarTextoMotivo(item)"
+                  <v-btn
+                    size="small"
+                    color="primary"
+                    variant="flat"
+                    @click="salvarTextoMotivo(item)"
                     >Salvar</v-btn
                   >
                 </div>
@@ -584,8 +643,20 @@ const CAT_VARS = {
                 <GravadorAudio
                   :model-value="motivoDoItem(item).audioPath"
                   @update:model-value="motivoDoItem(item).audioPath = $event"
+                  :transcricao="motivoDoItem(item).texto"
+                  @update:transcricao="motivoDoItem(item).texto = $event"
                   :fechamento-id="draft.id"
                   :campo="`vendas-canceladas-motivo-${item.id}`"
+                />
+                <v-textarea
+                  v-if="motivoDoItem(item).texto"
+                  :model-value="motivoDoItem(item).texto"
+                  label="Transcrição do áudio"
+                  rows="2"
+                  auto-grow
+                  readonly
+                  hide-details
+                  class="mt-2"
                 />
                 <v-btn size="small" variant="text" class="mt-2" @click="audioMotivoAbertoId = null"
                   >Fechar</v-btn
@@ -598,13 +669,15 @@ const CAT_VARS = {
                   :color="motivoDoItem(item).tipo === 'texto' ? 'primary' : undefined"
                   :variant="motivoDoItem(item).tipo === 'texto' ? 'flat' : 'outlined'"
                   @click="motivoDoItem(item).tipo = 'texto'"
-                >Texto</v-btn>
+                  >Texto</v-btn
+                >
                 <v-btn
                   size="small"
                   :color="motivoDoItem(item).tipo === 'audio' ? 'primary' : undefined"
                   :variant="motivoDoItem(item).tipo === 'audio' ? 'flat' : 'outlined'"
                   @click="motivoDoItem(item).tipo = 'audio'"
-                >Áudio</v-btn>
+                  >Áudio</v-btn
+                >
               </div>
             </div>
           </div>
@@ -670,7 +743,11 @@ const CAT_VARS = {
           </div>
           <p class="cat-subgrupo">Automáticas</p>
           <v-expansion-panels variant="accordion" class="cat-subacordeao">
-            <v-expansion-panel v-for="item in transferenciasAutomaticas" :key="item.rotulo" class="cat-subitem">
+            <v-expansion-panel
+              v-for="item in transferenciasAutomaticas"
+              :key="item.rotulo"
+              class="cat-subitem"
+            >
               <v-expansion-panel-title class="cat-subitem-titulo">
                 <span class="d-flex flex-column">
                   <span class="cat-subitem-rotulo">{{ item.rotulo }}</span>
@@ -716,7 +793,11 @@ const CAT_VARS = {
           </div>
           <p class="cat-subgrupo">Automáticas</p>
           <v-expansion-panels variant="accordion" class="cat-subacordeao">
-            <v-expansion-panel v-for="item in despesasAutomaticas" :key="item.rotulo" class="cat-subitem">
+            <v-expansion-panel
+              v-for="item in despesasAutomaticas"
+              :key="item.rotulo"
+              class="cat-subitem"
+            >
               <v-expansion-panel-title class="cat-subitem-titulo">
                 <span class="d-flex flex-column">
                   <span class="cat-subitem-rotulo">{{ item.rotulo }}</span>
@@ -755,7 +836,11 @@ const CAT_VARS = {
           </div>
           <p class="cat-subgrupo">Automáticas</p>
           <v-expansion-panels variant="accordion" class="cat-subacordeao">
-            <v-expansion-panel v-for="item in mercadoriasAutomaticas" :key="item.rotulo" class="cat-subitem">
+            <v-expansion-panel
+              v-for="item in mercadoriasAutomaticas"
+              :key="item.rotulo"
+              class="cat-subitem"
+            >
               <v-expansion-panel-title class="cat-subitem-titulo">
                 <span class="d-flex flex-column">
                   <span class="cat-subitem-rotulo">{{ item.rotulo }}</span>
@@ -949,13 +1034,14 @@ const CAT_VARS = {
               <input
                 :value="formatCents(draft.dinheiroContadoNotasCents)"
                 class="lc-input"
-                :class="{ 'lc-input-ro': draft.dinheiroContadoConfirmado }"
-                :readonly="draft.dinheiroContadoConfirmado"
+                :class="{ 'lc-input-ro': valoresContadosTravados }"
+                :readonly="valoresContadosTravados"
                 inputmode="decimal"
                 @input="
+                  notasTocada = true;
                   aoAlterarNotasContadas(
                     aoDigitarCentavos(($event.target as HTMLInputElement).value),
-                  )
+                  );
                 "
               />
             </label>
@@ -964,17 +1050,28 @@ const CAT_VARS = {
               <input
                 :value="formatCents(draft.dinheiroContadoMoedasCents)"
                 class="lc-input"
-                :class="{ 'lc-input-ro': draft.dinheiroContadoConfirmado }"
-                :readonly="draft.dinheiroContadoConfirmado"
+                :class="{ 'lc-input-ro': valoresContadosTravados }"
+                :readonly="valoresContadosTravados"
                 inputmode="decimal"
                 @input="
+                  moedasTocada = true;
                   aoAlterarMoedasContadas(
                     aoDigitarCentavos(($event.target as HTMLInputElement).value),
-                  )
+                  );
                 "
               />
             </label>
           </div>
+
+          <label v-if="mostrarConfirmarValores" class="lc-confirmar-valores">
+            <input
+              type="checkbox"
+              :checked="valoresContadosTravados"
+              :disabled="valoresContadosTravados"
+              @change="confirmarValoresContados(($event.target as HTMLInputElement).checked)"
+            />
+            <span>Confirma esses valores contados?</span>
+          </label>
 
           <label class="lc-campo">
             <span class="lc-campo-lbl">N° Lacre final</span>
@@ -1016,7 +1113,7 @@ const CAT_VARS = {
             v-if="!draft.dinheiroContadoConfirmado"
             type="button"
             class="lc-salvar"
-            :disabled="lacreFinalVazio"
+            :disabled="lacreFinalVazio || !draft.dinheiroContadoValoresConfirmados"
             @click="confirmarDinheiroFinal"
           >
             Confirmar
@@ -1082,5 +1179,4 @@ const CAT_VARS = {
   font-size: 10px;
   font-weight: 700;
 }
-
 </style>

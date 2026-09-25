@@ -14,9 +14,10 @@ export function gerarPdfVendasCanceladas(draft: FechamentoDraft, itens: VendaCan
   const pdf = new ConstrutorPdf();
 
   pdf.titulo('Vendas/Produtos Cancelados');
-  pdf.subtitulo(draft.codigo);
+  pdf.subtitulo(`Responsável: ${draft.responsavel || 'Não informado'}`);
+  pdf.subtitulo(`Data: ${formatarDataBr(draft.data)}`);
   pdf.subtitulo(
-    `${formatarDataBr(draft.data)} — ${draft.caixa || '—'} / ${draft.turno || '—'} — Responsável: ${draft.responsavel || '—'}`,
+    `Caixa: ${draft.caixa || 'Não informado'} — Turno: ${draft.turno || 'Não informado'} — Código: ${draft.codigo}`,
   );
 
   pdf.secao(`Itens cancelados (${itens.length})`);
@@ -25,14 +26,17 @@ export function gerarPdfVendasCanceladas(draft: FechamentoDraft, itens: VendaCan
   } else {
     for (const item of itens) {
       const motivo = draft.vendasCanceladasMotivos[item.id];
-      const hora = item.horaVenda ? ` — ${item.horaVenda.slice(0, 5)}` : '';
+      const hora = item.horaVenda ? item.horaVenda.slice(0, 5) : 'Horário não informado';
+      const explicacao = motivo?.texto?.trim()
+        ? motivo.texto.trim()
+        : motivo?.tipo === 'audio' && motivo.audioPath
+          ? 'Áudio registrado (transcrição não disponível)'
+          : 'Nenhum motivo informado';
       pdf.linha(
-        `${item.produto} (qtd. ${item.quantidade})${hora}`,
+        `${item.produto} — ${hora} (qtd. ${item.quantidade})`,
         `R$ ${formatCents(item.totalCents)}`,
       );
-      pdf.vazio(
-        `Motivo deste produto: ${motivo?.tipo === 'audio' ? (motivo.audioPath ? 'registrado em audio (ver anexo).' : 'nenhum audio gravado ainda.') : motivo?.texto || 'nenhum motivo informado ainda.'}`,
-      );
+      pdf.vazio(`Motivo: ${explicacao}`);
     }
   }
 

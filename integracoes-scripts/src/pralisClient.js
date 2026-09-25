@@ -78,6 +78,24 @@ export class PralisClient {
     );
   }
 
+  /**
+   * Regra 12 do usuário: conferência específica pra vendas canceladas ausentes no sistema — não
+   * é best-effort silencioso como `enviarLinhas` (não fica pendente em disco): quem chama decide
+   * o que fazer com o resultado. `idsCreare` vazio não bate na API (nada a conferir).
+   */
+  async conciliarCanceladas(idsCreare) {
+    if (idsCreare.length === 0) return { ausentes: [] };
+    return comRetry(
+      () =>
+        postJson({
+          url: `${this.apiUrl}/vendas/conciliar-canceladas`,
+          token: this.token,
+          payload: { idsCreare },
+        }),
+      { tentativas: this.retryTentativas, baseMs: this.retryBaseMs },
+    );
+  }
+
   /** Reenvia lotes que ficaram pendentes de um ciclo anterior. Nunca lança — best effort. */
   async reprocessarPendentes() {
     const arquivos = await this.arquivosPendentes();

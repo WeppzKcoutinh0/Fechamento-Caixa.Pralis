@@ -81,6 +81,43 @@ export const linhaVendaProdutoDiaSchema = z.object({
   HASH: textoObrigatorio,
 });
 
+// Fluxo oficial CREARE -> robô -> API (pedido do usuário, 25/09/2026): uma linha POR VENDA, com
+// itens e pagamentos aninhados — granularidade diferente de `linhaVendaProdutoDiaSchema` acima
+// (que é um agregado por produto/dia). ID_VENDA_CREARE é OBRIGATÓRIO aqui de propósito: uma venda
+// sem ID não pode ser inventada (regra do usuário) — cai em `vendas_importacao_inconsistencias`
+// em vez de ser gravada (ver importarVendas.ts).
+const itemVendaCreareSchema = z.object({
+  PRODUTO_CODIGO: valorLivre,
+  PRODUTO: textoObrigatorio,
+  QUANTIDADE: valorLivre,
+  VALOR_UNITARIO: valorLivre,
+  TOTAL: valorLivre,
+  CANCELADO: z.boolean().nullish(),
+});
+
+const pagamentoVendaCreareSchema = z.object({
+  FORMA_PAGAMENTO: textoObrigatorio,
+  VALOR: valorLivre,
+});
+
+export const linhaVendaCreareSchema = z.object({
+  // Nullish de propósito (não `textoObrigatorio`): uma venda sem ID não pode travar o lote
+  // inteiro — vira inconsistência registrada em vez de rejeitar o POST completo (regra do
+  // usuário). A obrigatoriedade real é aplicada em importarVendas.ts, linha a linha.
+  ID_VENDA_CREARE: valorLivre,
+  EMPRESA: textoObrigatorio,
+  DATA_VENDA: textoObrigatorio,
+  HORA_VENDA: valorLivre,
+  PDV: valorLivre,
+  OPERADOR: valorLivre,
+  // 'F' ou 'C', igual `linhaVendaProdutoDiaSchema.TIPO` — mapearLinhasBot.ts traduz pra
+  // FINALIZADA/CANCELADA antes de gravar.
+  STATUS: z.union([z.literal('F'), z.literal('C')]),
+  ITENS: z.array(itemVendaCreareSchema).default([]),
+  PAGAMENTOS: z.array(pagamentoVendaCreareSchema).default([]),
+  ATUALIZADO_EM: valorLivre,
+});
+
 export const importarVendasPayloadSchema = z.discriminatedUnion('tipo', [
   z.object({
     tipo: z.literal('fechamento_caixa_dia'),
@@ -90,10 +127,15 @@ export const importarVendasPayloadSchema = z.discriminatedUnion('tipo', [
     tipo: z.literal('venda_produto_dia'),
     linhas: z.array(linhaVendaProdutoDiaSchema).max(500),
   }),
+  z.object({
+    tipo: z.literal('venda_creare'),
+    linhas: z.array(linhaVendaCreareSchema).max(500),
+  }),
 ]);
 
 export type LinhaFechamentoCaixaDia = z.infer<typeof linhaFechamentoCaixaDiaSchema>;
 export type LinhaVendaProdutoDia = z.infer<typeof linhaVendaProdutoDiaSchema>;
+export type LinhaVendaCreare = z.infer<typeof linhaVendaCreareSchema>;
 export type ImportarVendasPayload = z.infer<typeof importarVendasPayloadSchema>;
 
 // ─── Leitura no frontend (dados já sincronizados no Supabase) ──────────────────────────────────

@@ -69,7 +69,26 @@ Copie `.env.producao.example` para `.env.producao` (fora do git) e preencha:
 | `SYNC_LOCK_MAX_MINUTOS`                                | idade máxima do lock (default `30`)                                  |
 | `SYNC_RETRY_TENTATIVAS` / `SYNC_RETRY_BASE_MS`         | retry de rede por lote (default `4` / `500`)                         |
 | `SYNC_ENVIAR_PRODUTOS`                                 | também sincronizar vendas por produto? (default `true`)              |
+| `SYNC_ENVIAR_VENDAS`                                   | também sincronizar venda a venda (itens + pagamentos) — fonte de verdade de "Vendas canceladas"? (default `true`) |
 | `SYNC_ESTADO_DIR`                                      | pasta do estado de runtime (default `.estado`)                       |
+
+## Fluxo oficial de vendas (25/09/2026)
+
+Além de `fechamento_caixa_dia` (totais por caixa/hora) e `venda_produto_dia` (agregado por
+produto/dia, só pra "produtos vendidos no dia"), o agente agora também envia `venda_creare`: uma
+linha POR VENDA (não agregada), com itens e pagamentos — é a fonte de verdade de "Vendas
+canceladas" no Caixa. Upsert por `CREARE:<ID_VENDA_BALCAO>` (não por hash de conteúdo): uma venda
+que muda de FINALIZADA pra CANCELADA depois atualiza a MESMA linha no próximo ciclo, em vez de
+criar uma duplicada — por isso o ciclo relê o dia inteiro (`SYNC_DIAS_REPROCESSAR`), nunca depende
+de um cursor incremental.
+
+Pra ver cancelamentos quase em tempo real, recomendado `SYNC_INTERVALO_MINUTOS="1"` (em vez do
+default `10`) quando `SYNC_ENVIAR_VENDAS` estiver ligado.
+
+Depois de cada envio, o agente confere (best-effort, nunca derruba o ciclo) se toda venda que ele
+leu como CANCELADA no CREARE realmente existe como CANCELADA no sistema — loga um aviso se faltar
+alguma (`POST /vendas/conciliar-canceladas`). Uma venda sem `ID_VENDA_BALCAO` na origem nunca
+ganha um ID inventado: fica registrada em `vendas_importacao_inconsistencias` pra correção manual.
 
 ## 2. Instalar e testar
 

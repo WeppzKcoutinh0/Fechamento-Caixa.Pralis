@@ -32,6 +32,65 @@ export async function buscarVendasProdutos(pool, dataInicio) {
   return linhas;
 }
 
+// Fluxo oficial CREARE -> robô -> API (pedido do usuário, 25/09/2026): 3 queries independentes
+// (cabeçalho, itens, pagamentos), cada uma retornando 1 linha por (venda[, item/forma]) — SEM
+// agregação por dia, diferente de VENDAS_PRODUTOS.sql. Rodam em paralelo (mesmo espírito de
+// `sincronizarPlanilha.ts` no app) e são agrupadas por ID_VENDA_BALCAO logo abaixo.
+export async function buscarVendas(pool, dataInicio) {
+  const [[cabecalhos], [itens], [pagamentos]] = await Promise.all([
+    carregarQuery('VENDAS.sql', dataInicio).then((sql) => pool.query(sql)),
+    carregarQuery('VENDAS_ITENS.sql', dataInicio).then((sql) => pool.query(sql)),
+    carregarQuery('VENDAS_PAGAMENTOS.sql', dataInicio).then((sql) => pool.query(sql)),
+  ]);
+  return { cabecalhos, itens, pagamentos };
+}
+
+/** Agrupa itens/pagamentos (cada um com sua própria linha) por ID_VENDA_BALCAO. */
+function agruparPorVenda(linhas) {
+  const grupos = new Map();
+  for (const linha of linhas) {
+    const chave = linha.ID_VENDA_BALCAO;
+    const grupo = grupos.get(chave);
+    if (grupo) grupo.push(linha);
+    else grupos.set(chave, [linha]);
+  }
+  return grupos;
+}
+
+/**
+ * Monta uma venda completa (cabeçalho + itens[] + pagamentos[]) pronta pro payload de
+ * `POST /vendas/importar` (tipo `venda_creare`) — ver `linhaVendaCreareSchema` no app. ID_VENDA_CREARE
+ * sai cru (só o número do CREARE); o app é quem monta o prefixo "CREARE:" final.
+ */
+export function montarLinhasVendaCreare({ cabecalhos, itens, pagamentos }, { empresa, agora }) {
+  const itensPorVenda = agruparPorVenda(itens);
+  const pagamentosPorVenda = agruparPorVenda(pagamentos);
+
+  return cabecalhos.map((venda) => ({
+    ID_VENDA_CREARE: venda.ID_VENDA_BALCAO === null || venda.ID_VENDA_BALCAO === undefined
+      ? null
+      : String(venda.ID_VENDA_BALCAO),
+    EMPRESA: empresa,
+    DATA_VENDA: venda.DATA_VENDA,
+    HORA_VENDA: venda.HORA_VENDA,
+    PDV: venda.PDV,
+    OPERADOR: venda.OPERADOR,
+    STATUS: venda.STATUS === 'C' ? 'C' : 'F',
+    ITENS: (itensPorVenda.get(venda.ID_VENDA_BALCAO) ?? []).map((item) => ({
+      PRODUTO_CODIGO: item.PRODUTO_CODIGO,
+      PRODUTO: item.PRODUTO,
+      QUANTIDADE: numero(item.QUANTIDADE),
+      VALOR_UNITARIO: numero(item.VALOR_UNITARIO),
+      TOTAL: numero(item.TOTAL),
+    })),
+    PAGAMENTOS: (pagamentosPorVenda.get(venda.ID_VENDA_BALCAO) ?? []).map((pagamento) => ({
+      FORMA_PAGAMENTO: pagamento.FORMA_PAGAMENTO,
+      VALOR: numero(pagamento.VALOR),
+    })),
+    ATUALIZADO_EM: agora,
+  }));
+}
+
 function numero(valor) {
   const n = Number(valor ?? 0);
   return Number.isFinite(n) ? n : 0;

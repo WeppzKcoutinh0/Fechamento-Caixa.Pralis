@@ -3,9 +3,11 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { criarPoolCreare } from './database.js';
 import {
   buscarFechamentoCaixa,
+  buscarVendas,
   buscarVendasProdutos,
   montarLinhaFechamentoCaixa,
   montarLinhaVendaProduto,
+  montarLinhasVendaCreare,
 } from './creareRepository.js';
 import { dataInicioReprocesso, formatDateTime } from './dateService.js';
 import { obterConfig } from './env.js';
@@ -45,7 +47,7 @@ export async function executarCiclo(config, caminhos) {
   const agora = formatDateTime();
   const pool = criarPoolCreare(config.creare);
 
-  const resultado = { fechamentoCaixa: null, vendasProdutos: null };
+  const resultado = { fechamentoCaixa: null, vendasProdutos: null, vendas: null };
   try {
     const rowsFechamento = await buscarFechamentoCaixa(pool, dataInicio);
     const linhasFechamento = rowsFechamento.map((row) => montarLinhaFechamentoCaixa(row, { empresa: config.empresa, agora }));
@@ -67,6 +69,42 @@ export async function executarCiclo(config, caminhos) {
           `lotes=${envioProdutos.lotes} enviados=${envioProdutos.enviados} pendentes=${envioProdutos.pendentes}` +
           (envioProdutos.erro ? ` erro=${envioProdutos.erro}` : ''),
       );
+    }
+
+    // Fluxo oficial CREARE -> robô -> API (25/09/2026): uma linha por venda (com itens e
+    // pagamentos), fonte de verdade de "Vendas canceladas" — reler o dia inteiro a cada ciclo
+    // (não é cursor incremental) é o que permite pegar uma venda que virou CANCELADA depois de
+    // já ter sido enviada como FINALIZADA (ver importarVendasCreare() no app, upsert por
+    // id_creare).
+    if (sync.enviarVendas) {
+      const dadosVendas = await buscarVendas(pool, dataInicio);
+      const linhasVendas = montarLinhasVendaCreare(dadosVendas, { empresa: config.empresa, agora });
+      const envioVendas = await cliente.enviarLinhas('venda_creare', linhasVendas);
+      resultado.vendas = { lidas: linhasVendas.length, ...envioVendas };
+      console.log(
+        `[sincronizar] venda_creare: desde=${dataInicio} lidas=${linhasVendas.length} ` +
+          `lotes=${envioVendas.lotes} enviados=${envioVendas.enviados} pendentes=${envioVendas.pendentes}` +
+          (envioVendas.erro ? ` erro=${envioVendas.erro}` : ''),
+      );
+
+      // Regra 12 do usuário: confere se toda venda cancelada que o robô LEU do CREARE neste ciclo
+      // realmente existe no sistema como CANCELADA — best-effort (nunca derruba o ciclo): uma
+      // falha aqui só fica no log, pra próxima rodada tentar de novo.
+      const idsCancelados = linhasVendas
+        .filter((l) => l.STATUS === 'C' && l.ID_VENDA_CREARE)
+        .map((l) => l.ID_VENDA_CREARE);
+      try {
+        const { ausentes } = await cliente.conciliarCanceladas(idsCancelados);
+        if (ausentes.length > 0) {
+          console.warn(
+            `[sincronizar] CONCILIAÇÃO: ${ausentes.length} venda(s) cancelada(s) no CREARE mas ausente(s) no sistema: ${ausentes.join(', ')}`,
+          );
+        } else if (idsCancelados.length > 0) {
+          console.log(`[sincronizar] conciliação de canceladas OK (${idsCancelados.length} conferidas)`);
+        }
+      } catch (erro) {
+        console.warn(`[sincronizar] falha ao conciliar canceladas (não bloqueante): ${erro.message}`);
+      }
     }
   } finally {
     await pool.end();

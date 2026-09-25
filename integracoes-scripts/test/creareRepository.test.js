@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { montarLinhaFechamentoCaixa, montarLinhaVendaProduto } from '../src/creareRepository.js';
+import {
+  montarLinhaFechamentoCaixa,
+  montarLinhaVendaProduto,
+  montarLinhasVendaCreare,
+} from '../src/creareRepository.js';
 
 const linhaBase = {
   DATA_VENDA: '21/08/2026',
@@ -110,4 +114,47 @@ test('montarLinhaVendaProduto: sem IDS_VENDA_CREARE/FORMAS_PAGAMENTO na linha, f
   );
   assert.equal(linha.IDS_VENDA_CREARE, null);
   assert.equal(linha.FORMAS_PAGAMENTO, null);
+});
+
+test('montarLinhasVendaCreare: agrupa itens e pagamentos por ID_VENDA_BALCAO', () => {
+  const dados = {
+    cabecalhos: [
+      { ID_VENDA_BALCAO: 501, DATA_VENDA: '25/09/2026', HORA_VENDA: '2026-09-25 10:00:00', PDV: 'TNP-PC-CXPDV-1', OPERADOR: 'VND CAIXA PDV - 1M', STATUS: 'F' },
+      { ID_VENDA_BALCAO: 502, DATA_VENDA: '25/09/2026', HORA_VENDA: '2026-09-25 11:00:00', PDV: 'TNP-PC-CXPDV-2', OPERADOR: 'VND CAIXA PDV - 2M', STATUS: 'C' },
+    ],
+    itens: [
+      { ID_VENDA_BALCAO: 501, PRODUTO_CODIGO: '1', PRODUTO: 'Pão Francês', QUANTIDADE: 2, VALOR_UNITARIO: 1.2, TOTAL: 2.4 },
+      { ID_VENDA_BALCAO: 501, PRODUTO_CODIGO: '2', PRODUTO: 'Croissant', QUANTIDADE: 1, VALOR_UNITARIO: 8, TOTAL: 8 },
+      { ID_VENDA_BALCAO: 502, PRODUTO_CODIGO: '3', PRODUTO: 'Coca-Cola 2L', QUANTIDADE: 1, VALOR_UNITARIO: 15.75, TOTAL: 15.75 },
+    ],
+    pagamentos: [
+      { ID_VENDA_BALCAO: 501, FORMA_PAGAMENTO: 'DINHEIRO', VALOR: 5.4 },
+      { ID_VENDA_BALCAO: 501, FORMA_PAGAMENTO: 'PIX', VALOR: 5 },
+    ],
+  };
+  const linhas = montarLinhasVendaCreare(dados, { empresa: 'TNP CENTRAL', agora: '2026-09-25 12:00:00' });
+
+  assert.equal(linhas.length, 2);
+  const venda501 = linhas.find((l) => l.ID_VENDA_CREARE === '501');
+  assert.equal(venda501.STATUS, 'F');
+  assert.equal(venda501.ITENS.length, 2);
+  assert.equal(venda501.PAGAMENTOS.length, 2);
+  assert.equal(venda501.PAGAMENTOS[0].FORMA_PAGAMENTO, 'DINHEIRO');
+
+  const venda502 = linhas.find((l) => l.ID_VENDA_CREARE === '502');
+  assert.equal(venda502.STATUS, 'C');
+  assert.equal(venda502.ITENS.length, 1);
+  assert.equal(venda502.PAGAMENTOS.length, 0);
+});
+
+test('montarLinhasVendaCreare: venda sem ID_VENDA_BALCAO vira ID_VENDA_CREARE null (não inventa)', () => {
+  const linhas = montarLinhasVendaCreare(
+    {
+      cabecalhos: [{ ID_VENDA_BALCAO: null, DATA_VENDA: '25/09/2026', HORA_VENDA: null, PDV: null, OPERADOR: null, STATUS: 'F' }],
+      itens: [],
+      pagamentos: [],
+    },
+    { empresa: 'TNP CENTRAL', agora: '2026-09-25 12:00:00' },
+  );
+  assert.equal(linhas[0].ID_VENDA_CREARE, null);
 });

@@ -1,6 +1,10 @@
-import { mapearFechamentoCaixaDia, mapearVendaProdutoDia } from './mapearLinhasBot';
+import { mapearFechamentoCaixaDia, mapearVendaCreare, mapearVendaProdutoDia } from './mapearLinhasBot';
 import { useSupabaseAdmin } from './supabaseAdmin';
-import type { LinhaFechamentoCaixaDia, LinhaVendaProdutoDia } from '../../types/vendasFechamento';
+import type {
+  LinhaFechamentoCaixaDia,
+  LinhaVendaCreare,
+  LinhaVendaProdutoDia,
+} from '../../types/vendasFechamento';
 
 /**
  * Núcleo de gravação de vendas, extraído de `server/routes/vendas/importar.post.ts` para ser
@@ -199,6 +203,98 @@ export async function processarImportacao(
   }
 
   return { recebidas: resposta.recebidas, gravadas: resposta.count ?? resposta.recebidas };
+}
+
+/**
+ * Fluxo oficial CREARE -> robô -> API (pedido do usuário, 25/09/2026): grava uma venda por linha
+ * em `vendas`, com `vendas_itens`/`vendas_pagamentos` como filhas — upsert real por `id_creare`
+ * (não por hash de conteúdo), então uma venda que muda de FINALIZADA pra CANCELADA depois
+ * atualiza a MESMA linha (regra do usuário), em vez de nascer uma linha nova.
+ *
+ * Vendas sem ID de origem NUNCA são gravadas com um ID inventado — vão pra
+ * `vendas_importacao_inconsistencias` pra correção manual/no robô (regra do usuário).
+ */
+export async function importarVendasCreare(
+  linhasBrutas: LinhaVendaCreare[],
+): Promise<{ recebidas: number; gravadas: number; inconsistentes: number }> {
+  const supabase = useSupabaseAdmin();
+  const mapeadas = linhasBrutas.map((linha) => ({ original: linha, venda: mapearVendaCreare(linha) }));
+
+  const semId = mapeadas.filter((m) => m.venda.id_creare === null);
+  if (semId.length > 0) {
+    const { error } = await supabase.from('vendas_importacao_inconsistencias').insert(
+      semId.map((m) => ({
+        motivo: 'Venda sem ID_VENDA_CREARE na origem — não gravada (regra: nunca inventar ID).',
+        payload: m.original,
+      })),
+    );
+    if (error) {
+      throw new ErroImportacaoVendas('INTEGRATION_DATABASE_ERROR', 503, { codigo: error.code ?? null });
+    }
+  }
+
+  const comId = mapeadas.filter((m) => m.venda.id_creare !== null);
+  const semData = comId.filter((m) => m.venda.data_venda === null);
+  if (semData.length > 0) {
+    throw new ErroImportacaoVendas('INTEGRATION_VALIDATION_ERROR', 400, {
+      erro: `${semData.length} venda(s) com DATA_VENDA em formato não reconhecido.`,
+    });
+  }
+  if (comId.length === 0) {
+    return { recebidas: linhasBrutas.length, gravadas: 0, inconsistentes: semId.length };
+  }
+
+  const cabecalhos = comId.map(({ venda: { itens: _itens, pagamentos: _pagamentos, ...cabecalho } }) => cabecalho);
+  const { data: vendasGravadas, error: erroUpsert } = await supabase
+    .from('vendas')
+    .upsert(cabecalhos, { onConflict: 'id_creare' })
+    .select('id, id_creare');
+  if (erroUpsert || !vendasGravadas) {
+    throw new ErroImportacaoVendas('INTEGRATION_DATABASE_ERROR', 503, {
+      codigo: erroUpsert?.code ?? null,
+    });
+  }
+
+  const idPorIdCreare = new Map(vendasGravadas.map((v) => [v.id_creare as string, v.id as string]));
+  const vendaIds = [...idPorIdCreare.values()];
+
+  // Substitui itens/pagamentos por completo a cada reenvio (mesmo padrão de `salvar_fechamento`:
+  // delete + reinsert) — o CREARE é a fonte da verdade a cada ciclo, não um diff incremental.
+  const { error: erroDeleteItens } = await supabase
+    .from('vendas_itens')
+    .delete()
+    .in('venda_id', vendaIds);
+  const { error: erroDeletePagamentos } = await supabase
+    .from('vendas_pagamentos')
+    .delete()
+    .in('venda_id', vendaIds);
+  if (erroDeleteItens || erroDeletePagamentos) {
+    throw new ErroImportacaoVendas('INTEGRATION_DATABASE_ERROR', 503, {
+      codigo: (erroDeleteItens ?? erroDeletePagamentos)?.code ?? null,
+    });
+  }
+
+  const novosItens = comId.flatMap(({ venda }) => {
+    const vendaId = idPorIdCreare.get(venda.id_creare!);
+    if (!vendaId) return [];
+    return venda.itens.map((item) => ({ ...item, venda_id: vendaId }));
+  });
+  const novosPagamentos = comId.flatMap(({ venda }) => {
+    const vendaId = idPorIdCreare.get(venda.id_creare!);
+    if (!vendaId) return [];
+    return venda.pagamentos.map((pagamento) => ({ ...pagamento, venda_id: vendaId }));
+  });
+
+  if (novosItens.length > 0) {
+    const { error } = await supabase.from('vendas_itens').insert(novosItens);
+    if (error) throw new ErroImportacaoVendas('INTEGRATION_DATABASE_ERROR', 503, { codigo: error.code ?? null });
+  }
+  if (novosPagamentos.length > 0) {
+    const { error } = await supabase.from('vendas_pagamentos').insert(novosPagamentos);
+    if (error) throw new ErroImportacaoVendas('INTEGRATION_DATABASE_ERROR', 503, { codigo: error.code ?? null });
+  }
+
+  return { recebidas: linhasBrutas.length, gravadas: vendasGravadas.length, inconsistentes: semId.length };
 }
 
 export { ErroImportacaoVendas };

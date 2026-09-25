@@ -87,3 +87,31 @@ test('enviarLinhas: HTTP não-2xx também vira pendência (erro estruturado)', a
     assert.match(resultado.erro, /HTTP 401/);
   });
 });
+
+test('conciliarCanceladas: lista vazia não chama a API', async (t) => {
+  let chamou = false;
+  t.mock.method(globalThis, 'fetch', async () => {
+    chamou = true;
+    return { ok: true, text: async () => '{}' };
+  });
+
+  await comCliente(async (cliente) => {
+    const resultado = await cliente.conciliarCanceladas([]);
+    assert.deepEqual(resultado, { ausentes: [] });
+    assert.equal(chamou, false);
+  });
+});
+
+test('conciliarCanceladas: manda os IDs pro endpoint certo e devolve os ausentes', async (t) => {
+  t.mock.method(globalThis, 'fetch', async (url, opcoes) => {
+    assert.equal(url, 'http://app.local/vendas/conciliar-canceladas');
+    const corpo = JSON.parse(opcoes.body);
+    assert.deepEqual(corpo.idsCreare, ['501', '502']);
+    return { ok: true, text: async () => '{"ausentes":["502"]}', json: async () => ({ ausentes: ['502'] }) };
+  });
+
+  await comCliente(async (cliente) => {
+    const resultado = await cliente.conciliarCanceladas(['501', '502']);
+    assert.deepEqual(resultado, { ausentes: ['502'] });
+  });
+});

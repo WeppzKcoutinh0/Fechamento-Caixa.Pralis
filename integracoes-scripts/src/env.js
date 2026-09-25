@@ -39,6 +39,9 @@ export function obterConfig() {
       retryTentativas: obterNumero('SYNC_RETRY_TENTATIVAS', 4),
       retryBaseMs: obterNumero('SYNC_RETRY_BASE_MS', 500),
       enviarProdutos: obterBooleano('SYNC_ENVIAR_PRODUTOS', true),
+      // Fluxo oficial CREARE -> robô -> API (25/09/2026): vendas por venda (não agregado),
+      // fonte de verdade de "Vendas canceladas" — ligado por padrão.
+      enviarVendas: obterBooleano('SYNC_ENVIAR_VENDAS', true),
       estadoDir: process.env.SYNC_ESTADO_DIR?.trim() || '.estado',
     },
   };

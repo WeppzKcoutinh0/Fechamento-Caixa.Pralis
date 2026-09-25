@@ -3,7 +3,11 @@ import {
   compararChaveIntegracao,
   extrairChaveIntegracaoDoHeader,
 } from '../../utils/integracaoAuth';
-import { ErroImportacaoVendas, processarImportacao } from '../../utils/importarVendas';
+import {
+  ErroImportacaoVendas,
+  importarVendasCreare,
+  processarImportacao,
+} from '../../utils/importarVendas';
 
 /**
  * Recebe o que o `bot_padaria_v3` já manda de verdade (ver `integracoes-scripts/` e
@@ -53,6 +57,10 @@ export default defineEventHandler(async (event) => {
   const payload = resultado.data;
 
   try {
+    if (payload.tipo === 'venda_creare') {
+      const { recebidas, gravadas, inconsistentes } = await importarVendasCreare(payload.linhas);
+      return { ok: true, tipo: payload.tipo, recebidas, gravadas, inconsistentes };
+    }
     const { recebidas, gravadas } = await processarImportacao(payload.tipo, payload.linhas);
     return { ok: true, tipo: payload.tipo, recebidas, gravadas };
   } catch (erro) {

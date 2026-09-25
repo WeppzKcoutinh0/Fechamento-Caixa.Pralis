@@ -631,6 +631,11 @@ const CAT_VARS = {
                   </span>
                   {{ item.produto }} ({{ formatarQtd(item.quantidade) }})
                   <template v-if="item.horaVenda"> — {{ item.horaVenda.slice(0, 5) }}</template>
+                  <span v-if="item.pdv || item.formaPagamento" class="d-block text-caption">
+                    <template v-if="item.pdv">PDV: {{ item.pdv }}</template>
+                    <template v-if="item.pdv && item.formaPagamento"> · </template>
+                    <template v-if="item.formaPagamento">Pagto: {{ item.formaPagamento }}</template>
+                  </span>
                 </span>
                 <strong>R$ {{ formatCents(item.totalCents) }}</strong>
                 <div class="d-flex align-center ga-1 ml-2">

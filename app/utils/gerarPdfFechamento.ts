@@ -5,9 +5,10 @@
  * fechamentos/[id]/ver.vue) — este arquivo só faz o layout, não recalcula nada.
  */
 import { jsPDF } from 'jspdf';
-import type { FechamentoDraft } from '~/types/fechamento';
+import type { FechamentoDraft, MotivoVendaCanceladaDraft } from '~/types/fechamento';
+import type { VendaProdutoDia } from '~/composables/useVendasProdutoDia';
+import { calculateDiscrimination, formatCents } from '~/utils/financeiro';
 import type { RelatorioFinalResult } from '~/utils/financeiro';
-import { formatCents } from '~/utils/financeiro';
 
 export interface DadosRelatorioParaPdf {
   totalEntradaCents: number;
@@ -28,6 +29,19 @@ export interface DadosRelatorioParaPdf {
   retiradasCents: number;
   relatorio: RelatorioFinalResult;
   fisico: { expectedCents: number; countedCents: number; differenceCents: number };
+  // Vendas por categoria (pedido do usuário, 25/09/2026: PDF completo com tudo que já aparece na
+  // tela) — mesma quebra em 9 categorias de SecaoRelatorioFinal.vue (5 formas de pagamento do PDV
+  // + 4 ajustes automáticos do CREARE).
+  vendasPorCategoria: { rotulo: string; valorCents: number }[];
+  // Detalhe linha a linha do "Esperado na gaveta" — mesma conta de calculatePhysicalClosing,
+  // só explicada (ver detalhesEsperado em SecaoRelatorioFinal.vue).
+  detalhesEsperado: { rotulo: string; sinal: '+' | '−'; valorCents: number }[];
+  // Produtos vendidos no dia (tipo='F') e cancelados (tipo='C', com o motivo por item) — loja
+  // inteira, mesma limitação de sempre (a tabela não liga produto a caixa/turno). Podem vir
+  // vazios se o usuário nunca abriu esses painéis na tela (o PDF busca antes de gerar, ver
+  // SecaoRelatorioFinal.vue#baixarPdf).
+  produtos: VendaProdutoDia[];
+  produtosCancelados: (VendaProdutoDia & { motivo: MotivoVendaCanceladaDraft | undefined })[];
 }
 
 const ROTULOS_TIPO: Record<string, string> = {
@@ -46,6 +60,10 @@ function formatarDataBr(data: string): string {
   if (!data) return '—';
   const [a, m, d] = data.split('-');
   return `${d}/${m}/${a}`;
+}
+
+function formatarQtd(qtd: number): string {
+  return qtd.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
 }
 
 const MARGEM_X = 40;
@@ -174,8 +192,23 @@ export function gerarPdfFechamento(draft: FechamentoDraft, dados: DadosRelatorio
     for (const l of draft.lancamentos) {
       pdf.linha(
         `[${ROTULOS_TIPO[l.tipo]}] ${l.fornecedor || 'Sem descrição'} — ${ROTULOS_STATUS[l.status]}`,
-        `R$ ${formatCents(l.valorCents)}`,
+        `R$ ${formatCents(l.valorCents + l.valorAcrescimoCents)}`,
       );
+      // Discriminação (pedido do usuário, 25/09/2026: "todos os produtos") — itens detalhados
+      // desse lançamento específico (ligados por lancamentoId, ver types/fechamento.ts).
+      const itens = draft.discriminacoes.filter((d) => d.lancamentoId === l.id);
+      for (const item of itens) {
+        const { totalCents } = calculateDiscrimination({
+          quantity: item.qtd,
+          unitValueCents: item.valUnitCents,
+          fixedDiscountCents: item.descontoValCents,
+          discountPercent: item.descontoPct,
+        });
+        pdf.linha(
+          `  ${item.produto || 'Sem nome'} (qtd. ${item.qtd})`,
+          `R$ ${formatCents(totalCents)}`,
+        );
+      }
     }
   }
 
@@ -266,7 +299,12 @@ export function gerarPdfFechamento(draft: FechamentoDraft, dados: DadosRelatorio
   }
 
   pdf.secao('Resultado');
-  pdf.linha('Vendas (PDV + Entradas)', `R$ ${formatCents(relatorio.valorTotalFinalCents)}`);
+  pdf.linha('Vendas (PDV + Entradas)', `R$ ${formatCents(relatorio.valorTotalFinalCents)}`, {
+    negrito: true,
+  });
+  for (const cat of dados.vendasPorCategoria) {
+    pdf.linha(`  ${cat.rotulo}`, `R$ ${formatCents(cat.valorCents)}`);
+  }
   pdf.linha('Despesas', `R$ ${formatCents(dados.despesasCents)}`);
   pdf.linha('Mercadorias', `R$ ${formatCents(dados.mercadoriasCents)}`);
   pdf.linha('Retiradas', `R$ ${formatCents(dados.retiradasCents)}`);
@@ -284,11 +322,64 @@ export function gerarPdfFechamento(draft: FechamentoDraft, dados: DadosRelatorio
     { negrito: true, corValor: corDiferenca },
   );
 
-  if (draft.dinheiroContadoCents) {
-    pdf.secao('Dinheiro esperado × contado (informativo)');
-    pdf.linha('Esperado na gaveta', `R$ ${formatCents(fisico.expectedCents)}`);
-    pdf.linha('Contado na gaveta', `R$ ${formatCents(fisico.countedCents)}`);
-    pdf.linha('Diferença (contado − esperado)', `R$ ${formatCents(fisico.differenceCents)}`);
+  // Transferência Final (pedido do usuário, 25/09/2026) — só existe depois de confirmada no
+  // wizard (ver SecaoRelatorioFinal.vue); um fechamento salvo sem confirmar não deveria existir
+  // (o "Salvar" fica bloqueado até lá), mas o PDF não assume isso, só reflete o estado real.
+  if (draft.dinheiroContadoConfirmado) {
+    pdf.secao('Transferência Final');
+    pdf.linha('N° Lacre final', draft.lacreFechamento || '—');
+    pdf.linha('Valor em Notas', `R$ ${formatCents(draft.dinheiroContadoNotasCents)}`);
+    pdf.linha('Valor em Moedas', `R$ ${formatCents(draft.dinheiroContadoMoedasCents)}`);
+    pdf.linha('Contado na gaveta', `R$ ${formatCents(fisico.countedCents)}`, { negrito: true });
+    pdf.espaco(4);
+    pdf.linha('Esperado na gaveta', `R$ ${formatCents(fisico.expectedCents)}`, { negrito: true });
+    for (const item of dados.detalhesEsperado) {
+      pdf.linha(`  ${item.sinal} ${item.rotulo}`, `R$ ${formatCents(item.valorCents)}`);
+    }
+    pdf.espaco(4);
+    const corDiferencaFinal: [number, number, number] | undefined =
+      fisico.differenceCents === 0
+        ? undefined
+        : fisico.differenceCents > 0
+          ? [22, 163, 74]
+          : [220, 38, 38];
+    pdf.linha(
+      'Diferença (contado − esperado)',
+      `R$ ${formatCents(fisico.differenceCents)}`,
+      { negrito: true, corValor: corDiferencaFinal },
+    );
+  }
+
+  pdf.secao(`Produtos vendidos no dia (${dados.produtos.length})`);
+  pdf.vazio('Loja inteira — não separado por caixa (a origem dos dados não liga produto a caixa/turno).');
+  if (dados.produtos.length === 0) {
+    pdf.vazio('Nenhum produto sincronizado para esta data.');
+  } else {
+    for (const p of dados.produtos) {
+      pdf.linha(
+        `${p.produto} (qtd. ${formatarQtd(p.quantidade)})`,
+        `R$ ${formatCents(p.totalCents)}`,
+      );
+    }
+  }
+
+  pdf.secao(`Vendas/Produtos Cancelados (${dados.produtosCancelados.length})`);
+  if (dados.produtosCancelados.length === 0) {
+    pdf.vazio('Nenhum item cancelado sincronizado para esta data.');
+  } else {
+    for (const item of dados.produtosCancelados) {
+      const hora = item.horaVenda ? item.horaVenda.slice(0, 5) : 'Horário não informado';
+      const explicacao = item.motivo?.texto?.trim()
+        ? item.motivo.texto.trim()
+        : item.motivo?.tipo === 'audio' && item.motivo.audioPath
+          ? 'Áudio registrado (transcrição não disponível)'
+          : 'Nenhum motivo informado';
+      pdf.linha(
+        `${item.produto} — ${hora} (qtd. ${formatarQtd(item.quantidade)})`,
+        `R$ ${formatCents(item.totalCents)}`,
+      );
+      pdf.vazio(`  Motivo: ${explicacao}`);
+    }
   }
 
   return pdf.doc;

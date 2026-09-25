@@ -116,28 +116,45 @@ const detalhesEsperado = computed(() => {
 });
 
 // Geração 100% client-side (jsPDF) — reusa os mesmos valores já calculados acima, não recalcula
-// nada por conta própria (ver utils/gerarPdfFechamento.ts).
-function baixarPdf(): void {
-  baixarPdfFechamento(props.draft, {
-    totalEntradaCents: totalEntradaCents.value,
-    totalSaidaCents: totalSaidaCents.value,
-    pdvTotalCents: pdv.value.totalCents,
-    pdvCreditoCents: pdv.value.creditoCents,
-    pdvDebitoCents: pdv.value.debitoCents,
-    pdvPixCents: pdv.value.pixCents,
-    pdvVoucherCents: pdv.value.voucherCents,
-    pdvCrediarioCents: pdv.value.crediarioCents,
-    liqCreditoCents: liqCreditoCents.value,
-    liqDebitoCents: liqDebitoCents.value,
-    liqPixCents: liqPixCents.value,
-    liqVoucherCents: liqVoucherCents.value,
-    crediarioTotalCents: crediarioTotais.value.totalCents,
-    despesasCents: lancamentosPorTipo.value.despesaCents,
-    mercadoriasCents: lancamentosPorTipo.value.mercadoriaCents,
-    retiradasCents: lancamentosPorTipo.value.retiradaCents,
-    relatorio: relatorio.value,
-    fisico: fisico.value,
-  });
+// nada por conta própria (ver utils/gerarPdfFechamento.ts). Assíncrona (pedido do usuário,
+// 25/09/2026: "todos os produtos" no PDF completo) — busca Produtos/Cancelados antes de gerar,
+// mesmo se o usuário nunca abriu esses painéis na tela (aoAbrirProdutos/aoAbrirCancelados já
+// pulam a busca se já tiver sido feita, ver os `*JaBuscados` refs).
+const gerandoPdf = ref(false);
+async function baixarPdf(): Promise<void> {
+  gerandoPdf.value = true;
+  try {
+    await Promise.all([aoAbrirProdutos(), aoAbrirCancelados()]);
+    baixarPdfFechamento(props.draft, {
+      totalEntradaCents: totalEntradaCents.value,
+      totalSaidaCents: totalSaidaCents.value,
+      pdvTotalCents: pdv.value.totalCents,
+      pdvCreditoCents: pdv.value.creditoCents,
+      pdvDebitoCents: pdv.value.debitoCents,
+      pdvPixCents: pdv.value.pixCents,
+      pdvVoucherCents: pdv.value.voucherCents,
+      pdvCrediarioCents: pdv.value.crediarioCents,
+      liqCreditoCents: liqCreditoCents.value,
+      liqDebitoCents: liqDebitoCents.value,
+      liqPixCents: liqPixCents.value,
+      liqVoucherCents: liqVoucherCents.value,
+      crediarioTotalCents: crediarioTotais.value.totalCents,
+      despesasCents: lancamentosPorTipo.value.despesaCents,
+      mercadoriasCents: lancamentosPorTipo.value.mercadoriaCents,
+      retiradasCents: lancamentosPorTipo.value.retiradaCents,
+      relatorio: relatorio.value,
+      fisico: fisico.value,
+      vendasPorCategoria: vendasPorCategoria.value,
+      detalhesEsperado: detalhesEsperado.value,
+      produtos: produtos.value,
+      produtosCancelados: itensCancelados.value.map((item) => ({
+        ...item,
+        motivo: props.draft.vendasCanceladasMotivos[item.id],
+      })),
+    });
+  } finally {
+    gerandoPdf.value = false;
+  }
 }
 
 const STATUS_TEXTO = {
@@ -436,6 +453,8 @@ const CAT_VARS = {
       variant="tonal"
       prepend-icon="mdi-file-pdf-box"
       class="align-self-start"
+      :loading="gerandoPdf"
+      :disabled="gerandoPdf"
       @click="baixarPdf"
     >
       Baixar PDF

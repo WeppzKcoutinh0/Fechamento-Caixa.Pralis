@@ -7,6 +7,17 @@ import {
   type DadosRelatorioParaPdf,
 } from './gerarPdfFechamento';
 
+/** Junta o conteúdo bruto (stream PDF) de todas as páginas — o texto desenhado via `doc.text()`
+ * aparece literalmente como `(texto) Tj` nesse stream, dá pra usar `.toContain()` de verdade em
+ * vez de só checar "gerou bytes/não lançou erro" (jsPDF não expõe um "getText()" pronto). */
+function textoDoPdf(doc: ReturnType<typeof gerarPdfFechamento>): string {
+  const pages = doc.internal.pages as unknown[];
+  return pages
+    .slice(1)
+    .map((p) => (Array.isArray(p) ? p.join('\n') : String(p)))
+    .join('\n');
+}
+
 function dadosVazios(): DadosRelatorioParaPdf {
   const relatorio = calculateRelatorioFinal({
     totalEntradaCents: 0,
@@ -58,6 +69,10 @@ function dadosVazios(): DadosRelatorioParaPdf {
     retiradasCents: 0,
     relatorio,
     fisico,
+    vendasPorCategoria: [],
+    detalhesEsperado: [],
+    produtos: [],
+    produtosCancelados: [],
   };
 }
 
@@ -132,5 +147,98 @@ describe('gerarPdfFechamento', () => {
     draft.codigo = 'FC-TESTE';
     draft.data = '2026-09-15';
     expect(nomeArquivoPdf(draft)).toBe('Fechamento-FC-TESTE-2026-09-15.pdf');
+  });
+
+  it('inclui a discriminação (itens detalhados) de cada lançamento', () => {
+    const draft = criarFechamentoVazio();
+    draft.lancamentos.push({
+      id: 'l-1',
+      tipo: 'mercadoria',
+      status: 'pago',
+      dataRef: '2026-09-25',
+      dataNfe: '',
+      nNfe: '',
+      fornecedor: 'Distribuidora X',
+      tipoMer: 'computado',
+      valorCents: 5000,
+      valorAcrescimoCents: 0,
+      tipoCredor: 'fornecedor',
+      obsTipo: '',
+      obsTexto: '',
+      obsAudioPath: null,
+      fotoPath: null,
+      vencimento: '',
+      dataPagamento: '',
+      fotoNotaPath: null,
+      origemAjusteCreare: '',
+    });
+    draft.discriminacoes.push({
+      lancamentoId: 'l-1',
+      tipo: 'mercadoria',
+      qtd: 2,
+      produto: 'Farinha de trigo',
+      grupo: 'materia_prima',
+      valUnitCents: 2500,
+      descontoValCents: 0,
+      descontoPct: 0,
+    });
+    const doc = gerarPdfFechamento(draft, dadosVazios());
+    const texto = textoDoPdf(doc);
+    expect(texto).toContain('Distribuidora X');
+    expect(texto).toContain('Farinha de trigo');
+    // 2 x R$25,00 = R$50,00 (calculateDiscrimination, sem desconto).
+    expect(texto).toContain('50,00');
+  });
+
+  it('só mostra a seção "Transferência Final" quando dinheiroContadoConfirmado é true', () => {
+    const draftNaoConfirmado = criarFechamentoVazio();
+    draftNaoConfirmado.dinheiroContadoCents = 1000;
+    draftNaoConfirmado.lacreFechamento = '000999';
+    const textoSemSecao = textoDoPdf(gerarPdfFechamento(draftNaoConfirmado, dadosVazios()));
+    expect(textoSemSecao).not.toContain('Transferência Final');
+    expect(textoSemSecao).not.toContain('000999');
+
+    const draftConfirmado = criarFechamentoVazio();
+    draftConfirmado.dinheiroContadoConfirmado = true;
+    draftConfirmado.lacreFechamento = '000123';
+    draftConfirmado.dinheiroContadoNotasCents = 15000;
+    draftConfirmado.dinheiroContadoMoedasCents = 5000;
+    const textoComSecao = textoDoPdf(gerarPdfFechamento(draftConfirmado, dadosVazios()));
+    expect(textoComSecao).toContain('Transferência Final');
+    expect(textoComSecao).toContain('000123');
+    expect(textoComSecao).toContain('150,00');
+  });
+
+  it('lista produtos vendidos e cancelados (com motivo)', () => {
+    const draft = criarFechamentoVazio();
+    const dados = dadosVazios();
+    dados.produtos = [
+      {
+        id: 'p-1',
+        produto: 'Pão Francês',
+        produtoCodigo: '001',
+        quantidade: 12.5,
+        valorUnitarioCents: 120,
+        totalCents: 1500,
+        horaVenda: null,
+      },
+    ];
+    dados.produtosCancelados = [
+      {
+        id: 'c-1',
+        produto: 'Coca-Cola 2L',
+        produtoCodigo: null,
+        quantidade: 1,
+        valorUnitarioCents: 1575,
+        totalCents: 1575,
+        horaVenda: '13:34:27',
+        motivo: { tipo: 'texto', texto: 'Cliente desistiu', audioPath: null },
+      },
+    ];
+    const texto = textoDoPdf(gerarPdfFechamento(draft, dados));
+    expect(texto).toContain('Pão Francês');
+    expect(texto).toContain('Coca-Cola 2L');
+    expect(texto).toContain('13:34');
+    expect(texto).toContain('Cliente desistiu');
   });
 });

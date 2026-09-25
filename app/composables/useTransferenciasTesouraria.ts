@@ -12,6 +12,19 @@ export type CaixaOuCofre = Caixa | 'Cofre' | 'Caixa Principal' | 'Caixa de Troco
 export const COFRES_CENTRAIS = ['Caixa Principal', 'Caixa de Troco', 'Fluxo'] as const;
 export type CofreCentral = (typeof COFRES_CENTRAIS)[number];
 
+/**
+ * A tela usa "Cofre ..." como rótulo amigável, mas o banco guarda os valores
+ * internos sem esse prefixo. Normalizar na borda evita que uma versão antiga
+ * do componente ou um navegador com estado preservado viole o CHECK constraint.
+ */
+function normalizarCaixa(valor: CaixaOuCofre): CaixaOuCofre {
+  const rotulo = String(valor);
+  if (rotulo === 'Cofre Principal') return 'Caixa Principal';
+  if (rotulo === 'Cofre Troco') return 'Caixa de Troco';
+  if (rotulo === 'Cofre Fluxo') return 'Fluxo';
+  return valor;
+}
+
 export interface DestinoExtra {
   caixa: CaixaOuCofre;
   valorCents?: number;
@@ -147,8 +160,10 @@ export function useTransferenciasTesouraria() {
     // escolher a data (registrando algo de um dia anterior, ex.: "caixa do dia 21/09").
     dataLanc?: string;
   }): Promise<TransferenciaTesouraria> {
-    const destinosExtras = [...new Set(dados.destinosExtra.map((d) => d.caixa))]
-      .filter((caixa) => caixa !== dados.caixaOrigem && caixa !== dados.caixaDestino)
+    const caixaOrigem = normalizarCaixa(dados.caixaOrigem);
+    const caixaDestino = normalizarCaixa(dados.caixaDestino);
+    const destinosExtras = [...new Set(dados.destinosExtra.map((d) => normalizarCaixa(d.caixa)))]
+      .filter((caixa) => caixa !== caixaOrigem && caixa !== caixaDestino)
       .map((caixa) => ({ caixa }));
     const { data, error } = await supabase
       .from('transferencias_tesouraria')
@@ -159,8 +174,8 @@ export function useTransferenciasTesouraria() {
         lacre: dados.lacre.trim(),
         data_lanc: dados.dataLanc || hojeISO(),
         agendamento: dados.agendamento,
-        caixa_origem: dados.caixaOrigem,
-        caixa_destino: dados.caixaDestino,
+        caixa_origem: caixaOrigem,
+        caixa_destino: caixaDestino,
         // `||` de propósito (não `??`): string vazia do v-select "sem seleção" tem que virar null
         // igual undefined/null — a coluna só aceita 'Manhã'/'Tarde'/null (achado real, 25/09/2026:
         // string vazia violava o check constraint em vez de ser tratada como "sem turno").
@@ -212,8 +227,8 @@ export function useTransferenciasTesouraria() {
         valor: (dados.valorCents / 100).toFixed(2),
         lacre: dados.lacre.trim(),
         data_lanc: dados.dataLanc,
-        caixa_origem: dados.caixaOrigem,
-        caixa_destino: dados.caixaDestino,
+        caixa_origem: normalizarCaixa(dados.caixaOrigem),
+        caixa_destino: normalizarCaixa(dados.caixaDestino),
         observacao: dados.observacao,
         atualizado_em: new Date().toISOString(),
       })

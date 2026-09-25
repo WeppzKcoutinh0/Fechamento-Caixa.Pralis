@@ -37,6 +37,7 @@ const router = useRouter();
 
 const salvando = ref(false);
 const erro = ref<string | null>(null);
+const aviso = ref<string | null>(null);
 
 const TITULOS_SECAO = [
   'Identificação',
@@ -50,13 +51,19 @@ const tituloSecao = computed(() => TITULOS_SECAO[secaoAtual.value - 1] ?? TITULO
 
 async function onSalvar() {
   erro.value = null;
+  aviso.value = null;
   salvando.value = true;
   try {
     const fechamentoId = await salvar(draft.value);
     const arquivosPendentes = draft.value.arquivosPendentes ?? {};
-    const camposCaminho: Record<'img-manha' | 'img-tarde', 'imgManhaPath' | 'imgTardePath'> = {
+    const camposCaminho: Record<
+      'img-manha' | 'img-tarde' | 'img-folha-fechamento' | 'img-pdv',
+      'imgManhaPath' | 'imgTardePath' | 'imgFolhaFechamentoPath' | 'imgPdvPath'
+    > = {
       'img-manha': 'imgManhaPath',
       'img-tarde': 'imgTardePath',
+      'img-folha-fechamento': 'imgFolhaFechamentoPath',
+      'img-pdv': 'imgPdvPath',
     };
     let houveUploadPendente = false;
     for (const [chave, arquivo] of Object.entries(arquivosPendentes) as [string, File][]) {
@@ -64,7 +71,12 @@ async function onSalvar() {
       // Chaves fixas (maquininha) vão direto pro draft; chaves de lançamento
       // (`lancamento-foto[-nota]-{id}`, ver SecaoLancamentos.vue) precisam achar o lançamento certo
       // na lista, já que pode haver vários no mesmo fechamento.
-      if (chave === 'img-manha' || chave === 'img-tarde') {
+      if (
+        chave === 'img-manha' ||
+        chave === 'img-tarde' ||
+        chave === 'img-folha-fechamento' ||
+        chave === 'img-pdv'
+      ) {
         draft.value[camposCaminho[chave]] = path;
       } else {
         const semSufixoNota = chave.startsWith('lancamento-foto-nota-');
@@ -78,6 +90,24 @@ async function onSalvar() {
             if (semSufixoNota) lancamento.fotoNotaPath = path;
             else lancamento.fotoPath = path;
           }
+        }
+        const prefixoAudioLancamento = 'audio-lancamento-obs-';
+        if (chave.startsWith(prefixoAudioLancamento)) {
+          const lancamentoId = chave.slice(prefixoAudioLancamento.length);
+          const lancamento = draft.value.lancamentos.find((l) => l.id === lancamentoId);
+          if (lancamento) lancamento.obsAudioPath = path;
+        }
+        const prefixoAudioMotivo = 'audio-vendas-canceladas-motivo-';
+        if (chave.startsWith(prefixoAudioMotivo)) {
+          const itemId = chave.slice(prefixoAudioMotivo.length);
+          const motivo = draft.value.vendasCanceladasMotivos[itemId];
+          if (motivo) motivo.audioPath = path;
+        }
+        const prefixoCrediario = 'cred-cupom-';
+        if (chave.startsWith(prefixoCrediario)) {
+          const indice = Number(chave.slice(prefixoCrediario.length));
+          const item = draft.value.crediario[indice];
+          if (item) item.fotoPath = path;
         }
       }
       Reflect.deleteProperty(arquivosPendentes, chave);
@@ -93,6 +123,7 @@ async function onSalvar() {
     // Retorno automático pro cofre (18/09/2026, pedido do usuário — versão simplificada do que o
     // Sistema Inteligente Pralís faz): melhor esforço, depois do fechamento já salvo — uma falha
     // aqui não desfaz o salvamento, só deixa de gerar o retorno automático desta vez.
+    const falhasPosFechamento: string[] = [];
     if (draft.value.caixa && draft.value.dinheiroContadoCents > 0) {
       try {
         await criarRetornoAutomatico({
@@ -105,6 +136,7 @@ async function onSalvar() {
           lacre: draft.value.lacreFechamento,
         });
       } catch (e) {
+        falhasPosFechamento.push('o retorno automatico para o Cofre Fluxo');
         // O fechamento já foi salvo, mas o retorno precisa ficar visível para
         // permitir uma conferência/repetição posterior sem esconder a falha.
         console.error('[fechamento] falha ao criar retorno automático:', e);
@@ -123,8 +155,13 @@ async function onSalvar() {
           valorCents: totalSangriasCents,
         });
       } catch (e) {
+        falhasPosFechamento.push('a sangria automatica para o Cofre Fluxo');
         console.error('[fechamento] falha ao criar sangria automática:', e);
       }
+    }
+    if (falhasPosFechamento.length) {
+      aviso.value = `Fechamento salvo, mas ${falhasPosFechamento.join(' e ')} nao foi registrado. Verifique sua conexao e clique em Salvar novamente para tentar de novo.`;
+      return;
     }
     await router.push('/');
   } catch (e) {
@@ -193,6 +230,16 @@ async function onSalvar() {
           role="alert"
           aria-live="assertive"
           >{{ erro }}</v-alert
+        >
+        <v-alert
+          v-if="aviso"
+          type="warning"
+          variant="tonal"
+          density="compact"
+          class="mb-4"
+          role="status"
+          aria-live="polite"
+          >{{ aviso }}</v-alert
         >
 
         <p

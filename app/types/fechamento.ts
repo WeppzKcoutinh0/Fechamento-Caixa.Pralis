@@ -270,6 +270,8 @@ export interface FechamentoDraft {
   // automático pra Tesouraria (ver WizardFechamento.vue/useTransferenciasTesouraria.ts), pra
   // identificar esse malote específico na notificação do admin.
   lacreFechamento: string;
+  // Foto da folha física de fechamento anexada na Transferência Final.
+  imgFolhaFechamentoPath: string | null;
   // "Transferência Final" (pedido do usuário, 25/09/2026): Notas/Moedas/Lacre só podem ser
   // editados até o operador confirmar — depois disso ficam travados (readonly) e só então o
   // botão "Salvar" do wizard libera (ver SecaoRelatorioFinal.vue/WizardFechamento.vue). Contar
@@ -399,6 +401,7 @@ export function criarFechamentoVazio(contexto?: ContextoSessaoCaixa): Fechamento
     dinheiroContadoNotasCents: 0,
     dinheiroContadoMoedasCents: 0,
     lacreFechamento: '',
+    imgFolhaFechamentoPath: null,
     dinheiroContadoConfirmado: false,
     dinheiroContadoValoresConfirmados: false,
     cashSessionId: contexto?.id ?? null,

@@ -12,7 +12,9 @@ interface ResultadoLeitura {
 }
 
 async function otimizarImagemParaIa(arquivo: Blob): Promise<Blob> {
-  if (!arquivo.type.startsWith('image/') || arquivo.size < 900_000) return arquivo;
+  const formatoApple = /image\/(heic|heif)/i.test(arquivo.type);
+  if (!arquivo.type.startsWith('image/') || (!formatoApple && arquivo.size < 900_000))
+    return arquivo;
   if (typeof createImageBitmap !== 'function') return arquivo;
 
   try {
@@ -31,7 +33,7 @@ async function otimizarImagemParaIa(arquivo: Blob): Promise<Blob> {
     bitmap.close();
 
     const reduzida = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, 'image/jpeg', 0.82),
+      canvas.toBlob(resolve, 'image/jpeg', formatoApple ? 0.9 : 0.82),
     );
     return reduzida && reduzida.size < arquivo.size ? reduzida : arquivo;
   } catch {

@@ -132,6 +132,7 @@ interface FechamentoRow {
   dinheiro_contado_notas: string | null;
   dinheiro_contado_moedas: string | null;
   lacre_fechamento: string;
+  img_folha_fechamento_path: string | null;
   dinheiro_contado_confirmado: boolean;
   vendas_canceladas_motivo_tipo: string;
   vendas_canceladas_motivo_texto: string;
@@ -195,7 +196,9 @@ function colunaMotivoEhJsonDeItens(valor: string | null | undefined): boolean {
   }
 }
 
-function motivosCanceladosDoBanco(valor: string | null | undefined): Record<string, MotivoVendaCanceladaDraft> {
+function motivosCanceladosDoBanco(
+  valor: string | null | undefined,
+): Record<string, MotivoVendaCanceladaDraft> {
   if (!colunaMotivoEhJsonDeItens(valor)) return {};
   try {
     const bruto = JSON.parse(valor as string) as unknown;
@@ -204,11 +207,16 @@ function motivosCanceladosDoBanco(valor: string | null | undefined): Record<stri
         if (!motivo || typeof motivo !== 'object') return [];
         const item = motivo as Record<string, unknown>;
         const tipo = item.tipo === 'audio' ? 'audio' : 'texto';
-        return [[id, {
-          tipo,
-          texto: typeof item.texto === 'string' ? item.texto : '',
-          audioPath: typeof item.audioPath === 'string' ? item.audioPath : null,
-        }]];
+        return [
+          [
+            id,
+            {
+              tipo,
+              texto: typeof item.texto === 'string' ? item.texto : '',
+              audioPath: typeof item.audioPath === 'string' ? item.audioPath : null,
+            },
+          ],
+        ];
       }),
     ) as Record<string, MotivoVendaCanceladaDraft>;
   } catch {
@@ -379,12 +387,12 @@ function linhaParaDraft(row: FechamentoRow): FechamentoDraft {
     dinheiroContadoNotasCents: toCents(row.dinheiro_contado_notas ?? 0),
     dinheiroContadoMoedasCents: toCents(row.dinheiro_contado_moedas ?? 0),
     lacreFechamento: row.lacre_fechamento,
+    imgFolhaFechamentoPath: row.img_folha_fechamento_path ?? null,
     dinheiroContadoConfirmado: row.dinheiro_contado_confirmado ?? false,
     // Sem coluna própria no banco (ver types/fechamento.ts) — se a confirmação final já
     // aconteceu, o passo intermediário (Notas/Moedas) necessariamente também já aconteceu.
     dinheiroContadoValoresConfirmados: row.dinheiro_contado_confirmado ?? false,
-    vendasCanceladasMotivoTipo:
-      row.vendas_canceladas_motivo_tipo === 'audio' ? 'audio' : 'texto',
+    vendasCanceladasMotivoTipo: row.vendas_canceladas_motivo_tipo === 'audio' ? 'audio' : 'texto',
     // Bug real corrigido (25/09/2026): quando a coluna já guarda o JSON por item (ver
     // `salvar()`), este campo legado tem que ficar vazio — senão a migração de compatibilidade
     // em `inicializarMotivosCancelados` (SecaoRelatorioFinal.vue) acha que é texto livre antigo
@@ -588,6 +596,7 @@ export function useFechamentos() {
         dinheiro_contado_notas: cents(draft.dinheiroContadoNotasCents),
         dinheiro_contado_moedas: cents(draft.dinheiroContadoMoedasCents),
         lacre_fechamento: draft.lacreFechamento,
+        img_folha_fechamento_path: draft.imgFolhaFechamentoPath,
         dinheiro_contado_confirmado: draft.dinheiroContadoConfirmado,
         vendas_canceladas_motivo_tipo: draft.vendasCanceladasMotivoTipo,
         vendas_canceladas_motivo_texto:
@@ -675,7 +684,15 @@ export function useFechamentos() {
 
     const { data, error } = await supabase.rpc('salvar_fechamento', { payload });
     if (error) throw error;
-    return data as string;
+    const fechamentoId = data as string;
+    // A coluna da folha foi adicionada depois do RPC legado. Atualiza-a separadamente
+    // para preservar o fluxo atômico existente e também permitir remover a foto.
+    const { error: erroFolha } = await supabase
+      .from('fechamentos')
+      .update({ img_folha_fechamento_path: draft.imgFolhaFechamentoPath })
+      .eq('id', fechamentoId);
+    if (erroFolha) throw erroFolha;
+    return fechamentoId;
   }
 
   /** Busca um fechamento salvo com todos os itens filhos e devolve pronto pro formulário. */

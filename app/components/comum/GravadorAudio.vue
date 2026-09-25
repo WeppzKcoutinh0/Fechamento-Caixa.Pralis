@@ -2,15 +2,25 @@
 import { ref, watch } from 'vue';
 import { useAnexos } from '~/composables/useAnexos';
 
-const props = defineProps<{ fechamentoId: string; campo: string }>();
+const props = defineProps<{
+  fechamentoId: string;
+  campo: string;
+  uploadAdiado?: boolean;
+  arquivoPendente?: File | null;
+}>();
 const modelValue = defineModel<string | null>({ default: null });
 const transcricao = defineModel<string>('transcricao', { default: '' });
+const emit = defineEmits<{
+  arquivoSelecionado: [arquivo: File];
+  arquivoRemovido: [];
+}>();
 
 const { enviar, urlAssinada } = useAnexos();
 const gravando = ref(false);
 const enviando = ref(false);
 const erro = ref<string | null>(null);
 const urlReproducao = ref<string | null>(null);
+const arquivoPendenteLocal = ref(false);
 
 let mediaRecorder: MediaRecorder | null = null;
 let chunks: Blob[] = [];
@@ -94,6 +104,11 @@ async function alternarGravacao(): Promise<void> {
       gravando.value = false;
       const blob = new Blob(chunks, { type: 'audio/webm' });
       const arquivo = new File([blob], `observacao-${Date.now()}.webm`, { type: 'audio/webm' });
+      if (props.uploadAdiado) {
+        arquivoPendenteLocal.value = true;
+        emit('arquivoSelecionado', arquivo);
+        return;
+      }
       enviando.value = true;
       try {
         modelValue.value = await enviar(props.fechamentoId, props.campo, arquivo);
@@ -109,6 +124,15 @@ async function alternarGravacao(): Promise<void> {
   } catch {
     erro.value = 'Microfone não disponível';
   }
+}
+
+function removerAudio(): void {
+  if (arquivoPendenteLocal.value || props.arquivoPendente) {
+    arquivoPendenteLocal.value = false;
+    emit('arquivoRemovido');
+  }
+  modelValue.value = null;
+  urlReproducao.value = null;
 }
 </script>
 
@@ -132,6 +156,23 @@ async function alternarGravacao(): Promise<void> {
       controls
       class="d-block mt-2"
       style="height: 32px"
+    />
+    <v-chip
+      v-if="(arquivoPendenteLocal || arquivoPendente) && !urlReproducao"
+      prepend-icon="mdi-microphone"
+      color="primary"
+      variant="tonal"
+      class="mt-2"
+    >
+      Áudio pronto para salvar
+    </v-chip>
+    <v-btn
+      v-if="modelValue || arquivoPendenteLocal || arquivoPendente"
+      icon="mdi-close"
+      size="x-small"
+      variant="text"
+      aria-label="Remover áudio"
+      @click="removerAudio"
     />
     <div v-if="erro" class="text-caption text-error mt-1">{{ erro }}</div>
   </div>

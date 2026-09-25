@@ -7,6 +7,7 @@ const props = defineProps<{
   campo: string;
   label: string;
   uploadAdiado?: boolean;
+  arquivoPendente?: File | null;
 }>();
 const modelValue = defineModel<string | null>({ default: null });
 const emit = defineEmits<{
@@ -17,7 +18,7 @@ const emit = defineEmits<{
 const { enviar, remover } = useAnexos();
 const enviando = ref(false);
 const erro = ref<string | null>(null);
-const arquivoPendente = ref(false);
+const arquivoPendenteLocal = ref(false);
 
 async function aoEscolherArquivo(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement;
@@ -26,7 +27,7 @@ async function aoEscolherArquivo(event: Event): Promise<void> {
 
   erro.value = null;
   if (props.uploadAdiado) {
-    arquivoPendente.value = true;
+    arquivoPendenteLocal.value = true;
     emit('arquivoSelecionado', arquivo);
     input.value = '';
     return;
@@ -44,9 +45,9 @@ async function aoEscolherArquivo(event: Event): Promise<void> {
 }
 
 async function removerFoto(): Promise<void> {
-  if (arquivoPendente.value) {
+  if (arquivoPendenteLocal.value || props.arquivoPendente) {
     emit('arquivoRemovido');
-    arquivoPendente.value = false;
+    arquivoPendenteLocal.value = false;
   }
   if (!modelValue.value) return;
   await remover(modelValue.value).catch(() => {});
@@ -57,7 +58,10 @@ async function removerFoto(): Promise<void> {
 <template>
   <div>
     <div class="text-caption text-medium-emphasis mb-1">{{ label }}</div>
-    <div v-if="modelValue || arquivoPendente" class="d-flex align-center ga-2">
+    <div
+      v-if="modelValue || arquivoPendenteLocal || arquivoPendente"
+      class="d-flex align-center ga-2"
+    >
       <v-chip prepend-icon="mdi-image" color="primary" variant="tonal">Foto anexada</v-chip>
       <v-btn
         icon="mdi-close"

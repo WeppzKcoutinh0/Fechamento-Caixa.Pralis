@@ -6,12 +6,27 @@ import { useRelatorioCalculado } from '~/composables/useRelatorioCalculado';
 import { useVendasCanceladas, type VendaCancelada } from '~/composables/useVendasCanceladas';
 import { useVendasProdutoDia } from '~/composables/useVendasProdutoDia';
 import GravadorAudio from '~/components/comum/GravadorAudio.vue';
+import CampoFoto from '~/components/comum/CampoFoto.vue';
 import { formatCents } from '~/utils/financeiro';
 import { baixarPdfFechamento } from '~/utils/gerarPdfFechamento';
 import { baixarPdfVendasCanceladas } from '~/utils/gerarPdfVendasCanceladas';
 import { abrirWhatsappVendasCanceladas } from '~/utils/whatsappVendasCanceladas';
 
 const props = defineProps<{ draft: FechamentoDraft }>();
+
+const CHAVE_FOTO_FOLHA = 'img-folha-fechamento';
+
+function registrarFotoFolha(arquivo: File): void {
+  props.draft.arquivosPendentes ??= {};
+  props.draft.arquivosPendentes[CHAVE_FOTO_FOLHA] = arquivo;
+}
+
+function removerFotoFolha(): void {
+  if (props.draft.arquivosPendentes) {
+    Reflect.deleteProperty(props.draft.arquivosPendentes, CHAVE_FOTO_FOLHA);
+  }
+  props.draft.imgFolhaFechamentoPath = null;
+}
 
 const {
   totalEntradaCents,
@@ -103,7 +118,11 @@ const detalhesEsperado = computed(() => {
     { rotulo: 'Transferências recebidas', sinal: '+', valorCents: transferenciaEntradaCents.value },
   ];
   if (lacreAberturaValorCents.value > 0) {
-    itens.push({ rotulo: 'Lacre de abertura', sinal: '+', valorCents: lacreAberturaValorCents.value });
+    itens.push({
+      rotulo: 'Lacre de abertura',
+      sinal: '+',
+      valorCents: lacreAberturaValorCents.value,
+    });
   }
   itens.push(
     { rotulo: 'Sangrias', sinal: '−', valorCents: totalSaidaCents.value },
@@ -272,6 +291,20 @@ function abrirAudioMotivo(item: VendaCancelada): void {
   textoMotivoAbertoId.value = null;
   audioMotivoAbertoId.value = audioMotivoAbertoId.value === item.id ? null : item.id;
   motivoDoItem(item).tipo = 'audio';
+}
+function chaveAudioMotivo(itemId: string): string {
+  return `audio-vendas-canceladas-motivo-${itemId}`;
+}
+function registrarAudioMotivo(itemId: string, arquivo: File): void {
+  props.draft.arquivosPendentes ??= {};
+  props.draft.arquivosPendentes[chaveAudioMotivo(itemId)] = arquivo;
+}
+function removerAudioMotivo(itemId: string): void {
+  if (props.draft.arquivosPendentes)
+    Reflect.deleteProperty(props.draft.arquivosPendentes, chaveAudioMotivo(itemId));
+}
+function audioPendenteMotivo(itemId: string): File | null {
+  return props.draft.arquivosPendentes?.[chaveAudioMotivo(itemId)] ?? null;
 }
 const totalCanceladosCents = computed(() =>
   itensCancelados.value.reduce((soma, i) => soma + i.totalCents, 0),
@@ -654,8 +687,12 @@ const CAT_VARS = {
                   :transcricao="motivoDoItem(item).texto"
                   :fechamento-id="draft.id"
                   :campo="`vendas-canceladas-motivo-${item.id}`"
+                  upload-adiado
+                  :arquivo-pendente="audioPendenteMotivo(item.id)"
                   @update:model-value="motivoDoItem(item).audioPath = $event"
                   @update:transcricao="motivoDoItem(item).texto = $event"
+                  @arquivo-selecionado="registrarAudioMotivo(item.id, $event)"
+                  @arquivo-removido="removerAudioMotivo(item.id)"
                 />
                 <v-textarea
                   v-if="motivoDoItem(item).texto"
@@ -1085,6 +1122,17 @@ const CAT_VARS = {
             Identifica o malote que leva esse dinheiro de volta ao cofre — sobe junto pro
             administrador conferir.
           </p>
+
+          <CampoFoto
+            v-model="draft.imgFolhaFechamentoPath"
+            :fechamento-id="draft.id"
+            campo="img-folha-fechamento"
+            label="Folha de fechamento de caixa"
+            upload-adiado
+            :arquivo-pendente="draft.arquivosPendentes?.[CHAVE_FOTO_FOLHA] ?? null"
+            @arquivo-selecionado="registrarFotoFolha"
+            @arquivo-removido="removerFotoFolha"
+          />
 
           <template v-if="draft.dinheiroContadoConfirmado">
             <v-divider class="my-3" />

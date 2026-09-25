@@ -35,13 +35,38 @@ const ehUsuarioCaixa = computed(() => perfil.value?.role === 'caixa');
 function chaveArquivoLancamento(lancamentoId: string, campo: 'foto' | 'foto-nota'): string {
   return `lancamento-${campo}-${lancamentoId}`;
 }
-function registrarFotoLancamento(lancamentoId: string, campo: 'foto' | 'foto-nota', arquivo: File): void {
+function registrarFotoLancamento(
+  lancamentoId: string,
+  campo: 'foto' | 'foto-nota',
+  arquivo: File,
+): void {
   props.draft.arquivosPendentes ??= {};
   props.draft.arquivosPendentes[chaveArquivoLancamento(lancamentoId, campo)] = arquivo;
 }
 function removerFotoLancamento(lancamentoId: string, campo: 'foto' | 'foto-nota'): void {
   if (props.draft.arquivosPendentes)
-    Reflect.deleteProperty(props.draft.arquivosPendentes, chaveArquivoLancamento(lancamentoId, campo));
+    Reflect.deleteProperty(
+      props.draft.arquivosPendentes,
+      chaveArquivoLancamento(lancamentoId, campo),
+    );
+}
+function arquivoPendenteLancamento(lancamentoId: string, campo: 'foto' | 'foto-nota'): File | null {
+  return props.draft.arquivosPendentes?.[chaveArquivoLancamento(lancamentoId, campo)] ?? null;
+}
+
+function chaveAudioLancamento(lancamentoId: string): string {
+  return `audio-lancamento-obs-${lancamentoId}`;
+}
+function registrarAudioLancamento(lancamentoId: string, arquivo: File): void {
+  props.draft.arquivosPendentes ??= {};
+  props.draft.arquivosPendentes[chaveAudioLancamento(lancamentoId)] = arquivo;
+}
+function removerAudioLancamento(lancamentoId: string): void {
+  if (props.draft.arquivosPendentes)
+    Reflect.deleteProperty(props.draft.arquivosPendentes, chaveAudioLancamento(lancamentoId));
+}
+function audioPendenteLancamento(lancamentoId: string): File | null {
+  return props.draft.arquivosPendentes?.[chaveAudioLancamento(lancamentoId)] ?? null;
 }
 
 // Mesmo padrão visual do modal de Despesa/Mercadoria/Retirada do Sistema Inteligente Pralís
@@ -165,12 +190,28 @@ function observacaoPorOrigem(origem: string): string {
   return lancamento?.obsTexto || 'Nenhum ajuste sincronizado ainda para esta categoria.';
 }
 const despesasAutomaticas = computed(() => [
-  { rotulo: 'COLABORADOR', valorCents: valorPorOrigem('colaboradores'), observacao: observacaoPorOrigem('colaboradores') },
-  { rotulo: 'LANCHES', valorCents: valorPorOrigem('alimentacao'), observacao: observacaoPorOrigem('alimentacao') },
+  {
+    rotulo: 'COLABORADOR',
+    valorCents: valorPorOrigem('colaboradores'),
+    observacao: observacaoPorOrigem('colaboradores'),
+  },
+  {
+    rotulo: 'LANCHES',
+    valorCents: valorPorOrigem('alimentacao'),
+    observacao: observacaoPorOrigem('alimentacao'),
+  },
 ]);
 const mercadoriasAutomaticas = computed(() => [
-  { rotulo: 'SOBRA/PERDA', valorCents: valorPorOrigem('sobraPerda'), observacao: observacaoPorOrigem('sobraPerda') },
-  { rotulo: 'FURTO/ROUBO', valorCents: valorPorOrigem('rouboFurto'), observacao: observacaoPorOrigem('rouboFurto') },
+  {
+    rotulo: 'SOBRA/PERDA',
+    valorCents: valorPorOrigem('sobraPerda'),
+    observacao: observacaoPorOrigem('sobraPerda'),
+  },
+  {
+    rotulo: 'FURTO/ROUBO',
+    valorCents: valorPorOrigem('rouboFurto'),
+    observacao: observacaoPorOrigem('rouboFurto'),
+  },
 ]);
 const totalDespesasAutomaticasCents = computed(() =>
   despesasAutomaticas.value.reduce((soma, item) => soma + item.valorCents, 0),
@@ -309,7 +350,9 @@ async function lerItensNota(): Promise<void> {
   avisoLeituraNotaFiscal.value = '';
   try {
     const resultado =
-      fonte.tipo === 'pendente' ? await lerArquivoNotaFiscal(fonte.arquivo) : await lerNotaFiscal(fonte.path);
+      fonte.tipo === 'pendente'
+        ? await lerArquivoNotaFiscal(fonte.arquivo)
+        : await lerNotaFiscal(fonte.path);
 
     if (resultado.fornecedor && !lancamento.fornecedor.trim()) {
       lancamento.fornecedor = resultado.fornecedor;
@@ -328,7 +371,10 @@ async function lerItensNota(): Promise<void> {
     }
     discriminando.value = true;
 
-    const percentual = resultado.confianca === null ? '' : ` Confiança estimada: ${Math.round(resultado.confianca * 100)}%.`;
+    const percentual =
+      resultado.confianca === null
+        ? ''
+        : ` Confiança estimada: ${Math.round(resultado.confianca * 100)}%.`;
     avisoLeituraNotaFiscal.value = resultado.itens.length
       ? `${resultado.itens.length} ${resultado.itens.length === 1 ? 'item adicionado' : 'itens adicionados'} à discriminação. Confira o grupo e os valores antes de salvar.${percentual}`
       : `Nenhum item foi lido com segurança nesta imagem.${percentual}`;
@@ -455,7 +501,11 @@ watch(
           </v-expansion-panel-title>
           <v-expansion-panel-text>
             <v-expansion-panels variant="accordion" class="cat-subacordeao">
-              <v-expansion-panel v-for="item in despesasAutomaticas" :key="item.rotulo" class="cat-subitem">
+              <v-expansion-panel
+                v-for="item in despesasAutomaticas"
+                :key="item.rotulo"
+                class="cat-subitem"
+              >
                 <v-expansion-panel-title class="cat-subitem-titulo">
                   <span class="d-flex flex-column">
                     <span class="cat-subitem-rotulo">{{ item.rotulo }}</span>
@@ -480,11 +530,17 @@ watch(
         >
           <v-expansion-panel-title class="cat-titulo">
             <span class="flex-grow-1">Mercadorias Automáticas</span>
-            <strong class="cat-valor">R$ {{ formatCents(totalMercadoriasAutomaticasCents) }}</strong>
+            <strong class="cat-valor"
+              >R$ {{ formatCents(totalMercadoriasAutomaticasCents) }}</strong
+            >
           </v-expansion-panel-title>
           <v-expansion-panel-text>
             <v-expansion-panels variant="accordion" class="cat-subacordeao">
-              <v-expansion-panel v-for="item in mercadoriasAutomaticas" :key="item.rotulo" class="cat-subitem">
+              <v-expansion-panel
+                v-for="item in mercadoriasAutomaticas"
+                :key="item.rotulo"
+                class="cat-subitem"
+              >
                 <v-expansion-panel-title class="cat-subitem-titulo">
                   <span class="d-flex flex-column">
                     <span class="cat-subitem-rotulo">{{ item.rotulo }}</span>
@@ -536,7 +592,9 @@ watch(
                 :value="formatCents(lancamentoAtual.valorCents)"
                 inputmode="decimal"
                 aria-label="Valor"
-                :readonly="ehUsuarioCaixa && tipoAtual === 'despesa' && itensDiscriminacao.length > 0"
+                :readonly="
+                  ehUsuarioCaixa && tipoAtual === 'despesa' && itensDiscriminacao.length > 0
+                "
                 @input="
                   lancamentoAtual.valorCents = aoDigitarCentavos(
                     ($event.target as HTMLInputElement).value,
@@ -554,7 +612,9 @@ watch(
                 class="lc-input"
                 :value="formatCents(lancamentoAtual.valorAcrescimoCents)"
                 inputmode="decimal"
-                :readonly="ehUsuarioCaixa && tipoAtual === 'despesa' && itensDiscriminacao.length > 0"
+                :readonly="
+                  ehUsuarioCaixa && tipoAtual === 'despesa' && itensDiscriminacao.length > 0
+                "
                 @input="
                   lancamentoAtual.valorAcrescimoCents = aoDigitarCentavos(
                     ($event.target as HTMLInputElement).value,
@@ -817,7 +877,11 @@ watch(
             v-else-if="lancamentoAtual.obsTipo === 'audio'"
             v-model="lancamentoAtual.obsAudioPath"
             :fechamento-id="draft.id"
-            campo="lancamento-obs-audio"
+            :campo="`lancamento-obs-audio-${lancamentoAtual.id}`"
+            upload-adiado
+            :arquivo-pendente="audioPendenteLancamento(lancamentoAtual.id)"
+            @arquivo-selecionado="registrarAudioLancamento(lancamentoAtual.id, $event)"
+            @arquivo-removido="removerAudioLancamento(lancamentoAtual.id)"
           />
 
           <div class="lc-campo lc-mt">
@@ -827,6 +891,7 @@ watch(
               campo="lancamento-foto"
               label="Foto"
               upload-adiado
+              :arquivo-pendente="arquivoPendenteLancamento(lancamentoAtual.id, 'foto')"
               @arquivo-selecionado="registrarFotoLancamento(lancamentoAtual.id, 'foto', $event)"
               @arquivo-removido="removerFotoLancamento(lancamentoAtual.id, 'foto')"
             />
@@ -870,7 +935,10 @@ watch(
               campo="lancamento-foto-nota"
               label="Foto Nota / Boleto"
               upload-adiado
-              @arquivo-selecionado="registrarFotoLancamento(lancamentoAtual.id, 'foto-nota', $event)"
+              :arquivo-pendente="arquivoPendenteLancamento(lancamentoAtual.id, 'foto-nota')"
+              @arquivo-selecionado="
+                registrarFotoLancamento(lancamentoAtual.id, 'foto-nota', $event)
+              "
               @arquivo-removido="removerFotoLancamento(lancamentoAtual.id, 'foto-nota')"
             />
           </div>

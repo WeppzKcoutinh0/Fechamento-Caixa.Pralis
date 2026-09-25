@@ -31,6 +31,30 @@ function removerFotoMaquininha(campo: 'img-manha' | 'img-tarde'): void {
   if (props.draft.arquivosPendentes) Reflect.deleteProperty(props.draft.arquivosPendentes, campo);
 }
 
+function chaveArquivoPdv(): string {
+  return 'img-pdv';
+}
+function registrarFotoPdv(arquivo: File): void {
+  props.draft.arquivosPendentes ??= {};
+  props.draft.arquivosPendentes[chaveArquivoPdv()] = arquivo;
+}
+function removerFotoPdv(): void {
+  if (props.draft.arquivosPendentes)
+    Reflect.deleteProperty(props.draft.arquivosPendentes, chaveArquivoPdv());
+}
+
+function chaveArquivoCrediario(indice: number): string {
+  return `cred-cupom-${indice}`;
+}
+function registrarFotoCrediario(indice: number, arquivo: File): void {
+  props.draft.arquivosPendentes ??= {};
+  props.draft.arquivosPendentes[chaveArquivoCrediario(indice)] = arquivo;
+}
+function removerFotoCrediario(indice: number): void {
+  if (props.draft.arquivosPendentes)
+    Reflect.deleteProperty(props.draft.arquivosPendentes, chaveArquivoCrediario(indice));
+}
+
 // Painéis empilhados (PDV / Maquininhas / Crediário), mesmo padrão visual de faixa colorida +
 // corpo usado em SecaoTransferencias.vue (Entradas/Sangrias/Transferência entre caixas), em vez
 // da troca por abas de antes. PDV usa a cor "venda" (o Pralís mapeia relatório de vendas pra essa
@@ -298,6 +322,7 @@ function abrirCrediario(indiceGlobal: number): void {
 }
 function removerCrediarioAtual(): void {
   if (indiceCrediarioEditando.value === null) return;
+  removerFotoCrediario(indiceCrediarioEditando.value);
   props.draft.crediario.splice(indiceCrediarioEditando.value, 1);
   modalCrediarioAberto.value = false;
 }
@@ -464,6 +489,10 @@ function alternarTurnoMaquininha(turno: 'manha' | 'tarde'): void {
               :fechamento-id="draft.id"
               campo="img-pdv"
               label="Imagem Relatório PDV"
+              upload-adiado
+              :arquivo-pendente="draft.arquivosPendentes?.['img-pdv'] ?? null"
+              @arquivo-selecionado="registrarFotoPdv"
+              @arquivo-removido="removerFotoPdv"
             />
           </div>
         </div>
@@ -738,6 +767,7 @@ function alternarTurnoMaquininha(turno: 'manha' | 'tarde'): void {
                   campo="img-manha"
                   label="Imagem Manhã"
                   upload-adiado
+                  :arquivo-pendente="draft.arquivosPendentes?.['img-manha'] ?? null"
                   @arquivo-selecionado="registrarFotoMaquininha('img-manha', $event)"
                   @arquivo-removido="removerFotoMaquininha('img-manha')"
                 />
@@ -888,6 +918,7 @@ function alternarTurnoMaquininha(turno: 'manha' | 'tarde'): void {
                   campo="img-tarde"
                   label="Imagem Tarde"
                   upload-adiado
+                  :arquivo-pendente="draft.arquivosPendentes?.['img-tarde'] ?? null"
                   @arquivo-selecionado="registrarFotoMaquininha('img-tarde', $event)"
                   @arquivo-removido="removerFotoMaquininha('img-tarde')"
                 />
@@ -1075,8 +1106,21 @@ function alternarTurnoMaquininha(turno: 'manha' | 'tarde'): void {
             <CampoFoto
               v-model="itemCrediarioAtual.fotoPath"
               :fechamento-id="draft.id"
-              campo="cred-cupom"
+              :campo="`cred-cupom-${indiceCrediarioEditando}`"
               label="Foto do cupom assinado"
+              upload-adiado
+              :arquivo-pendente="
+                indiceCrediarioEditando === null
+                  ? null
+                  : (draft.arquivosPendentes?.[`cred-cupom-${indiceCrediarioEditando}`] ?? null)
+              "
+              @arquivo-selecionado="
+                indiceCrediarioEditando !== null &&
+                registrarFotoCrediario(indiceCrediarioEditando, $event)
+              "
+              @arquivo-removido="
+                indiceCrediarioEditando !== null && removerFotoCrediario(indiceCrediarioEditando)
+              "
             />
           </div>
         </div>

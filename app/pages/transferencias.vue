@@ -10,6 +10,8 @@ import {
 import { formatCents } from '~/utils/financeiro';
 import { formatarDataBr } from '~/utils/vendasFechamento';
 
+definePageMeta({ middleware: ['admin'] });
+
 const { isAdmin, carregar: carregarPerfil } = usePerfil();
 const { listar, excluir, confirmarRecebimento } = useTransferenciasTesouraria();
 const confirmando = ref<string | null>(null);
@@ -185,12 +187,20 @@ async function confirmarRecebimentoDe(id: string): Promise<void> {
               Nenhum registro nesta categoria.
             </v-alert>
             <div v-else class="d-flex flex-column ga-2">
-              <v-card v-for="t in grupo.itens" :key="t.id" variant="outlined" rounded="lg" class="pa-4">
+              <v-card
+                v-for="t in grupo.itens"
+                :key="t.id"
+                variant="outlined"
+                rounded="lg"
+                class="pa-4"
+              >
                 <div class="d-flex align-center flex-wrap ga-3">
                   <v-icon icon="mdi-check-circle" color="success" size="20" />
                   <strong>{{ t.caixaOrigem }} → {{ t.caixaDestino }}</strong>
                   <span class="text-caption text-medium-emphasis">Lacre {{ t.lacre }}</span>
-                  <span class="text-caption text-medium-emphasis">{{ formatarDataBr(t.dataLanc) }}</span>
+                  <span class="text-caption text-medium-emphasis">{{
+                    formatarDataBr(t.dataLanc)
+                  }}</span>
                   <v-spacer />
                   <strong>R$ {{ formatCents(t.valorCents) }}</strong>
                   <v-btn

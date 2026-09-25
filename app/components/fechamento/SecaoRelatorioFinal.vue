@@ -90,6 +90,31 @@ const rotuloDiferenca = computed(() => {
   return d > 0 ? 'Sobra (contado − esperado)' : 'Falta (contado − esperado)';
 });
 
+// Detalhe do "Esperado na gaveta" (pedido do usuário, 25/09/2026): mesma fórmula do
+// calculatePhysicalClosing (ver financeiro.ts) quebrada linha a linha, pra explicar de onde
+// veio o número em vez de só mostrar o total. Lacre de abertura entra separado de
+// "Transferências recebidas" (mesma separação que fisico.expectedCents já faz por trás, ver
+// transferenciaEntradaTotalCents em useRelatorioCalculado.ts) — só aparece quando > 0.
+const detalheEsperadoAberto = ref(false);
+const detalhesEsperado = computed(() => {
+  const itens: { rotulo: string; sinal: '+' | '−'; valorCents: number }[] = [
+    { rotulo: 'Dinheiro do PDV', sinal: '+', valorCents: pdv.value.dinheiroCents },
+    { rotulo: 'Entradas', sinal: '+', valorCents: totalEntradaCents.value },
+    { rotulo: 'Transferências recebidas', sinal: '+', valorCents: transferenciaEntradaCents.value },
+  ];
+  if (lacreAberturaValorCents.value > 0) {
+    itens.push({ rotulo: 'Lacre de abertura', sinal: '+', valorCents: lacreAberturaValorCents.value });
+  }
+  itens.push(
+    { rotulo: 'Sangrias', sinal: '−', valorCents: totalSaidaCents.value },
+    { rotulo: 'Despesas', sinal: '−', valorCents: lancamentosPorTipo.value.despesaCents },
+    { rotulo: 'Mercadorias', sinal: '−', valorCents: lancamentosPorTipo.value.mercadoriaCents },
+    { rotulo: 'Retiradas', sinal: '−', valorCents: lancamentosPorTipo.value.retiradaCents },
+    { rotulo: 'Transferências enviadas', sinal: '−', valorCents: transferenciaSaidaCents.value },
+  );
+  return itens;
+});
+
 // Geração 100% client-side (jsPDF) — reusa os mesmos valores já calculados acima, não recalcula
 // nada por conta própria (ver utils/gerarPdfFechamento.ts).
 function baixarPdf(): void {
@@ -1096,9 +1121,28 @@ const CAT_VARS = {
 
           <template v-if="draft.dinheiroContadoConfirmado">
             <v-divider class="my-3" />
-            <div class="d-flex justify-space-between text-body-2 mb-2">
-              <span class="text-medium-emphasis">Esperado na gaveta</span>
+            <div
+              class="d-flex justify-space-between align-center text-body-2 mb-1"
+              style="cursor: pointer"
+              @click="detalheEsperadoAberto = !detalheEsperadoAberto"
+            >
+              <span class="text-medium-emphasis d-flex align-center ga-1">
+                Esperado na gaveta
+                <v-icon size="16">{{
+                  detalheEsperadoAberto ? 'mdi-chevron-up' : 'mdi-chevron-down'
+                }}</v-icon>
+              </span>
               <strong>R$ {{ formatCents(fisico.expectedCents) }}</strong>
+            </div>
+            <div v-if="detalheEsperadoAberto" class="lc-detalhe-esperado mb-2">
+              <div
+                v-for="item in detalhesEsperado"
+                :key="item.rotulo"
+                class="d-flex justify-space-between"
+              >
+                <span class="text-medium-emphasis">{{ item.sinal }} {{ item.rotulo }}</span>
+                <span>R$ {{ formatCents(item.valorCents) }}</span>
+              </div>
             </div>
             <CartaoValor
               :rotulo="rotuloDiferenca"
@@ -1178,5 +1222,16 @@ const CAT_VARS = {
   color: white;
   font-size: 10px;
   font-weight: 700;
+}
+
+/* Detalhe do "Esperado na gaveta" (pedido do usuário, 25/09/2026) — pequeno de propósito, é só
+   uma conferência a mais, não um bloco novo de destaque. */
+.lc-detalhe-esperado {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-left: 2px solid var(--cx-line);
+  font-size: var(--cx-fs-micro);
 }
 </style>

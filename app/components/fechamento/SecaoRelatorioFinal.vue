@@ -2,6 +2,7 @@
 import { computed, ref, toRef } from 'vue';
 import {
   MOTIVOS_MAQUINA_DESLIGADA,
+  type EventoMaquinaDesligada,
   type FechamentoDraft,
   type MotivoMaquinaDesligada,
   type MotivoVendaCanceladaDraft,
@@ -321,24 +322,36 @@ function enviarWhatsappCancelados(): void {
   abrirWhatsappVendasCanceladas(props.draft, itensCancelados.value);
 }
 
-// "A máquina foi desligada hoje?" (pedido do usuário, 28/09/2026) — puramente informativo, não
-// entra em nenhum cálculo. Desligar o interruptor limpa os motivos já marcados (não deixa lixo de
-// uma resposta "Sim" anterior escondido atrás de um "Não").
-function aoAlternarMaquinaDesligada(valor: boolean | null): void {
-  props.draft.maquinaDesligadaHoje = Boolean(valor);
-  if (!props.draft.maquinaDesligadaHoje) {
-    props.draft.maquinaDesligadaMotivos = [];
-    props.draft.maquinaDesligadaOutroTexto = '';
-  }
+// "Máquina desligada" (28/09/2026, pedido do usuário: "tem que ser um FATO") — a lista em
+// `draft.maquinaDesligadaEventos` é preenchida sozinha por `useDeteccaoMaquinaDesligada.ts`
+// (heartbeat), lá em WizardFechamento.vue; aqui só edita o motivo de cada evento já detectado —
+// nunca cria/apaga um evento (isso seria voltar a ser autodeclarado).
+function formatarHoraEvento(iso: string): string {
+  const data = new Date(iso);
+  if (Number.isNaN(data.getTime())) return '—';
+  return data.toLocaleTimeString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
-function alternarMotivoMaquina(motivo: MotivoMaquinaDesligada, marcado: boolean): void {
-  const atuais = props.draft.maquinaDesligadaMotivos;
+function duracaoEvento(evento: EventoMaquinaDesligada): string {
+  const minutos = Math.round(
+    (new Date(evento.fim).getTime() - new Date(evento.inicio).getTime()) / 60_000,
+  );
+  return minutos < 1 ? 'menos de 1 min' : `${minutos} min`;
+}
+function alternarMotivoMaquina(
+  evento: EventoMaquinaDesligada,
+  motivo: MotivoMaquinaDesligada,
+  marcado: boolean,
+): void {
   if (marcado) {
-    if (!atuais.includes(motivo)) atuais.push(motivo);
+    if (!evento.motivos.includes(motivo)) evento.motivos.push(motivo);
   } else {
-    const indice = atuais.indexOf(motivo);
-    if (indice !== -1) atuais.splice(indice, 1);
-    if (motivo === 'Outro') props.draft.maquinaDesligadaOutroTexto = '';
+    const indice = evento.motivos.indexOf(motivo);
+    if (indice !== -1) evento.motivos.splice(indice, 1);
+    if (motivo === 'Outro') evento.outroTexto = '';
   }
 }
 
@@ -1036,45 +1049,59 @@ const CAT_VARS = {
 
       <v-expansion-panel class="cat-painel" :style="CAT_VARS.incidente">
         <v-expansion-panel-title class="cat-titulo">
-          <span class="flex-grow-1">Máquina desligada hoje?</span>
+          <span class="flex-grow-1">Máquina desligada</span>
           <v-chip
             size="small"
             variant="tonal"
-            :color="draft.maquinaDesligadaHoje ? 'warning' : undefined"
+            :color="draft.maquinaDesligadaEventos.length ? 'warning' : undefined"
           >
-            {{ draft.maquinaDesligadaHoje ? 'Sim' : 'Não' }}
+            {{
+              draft.maquinaDesligadaEventos.length
+                ? `${draft.maquinaDesligadaEventos.length} detectado${draft.maquinaDesligadaEventos.length === 1 ? '' : 's'}`
+                : 'Nenhum'
+            }}
           </v-chip>
         </v-expansion-panel-title>
         <v-expansion-panel-text>
-          <v-switch
-            :model-value="draft.maquinaDesligadaHoje"
-            label="A máquina foi desligada hoje?"
-            color="primary"
-            density="compact"
-            hide-details
-            @update:model-value="aoAlternarMaquinaDesligada"
-          />
-          <template v-if="draft.maquinaDesligadaHoje">
-            <p class="cat-subgrupo mt-3">Por quê? (marque tudo o que se aplica)</p>
+          <p class="text-caption text-medium-emphasis mb-3">
+            Detectado automaticamente pelo sistema (não é uma pergunta pro operador) — se o app
+            ficou sem sinal de vida por mais de 1 minuto durante o turno, é porque a máquina
+            desligou, travou ou hibernou.
+          </p>
+          <p v-if="!draft.maquinaDesligadaEventos.length" class="text-body-2">
+            Nenhum desligamento detectado durante este turno.
+          </p>
+          <div
+            v-for="(evento, indice) in draft.maquinaDesligadaEventos"
+            :key="evento.inicio"
+            class="mb-4"
+          >
+            <p class="cat-subgrupo">
+              Desligamento {{ indice + 1 }}: das {{ formatarHoraEvento(evento.inicio) }} às
+              {{ formatarHoraEvento(evento.fim) }} ({{ duracaoEvento(evento) }})
+            </p>
+            <p class="text-caption text-medium-emphasis mb-1">Por quê? (marque tudo o que se aplica)</p>
             <div class="d-flex flex-column ga-1">
               <v-checkbox
                 v-for="motivo in MOTIVOS_MAQUINA_DESLIGADA"
                 :key="motivo"
-                :model-value="draft.maquinaDesligadaMotivos.includes(motivo)"
+                :model-value="evento.motivos.includes(motivo)"
                 :label="motivo"
                 density="compact"
                 hide-details
-                @update:model-value="(marcado) => alternarMotivoMaquina(motivo, Boolean(marcado))"
+                @update:model-value="
+                  (marcado) => alternarMotivoMaquina(evento, motivo, Boolean(marcado))
+                "
               />
             </div>
             <v-text-field
-              v-if="draft.maquinaDesligadaMotivos.includes('Outro')"
-              v-model="draft.maquinaDesligadaOutroTexto"
+              v-if="evento.motivos.includes('Outro')"
+              v-model="evento.outroTexto"
               label="Descreva o motivo"
               placeholder="O que aconteceu?"
               class="mt-3"
             />
-          </template>
+          </div>
         </v-expansion-panel-text>
       </v-expansion-panel>
     </v-expansion-panels>

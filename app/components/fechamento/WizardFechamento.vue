@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onUnmounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useFechamentoForm } from '~/composables/useFechamentoForm';
 import { useFechamentos } from '~/composables/useFechamentos';
@@ -8,6 +8,7 @@ import { useTransferenciasTesouraria } from '~/composables/useTransferenciasTeso
 import { useVendasCanceladas } from '~/composables/useVendasCanceladas';
 import { useAnexos } from '~/composables/useAnexos';
 import { useExportarFechamentoPlanilha } from '~/composables/useExportarFechamentoPlanilha';
+import { useDeteccaoMaquinaDesligada } from '~/composables/useDeteccaoMaquinaDesligada';
 import SecaoIdentificacao from '~/components/fechamento/SecaoIdentificacao.vue';
 import SecaoTransferencias from '~/components/fechamento/SecaoTransferencias.vue';
 import SecaoLancamentos from '~/components/fechamento/SecaoLancamentos.vue';
@@ -58,6 +59,39 @@ const TITULOS_SECAO = [
 
 const tituloSecao = computed(() => TITULOS_SECAO[secaoAtual.value - 1] ?? TITULOS_SECAO[0]);
 
+// "Máquina desligada" tem que ser um FATO medido, não autodeclarado (pedido do usuário,
+// 28/09/2026) — liga o heartbeat assim que existir uma sessão de caixa (só faz sentido pra quem
+// está de fato operando um caixa físico; admin criando fechamento direto não tem isso). Reage a
+// `cashSessionId` chegar depois do mount (ver novo.vue: a sessão só é confirmada via API,
+// `contextoDe` roda de novo no onMounted de lá) em vez de só no mount deste componente.
+const deteccaoMaquina = useDeteccaoMaquinaDesligada();
+function aoDetectarDesligamento(eventos: typeof draft.value.maquinaDesligadaEventos): void {
+  draft.value.maquinaDesligadaEventos = eventos;
+}
+watch(
+  () => draft.value.cashSessionId,
+  (sessaoId, sessaoAnterior) => {
+    if (sessaoAnterior) deteccaoMaquina.parar();
+    if (!sessaoId) return;
+    draft.value.maquinaDesligadaEventos = deteccaoMaquina.lerEventos(sessaoId);
+    deteccaoMaquina.iniciar(sessaoId, aoDetectarDesligamento);
+  },
+  { immediate: true },
+);
+onUnmounted(() => deteccaoMaquina.parar());
+
+async function validarMotivosMaquinaDesligada(): Promise<boolean> {
+  const faltantes = draft.value.maquinaDesligadaEventos.filter((e) => e.motivos.length === 0);
+  if (faltantes.length > 0) {
+    erro.value =
+      faltantes.length === 1
+        ? 'Foi detectado um desligamento da máquina — informe o motivo antes de salvar.'
+        : `Foram detectados ${faltantes.length} desligamentos da máquina — informe o motivo de cada um antes de salvar.`;
+    return false;
+  }
+  return true;
+}
+
 async function validarMotivosProdutosCancelados(): Promise<boolean> {
   await buscarCancelados(draft.value.data);
   if (erroCancelados.value) {
@@ -91,6 +125,7 @@ async function onSalvar() {
   aviso.value = null;
   salvando.value = true;
   try {
+    if (!(await validarMotivosMaquinaDesligada())) return;
     if (!(await validarMotivosProdutosCancelados())) return;
     const fechamentoId = await salvar(draft.value);
     const arquivosPendentes = draft.value.arquivosPendentes ?? {};
@@ -171,6 +206,9 @@ async function onSalvar() {
     // gravado (não se perde), só a sessão fica ABERTA até uma nova tentativa/ação admin.
     if (draft.value.cashSessionId) {
       await fecharSessao(draft.value.cashSessionId, fechamentoId);
+      // Turno encerrado — não precisa mais detectar desligamento pra essa sessão.
+      deteccaoMaquina.parar();
+      deteccaoMaquina.limpar(draft.value.cashSessionId);
     }
     // Retorno automático pro cofre (18/09/2026, pedido do usuário — versão simplificada do que o
     // Sistema Inteligente Pralís faz): melhor esforço, depois do fechamento já salvo — uma falha

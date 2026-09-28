@@ -16,9 +16,9 @@ export type Turno = (typeof TURNOS)[number];
 export const TIPOS_LANCAMENTO = ['despesa', 'mercadoria', 'retirada'] as const;
 export type TipoLancamento = (typeof TIPOS_LANCAMENTO)[number];
 
-// "A máquina foi desligada hoje?" (pedido do usuário, 28/09/2026) — múltipla escolha, "Outro" abre
-// um campo de texto livre (ver maquinaDesligadaOutroTexto). Motivos além dos que o usuário pediu
-// (energia/internet/fio/travou) são sugestão nossa — mesma ideia: causas comuns de um PDV cair.
+// Motivos de um desligamento DETECTADO (ver EventoMaquinaDesligada) — múltipla escolha, "Outro"
+// abre um campo de texto livre. Motivos além dos que o usuário pediu (energia/internet/fio/
+// travou) são sugestão nossa — mesma ideia: causas comuns de um PDV cair.
 export const MOTIVOS_MAQUINA_DESLIGADA = [
   'Falta de energia na loja',
   'Oscilação ou pane elétrica',
@@ -30,6 +30,20 @@ export const MOTIVOS_MAQUINA_DESLIGADA = [
   'Outro',
 ] as const;
 export type MotivoMaquinaDesligada = (typeof MOTIVOS_MAQUINA_DESLIGADA)[number];
+
+/**
+ * 28/09/2026 (correção de conceito, pedido do usuário: "tem que ser um FATO"): não é mais um
+ * interruptor que o operador liga por conta própria — `useDeteccaoMaquinaDesligada.ts` MEDE (via
+ * heartbeat salvo no aparelho) se o app ficou sem sinal de vida por mais de 1 minuto e PREENCHE
+ * este evento sozinho, com o horário real. O operador só marca o motivo depois — nunca inventa o
+ * "aconteceu ou não".
+ */
+export interface EventoMaquinaDesligada {
+  inicio: string; // ISO
+  fim: string; // ISO
+  motivos: MotivoMaquinaDesligada[];
+  outroTexto: string;
+}
 
 export const STATUS_LANCAMENTO = ['pago', 'naopago'] as const;
 export type StatusLancamento = (typeof STATUS_LANCAMENTO)[number];
@@ -302,9 +316,7 @@ export interface FechamentoDraft {
   // "A máquina foi desligada hoje?" (pedido do usuário, 28/09/2026) — bloco clicável no Relatório
   // Final, mesmo espírito informativo de "Vendas/Produtos Cancelados": não afeta nenhum cálculo,
   // só registra o incidente pra quem for conferir o fechamento depois.
-  maquinaDesligadaHoje: boolean;
-  maquinaDesligadaMotivos: MotivoMaquinaDesligada[];
-  maquinaDesligadaOutroTexto: string;
+  maquinaDesligadaEventos: EventoMaquinaDesligada[];
 
   // Fluxo de Caixa (18/09/2026): liga este fechamento à sessão de caixa que o originou —
   // `null` quando não veio de uma sessão (ex.: fechamento criado direto pelo admin). Quando
@@ -426,9 +438,7 @@ export function criarFechamentoVazio(contexto?: ContextoSessaoCaixa): Fechamento
     imgFolhaFechamentoPath: null,
     dinheiroContadoConfirmado: false,
     dinheiroContadoValoresConfirmados: false,
-    maquinaDesligadaHoje: false,
-    maquinaDesligadaMotivos: [],
-    maquinaDesligadaOutroTexto: '',
+    maquinaDesligadaEventos: [],
     cashSessionId: contexto?.id ?? null,
     lacreAbertura: contexto?.lacreAbertura ?? '',
     arquivosPendentes: {},

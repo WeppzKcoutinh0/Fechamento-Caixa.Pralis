@@ -61,6 +61,31 @@ function formatDataHora(iso: string | null): string {
   return data.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
 }
 
+function formatHora(iso: string): string {
+  const data = new Date(iso);
+  if (Number.isNaN(data.getTime())) return '—';
+  return data.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
+}
+
+interface EventoMaquinaDesligada {
+  inicio: string;
+  fim: string;
+  motivos: string[];
+  outroTexto: string;
+}
+
+/** "Máquina desligada" agora é FATO detectado (heartbeat), não autodeclarado — ver
+ * useDeteccaoMaquinaDesligada.ts. Cada evento vira "HH:MM–HH:MM (motivos)" na célula. */
+function resumoMaquinaDesligada(eventos: EventoMaquinaDesligada[] | null): string {
+  if (!eventos || eventos.length === 0) return 'Não';
+  return eventos
+    .map((e) => {
+      const motivos = [...e.motivos, e.outroTexto].filter(Boolean).join(', ') || 'sem motivo informado';
+      return `${formatHora(e.inicio)}–${formatHora(e.fim)} (${motivos})`;
+    })
+    .join('; ');
+}
+
 /** `vendas_canceladas_motivo_texto` guarda ou um JSON por item, ou (formato antigo) texto livre
  * compartilhado — mesma heurística de `colunaMotivoEhJsonDeItens` em useFechamentos.ts. */
 function motivoCanceladoPorItem(texto: string | null): Record<string, string> | null {
@@ -275,9 +300,7 @@ export async function exportarFechamentoParaPlanilha(fechamentoId: string): Prom
     `${sangrias.length} sangrias — ${formatBRL(totalSangriasCents / 100)}`,
     `${crediario.length} itens — ${formatBRL(totalCrediarioCents / 100)}`,
     formatDataHora(fechamento.atualizado_em ?? fechamento.criado_em),
-    fechamento.maquina_desligada_hoje
-      ? `Sim — ${[...(fechamento.maquina_desligada_motivos ?? []), fechamento.maquina_desligada_outro_texto].filter(Boolean).join(', ')}`
-      : 'Não',
+    resumoMaquinaDesligada(fechamento.maquina_desligada_eventos),
     (fechamento.pdv_entradas ?? []).reduce(
       (s: number, p: { nr_clientes: number }) => s + Number(p.nr_clientes ?? 0),
       0,

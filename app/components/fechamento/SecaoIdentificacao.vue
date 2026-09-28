@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { CAIXAS, TURNOS, type Caixa, type FechamentoDraft, type Turno } from '~/types/fechamento';
-import { useSupabase } from '~/composables/useSupabase';
 import { useVendasCanceladas } from '~/composables/useVendasCanceladas';
 import { useVendasFechamento } from '~/composables/useVendasFechamento';
+import { useSincronizarVendas } from '~/composables/useSincronizarVendas';
 import { formatCents, toCents } from '~/utils/financeiro';
 import {
   aplicarAjustesComoLancamentos,
@@ -12,7 +12,6 @@ import {
   formatarDataBr,
   turnoParaLetra,
 } from '~/utils/vendasFechamento';
-import { mensagemDeErro } from '~/utils/erros';
 
 const props = defineProps<{ draft: FechamentoDraft }>();
 
@@ -79,59 +78,47 @@ const rotuloFiltro = computed(() => {
   return `${base}, ${rotuloHora}`;
 });
 
-async function buscarVendas() {
-  jaBuscou.value = true;
-  const resultado = await buscarPorData(dataVendas.value, {
-    caixa: caixaParaNumero(props.draft.caixa),
-    turno: turnoParaLetra(props.draft.turno),
-    horaInicio: filtrarPorHorario.value ? horaDoCampo(horaInicio.value) : null,
-    horaFim: filtrarPorHorario.value ? horaDoCampo(horaFim.value) : null,
-  });
-  if (!resultado || resultado.registros === 0) return;
-  aplicarResumoAoPrimeiroPdv(props.draft, resultado);
-  aplicarAjustesComoLancamentos(props.draft, resultado);
-}
-
 // "Sincronizar vendas agora" (pedido do usuário, 17/09/2026): puxa a planilha na hora, sem
 // esperar o cron automático (1x/dia, de madrugada — ver server/utils/sincronizarPlanilha.ts).
 // ATENÇÃO, real: isto NUNCA traz vendas de HOJE enquanto a loja ainda está aberta — o bot da loja
 // só escreve na planilha à noite (22h10). Isto só evita esperar até o cron da manhã SEGUINTE
 // depois que o bot já rodou — não é tempo real durante o dia (a mensagem abaixo do botão deixa
 // isso explícito, pra não parecer que "sincronizar" traz venda que ainda nem existe na origem).
-const sincronizando = ref(false);
-const sincronizacaoErro = ref('');
-const sincronizacaoResultado = ref<{ gravadasFechamento: number; gravadasProdutos: number } | null>(
-  null,
-);
+//
+// 28/09/2026 (bug real em produção): o cron automático da Vercel simplesmente não disparou por 2
+// dias seguidos — sem nenhum aviso, "Buscar vendas" voltava vazio porque só lê o que já está
+// sincronizado, nunca puxa a planilha sozinho. `useSincronizarVendas` (compartilhado com
+// SecaoRelatorios.vue) agora é chamado ANTES de ler, aqui e no botão separado, tirando a
+// dependência de alguém lembrar de clicar em dois botões — e do cron precisar funcionar sozinho.
+const {
+  sincronizando,
+  erro: sincronizacaoErro,
+  resultado: sincronizacaoResultado,
+  sincronizar: sincronizarSilenciosamente,
+} = useSincronizarVendas();
 
+const filtroBusca = computed(() => ({
+  caixa: caixaParaNumero(props.draft.caixa),
+  turno: turnoParaLetra(props.draft.turno),
+  horaInicio: filtrarPorHorario.value ? horaDoCampo(horaInicio.value) : null,
+  horaFim: filtrarPorHorario.value ? horaDoCampo(horaFim.value) : null,
+}));
+
+async function buscarVendas() {
+  jaBuscou.value = true;
+  await sincronizarSilenciosamente();
+  const resultado = await buscarPorData(dataVendas.value, filtroBusca.value);
+  if (!resultado || resultado.registros === 0) return;
+  aplicarResumoAoPrimeiroPdv(props.draft, resultado);
+  aplicarAjustesComoLancamentos(props.draft, resultado);
+}
+
+/** Botão "Sincronizar vendas agora" — mesma sincronização, só que sem ler depois (o usuário só
+ * quer empurrar a planilha pro banco, não necessariamente re-buscar o filtro atual). */
 async function sincronizarAgora() {
-  sincronizando.value = true;
-  sincronizacaoErro.value = '';
-  sincronizacaoResultado.value = null;
-  try {
-    const supabase = useSupabase();
-    const { data } = await supabase.auth.getSession();
-    const token = data.session?.access_token;
-    if (!token) throw new Error('Sessão expirada — faça login de novo.');
-
-    const resposta = await $fetch<{
-      fechamentoCaixa: { gravadas: number };
-      vendasProdutos: { gravadas: number };
-    }>('/vendas/sincronizar', {
-      method: 'POST',
-      headers: { authorization: `Bearer ${token}` },
-    });
-    sincronizacaoResultado.value = {
-      gravadasFechamento: resposta.fechamentoCaixa.gravadas,
-      gravadasProdutos: resposta.vendasProdutos.gravadas,
-    };
-    // Re-busca automaticamente pro filtro atual, pra já mostrar se algo novo chegou.
-    if (jaBuscou.value) await buscarVendas();
-  } catch (erro) {
-    sincronizacaoErro.value = mensagemDeErro(erro, 'Falha ao sincronizar.');
-  } finally {
-    sincronizando.value = false;
-  }
+  await sincronizarSilenciosamente();
+  // Re-busca automaticamente pro filtro atual, pra já mostrar se algo novo chegou.
+  if (jaBuscou.value) await buscarPorData(dataVendas.value, filtroBusca.value);
 }
 
 // Vendas canceladas (pedido do usuário, 23/09/2026, ligado de vez em 24/09/2026): mesmo botão
@@ -146,6 +133,7 @@ const {
 const jaBuscouCanceladas = ref(false);
 async function buscarVendasCanceladas() {
   jaBuscouCanceladas.value = true;
+  await sincronizarSilenciosamente();
   await buscarVendasCanceladasBase(dataVendas.value);
 }
 function formatarQtd(qtd: number): string {
@@ -243,11 +231,11 @@ const ajustesPresentes = computed(() => {
         <v-btn
           color="primary"
           variant="tonal"
-          :loading="carregando"
-          :disabled="carregando || !dataVendas"
+          :loading="sincronizando || carregando"
+          :disabled="sincronizando || carregando || !dataVendas"
           @click="buscarVendas"
         >
-          {{ carregando ? 'Buscando vendas...' : 'Buscar vendas' }}
+          {{ sincronizando ? 'Sincronizando...' : carregando ? 'Buscando vendas...' : 'Buscar vendas' }}
         </v-btn>
         <v-btn
           variant="text"
@@ -263,15 +251,15 @@ const ajustesPresentes = computed(() => {
           variant="outlined"
           size="small"
           prepend-icon="mdi-cancel"
-          :loading="buscandoCanceladas"
-          :disabled="buscandoCanceladas || !dataVendas"
+          :loading="sincronizando || buscandoCanceladas"
+          :disabled="sincronizando || buscandoCanceladas || !dataVendas"
           @click="buscarVendasCanceladas"
         >
-          {{ buscandoCanceladas ? 'Buscando...' : 'Buscar vendas canceladas' }}
+          {{ sincronizando ? 'Sincronizando...' : buscandoCanceladas ? 'Buscando...' : 'Buscar vendas canceladas' }}
         </v-btn>
       </div>
 
-      <template v-if="jaBuscouCanceladas && !buscandoCanceladas">
+      <template v-if="jaBuscouCanceladas && !sincronizando && !buscandoCanceladas">
         <v-alert v-if="erroCanceladas" type="error" variant="tonal" density="comfortable">
           {{ erroCanceladas }}
         </v-alert>
@@ -326,7 +314,7 @@ const ajustesPresentes = computed(() => {
         {{ sincronizacaoResultado.gravadasProdutos }} de produto gravadas (reenviar não duplica).
       </v-alert>
 
-      <template v-if="jaBuscou && !carregando">
+      <template v-if="jaBuscou && !sincronizando && !carregando">
         <v-alert v-if="erro" type="error" variant="tonal" density="comfortable">
           {{ erro }}
         </v-alert>

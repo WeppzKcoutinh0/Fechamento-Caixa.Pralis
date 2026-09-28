@@ -10,6 +10,7 @@ import CampoFoto from '~/components/comum/CampoFoto.vue';
 import CartaoValor from '~/components/comum/CartaoValor.vue';
 import DetalhesPagamentoMaquininha from './DetalhesPagamentoMaquininha.vue';
 import { useVendasFechamento } from '~/composables/useVendasFechamento';
+import { useSincronizarVendas } from '~/composables/useSincronizarVendas';
 import { useLeituraMaquininha } from '~/composables/useLeituraMaquininha';
 import { calculatePdvEntradas, formatCents, toCents } from '~/utils/financeiro';
 import {
@@ -86,6 +87,11 @@ const {
   resumo: resumoVendas,
   buscarPorData,
 } = useVendasFechamento();
+// 28/09/2026 (bug real em produção): o cron automático da Vercel (1x/dia) parou de disparar por 2
+// dias sem nenhum aviso — "Buscar vendas" só lia o que já estava sincronizado, nunca puxava a
+// planilha sozinho. Sincroniza ANTES de ler, mesmo composable de SecaoIdentificacao.vue.
+const { sincronizando: sincronizandoVendas, sincronizar: sincronizarVendas } =
+  useSincronizarVendas();
 const jaBuscouVendas = ref(false);
 const vendasEncontradas = ref(false);
 const rotuloFiltroVendas = computed(() => {
@@ -95,6 +101,7 @@ const rotuloFiltroVendas = computed(() => {
 
 async function buscarVendasDoDia(): Promise<void> {
   jaBuscouVendas.value = true;
+  await sincronizarVendas();
   const resumo = await buscarPorData(props.draft.data, {
     caixa: caixaParaNumero(props.draft.caixa),
     turno: turnoParaLetra(props.draft.turno),
@@ -392,15 +399,21 @@ function alternarTurnoMaquininha(turno: 'manha' | 'tarde'): void {
               color="primary"
               variant="tonal"
               size="small"
-              :loading="buscandoVendas"
-              :disabled="buscandoVendas"
+              :loading="sincronizandoVendas || buscandoVendas"
+              :disabled="sincronizandoVendas || buscandoVendas"
               @click="buscarVendasDoDia"
             >
-              {{ buscandoVendas ? 'Buscando vendas...' : 'Buscar vendas do dia' }}
+              {{
+                sincronizandoVendas
+                  ? 'Sincronizando...'
+                  : buscandoVendas
+                    ? 'Buscando vendas...'
+                    : 'Buscar vendas do dia'
+              }}
             </v-btn>
 
             <v-alert
-              v-if="jaBuscouVendas && !buscandoVendas && erroVendas"
+              v-if="jaBuscouVendas && !sincronizandoVendas && !buscandoVendas && erroVendas"
               type="error"
               variant="tonal"
               density="comfortable"
@@ -408,7 +421,7 @@ function alternarTurnoMaquininha(turno: 'manha' | 'tarde'): void {
               {{ erroVendas }}
             </v-alert>
             <v-alert
-              v-else-if="jaBuscouVendas && !buscandoVendas && !vendasEncontradas"
+              v-else-if="jaBuscouVendas && !sincronizandoVendas && !buscandoVendas && !vendasEncontradas"
               type="info"
               variant="tonal"
               density="comfortable"
@@ -418,7 +431,7 @@ function alternarTurnoMaquininha(turno: 'manha' | 'tarde'): void {
               rodando.
             </v-alert>
             <v-alert
-              v-else-if="jaBuscouVendas && !buscandoVendas && vendasEncontradas"
+              v-else-if="jaBuscouVendas && !sincronizandoVendas && !buscandoVendas && vendasEncontradas"
               type="success"
               variant="tonal"
               density="comfortable"

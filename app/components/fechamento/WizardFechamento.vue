@@ -5,6 +5,7 @@ import { useFechamentoForm } from '~/composables/useFechamentoForm';
 import { useFechamentos } from '~/composables/useFechamentos';
 import { useSessaoCaixa } from '~/composables/useSessaoCaixa';
 import { useTransferenciasTesouraria } from '~/composables/useTransferenciasTesouraria';
+import { useVendasCanceladas } from '~/composables/useVendasCanceladas';
 import { useAnexos } from '~/composables/useAnexos';
 import SecaoIdentificacao from '~/components/fechamento/SecaoIdentificacao.vue';
 import SecaoTransferencias from '~/components/fechamento/SecaoTransferencias.vue';
@@ -34,6 +35,11 @@ const { salvar } = useFechamentos();
 const { fecharSessao } = useSessaoCaixa();
 const { criarRetornoAutomatico, criarSangriaAutomatica } = useTransferenciasTesouraria();
 const { enviar: enviarAnexo } = useAnexos();
+const {
+  itens: itensCancelados,
+  erro: erroCancelados,
+  buscarPorData: buscarCancelados,
+} = useVendasCanceladas();
 const router = useRouter();
 
 const salvando = ref(false);
@@ -50,11 +56,40 @@ const TITULOS_SECAO = [
 
 const tituloSecao = computed(() => TITULOS_SECAO[secaoAtual.value - 1] ?? TITULOS_SECAO[0]);
 
+async function validarMotivosProdutosCancelados(): Promise<boolean> {
+  await buscarCancelados(draft.value.data);
+  if (erroCancelados.value) {
+    erro.value = erroCancelados.value;
+    return false;
+  }
+
+  const arquivosPendentes = draft.value.arquivosPendentes ?? {};
+  const faltantes = itensCancelados.value.filter((item) => {
+    const motivo = draft.value.vendasCanceladasMotivos[item.id];
+    const temTexto = Boolean(motivo?.texto.trim());
+    const temAudio = Boolean(motivo?.audioPath);
+    const temAudioPendente = Boolean(
+      arquivosPendentes[`audio-vendas-canceladas-motivo-${item.id}`],
+    );
+    return !temTexto && !temAudio && !temAudioPendente;
+  });
+
+  if (faltantes.length > 0) {
+    erro.value =
+      faltantes.length === 1
+        ? 'Informe o motivo do produto cancelado antes de salvar o fechamento.'
+        : `Informe o motivo de todos os produtos cancelados. Faltam ${faltantes.length} justificativas.`;
+    return false;
+  }
+  return true;
+}
+
 async function onSalvar() {
   erro.value = null;
   aviso.value = null;
   salvando.value = true;
   try {
+    if (!(await validarMotivosProdutosCancelados())) return;
     const fechamentoId = await salvar(draft.value);
     const arquivosPendentes = draft.value.arquivosPendentes ?? {};
     const camposCaminho: Record<
@@ -140,7 +175,8 @@ async function onSalvar() {
     // aqui não desfaz o salvamento, só deixa de gerar o retorno automático desta vez.
     const falhasPosFechamento: string[] = [];
     if (falhasAnexos.length === 1) falhasPosFechamento.push('1 anexo (foto/áudio)');
-    else if (falhasAnexos.length > 1) falhasPosFechamento.push(`${falhasAnexos.length} anexos (foto/áudio)`);
+    else if (falhasAnexos.length > 1)
+      falhasPosFechamento.push(`${falhasAnexos.length} anexos (foto/áudio)`);
     if (draft.value.caixa && draft.value.dinheiroContadoCents > 0) {
       try {
         await criarRetornoAutomatico({

@@ -16,6 +16,21 @@ export type Turno = (typeof TURNOS)[number];
 export const TIPOS_LANCAMENTO = ['despesa', 'mercadoria', 'retirada'] as const;
 export type TipoLancamento = (typeof TIPOS_LANCAMENTO)[number];
 
+// "A máquina foi desligada hoje?" (pedido do usuário, 28/09/2026) — múltipla escolha, "Outro" abre
+// um campo de texto livre (ver maquinaDesligadaOutroTexto). Motivos além dos que o usuário pediu
+// (energia/internet/fio/travou) são sugestão nossa — mesma ideia: causas comuns de um PDV cair.
+export const MOTIVOS_MAQUINA_DESLIGADA = [
+  'Falta de energia na loja',
+  'Oscilação ou pane elétrica',
+  'Internet caiu',
+  'Esbarrão em fio / cabo desconectado',
+  'Computador travou, tive que reiniciar',
+  'Limpeza ou manutenção na loja',
+  'Atualização do sistema (Windows)',
+  'Outro',
+] as const;
+export type MotivoMaquinaDesligada = (typeof MOTIVOS_MAQUINA_DESLIGADA)[number];
+
 export const STATUS_LANCAMENTO = ['pago', 'naopago'] as const;
 export type StatusLancamento = (typeof STATUS_LANCAMENTO)[number];
 
@@ -284,6 +299,13 @@ export interface FechamentoDraft {
   // intermediário já fica implícito/redundante — só existe em memória no client.
   dinheiroContadoValoresConfirmados: boolean;
 
+  // "A máquina foi desligada hoje?" (pedido do usuário, 28/09/2026) — bloco clicável no Relatório
+  // Final, mesmo espírito informativo de "Vendas/Produtos Cancelados": não afeta nenhum cálculo,
+  // só registra o incidente pra quem for conferir o fechamento depois.
+  maquinaDesligadaHoje: boolean;
+  maquinaDesligadaMotivos: MotivoMaquinaDesligada[];
+  maquinaDesligadaOutroTexto: string;
+
   // Fluxo de Caixa (18/09/2026): liga este fechamento à sessão de caixa que o originou —
   // `null` quando não veio de uma sessão (ex.: fechamento criado direto pelo admin). Quando
   // presente, Caixa/Turno da Seção 1 ficam travados no valor da sessão (ver
@@ -404,6 +426,9 @@ export function criarFechamentoVazio(contexto?: ContextoSessaoCaixa): Fechamento
     imgFolhaFechamentoPath: null,
     dinheiroContadoConfirmado: false,
     dinheiroContadoValoresConfirmados: false,
+    maquinaDesligadaHoje: false,
+    maquinaDesligadaMotivos: [],
+    maquinaDesligadaOutroTexto: '',
     cashSessionId: contexto?.id ?? null,
     lacreAbertura: contexto?.lacreAbertura ?? '',
     arquivosPendentes: {},

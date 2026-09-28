@@ -21,6 +21,7 @@ import type {
   FechamentoDraft,
   FechamentoListItem,
   LancamentoDraft,
+  MotivoMaquinaDesligada,
   MotivoVendaCanceladaDraft,
   PdvEntradaDraft,
   SangriaDraft,
@@ -137,6 +138,9 @@ interface FechamentoRow {
   vendas_canceladas_motivo_tipo: string;
   vendas_canceladas_motivo_texto: string;
   vendas_canceladas_motivo_audio_path: string | null;
+  maquina_desligada_hoje: boolean;
+  maquina_desligada_motivos: string[];
+  maquina_desligada_outro_texto: string;
   cash_session_id: string | null;
   entradas: EntradaRow[];
   sangrias: SangriaRow[];
@@ -402,6 +406,9 @@ function linhaParaDraft(row: FechamentoRow): FechamentoDraft {
       : (row.vendas_canceladas_motivo_texto ?? ''),
     vendasCanceladasMotivoAudioPath: row.vendas_canceladas_motivo_audio_path,
     vendasCanceladasMotivos: motivosCanceladosDoBanco(row.vendas_canceladas_motivo_texto),
+    maquinaDesligadaHoje: row.maquina_desligada_hoje ?? false,
+    maquinaDesligadaMotivos: (row.maquina_desligada_motivos ?? []) as MotivoMaquinaDesligada[],
+    maquinaDesligadaOutroTexto: row.maquina_desligada_outro_texto ?? '',
     cashSessionId: row.cash_session_id,
     // Só existe pro fluxo de abertura (ver criarFechamentoVazio) — reabrir um fechamento já
     // salvo pra edição não deve disparar o lookup de novo com um valor de Tesouraria que já
@@ -604,6 +611,9 @@ export function useFechamentos() {
             ? JSON.stringify(draft.vendasCanceladasMotivos)
             : draft.vendasCanceladasMotivoTexto,
         vendas_canceladas_motivo_audio_path: draft.vendasCanceladasMotivoAudioPath,
+        maquina_desligada_hoje: draft.maquinaDesligadaHoje,
+        maquina_desligada_motivos: draft.maquinaDesligadaMotivos,
+        maquina_desligada_outro_texto: draft.maquinaDesligadaOutroTexto,
         saldo_fisico_esperado: cents(fisico.expectedCents),
         cash_session_id: draft.cashSessionId,
       },

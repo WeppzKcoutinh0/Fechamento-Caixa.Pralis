@@ -104,6 +104,13 @@
   --cat-cancelados-tinta: #334155;
   --cat-cancelados-faixa: #475569;
 
+  /* Incidente / "Máquina desligada hoje?" (28/09/2026): categoria nova, teal — distinta das 6
+     "oficiais" e de cancelados (cinza), pra não confundir com nenhuma delas. */
+  --cat-incidente-base: #0d9488;
+  --cat-incidente-soft: #f0fdfa;
+  --cat-incidente-tinta: #0f544d;
+  --cat-incidente-faixa: #0d9488;
+
   /* ---- Tipografia ---- */
   --cx-fs-micro: 11px;
   --cx-fs-caption: 12px;
@@ -156,6 +163,8 @@
     --cat-resultado-tinta: #a47ae7;
     --cat-cancelados-soft: color-mix(in srgb, var(--cat-cancelados-base) 18%, var(--cx-surface));
     --cat-cancelados-tinta: #b6c0cc;
+    --cat-incidente-soft: color-mix(in srgb, var(--cat-incidente-base) 18%, var(--cx-surface));
+    --cat-incidente-tinta: #5eead4;
   }
 }
 :root[data-theme='dark'] {
@@ -194,6 +203,8 @@
   --cat-resultado-tinta: #a47ae7;
   --cat-cancelados-soft: color-mix(in srgb, var(--cat-cancelados-base) 18%, var(--cx-surface));
   --cat-cancelados-tinta: #b6c0cc;
+  --cat-incidente-soft: color-mix(in srgb, var(--cat-incidente-base) 18%, var(--cx-surface));
+  --cat-incidente-tinta: #5eead4;
 }
 
 html,

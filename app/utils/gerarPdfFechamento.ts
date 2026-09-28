@@ -385,6 +385,20 @@ export function gerarPdfFechamento(draft: FechamentoDraft, dados: DadosRelatorio
     }
   }
 
+  // "A máquina foi desligada hoje?" (pedido do usuário, 28/09/2026).
+  pdf.secao('Máquina desligada hoje?');
+  if (!draft.maquinaDesligadaHoje) {
+    pdf.vazio('Não.');
+  } else {
+    pdf.vazio('Sim.');
+    if (draft.maquinaDesligadaMotivos.length > 0) {
+      pdf.vazio(`Motivo(s): ${draft.maquinaDesligadaMotivos.join(', ')}`);
+    }
+    if (draft.maquinaDesligadaOutroTexto.trim()) {
+      pdf.vazio(`Detalhes: ${draft.maquinaDesligadaOutroTexto.trim()}`);
+    }
+  }
+
   return pdf.doc;
 }
 

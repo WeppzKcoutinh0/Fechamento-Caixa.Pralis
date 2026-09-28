@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, toRef } from 'vue';
-import type { FechamentoDraft, MotivoVendaCanceladaDraft } from '~/types/fechamento';
+import {
+  MOTIVOS_MAQUINA_DESLIGADA,
+  type FechamentoDraft,
+  type MotivoMaquinaDesligada,
+  type MotivoVendaCanceladaDraft,
+} from '~/types/fechamento';
 import CartaoValor from '~/components/comum/CartaoValor.vue';
 import { useRelatorioCalculado } from '~/composables/useRelatorioCalculado';
 import { useVendasCanceladas, type VendaCancelada } from '~/composables/useVendasCanceladas';
@@ -316,6 +321,27 @@ function enviarWhatsappCancelados(): void {
   abrirWhatsappVendasCanceladas(props.draft, itensCancelados.value);
 }
 
+// "A máquina foi desligada hoje?" (pedido do usuário, 28/09/2026) — puramente informativo, não
+// entra em nenhum cálculo. Desligar o interruptor limpa os motivos já marcados (não deixa lixo de
+// uma resposta "Sim" anterior escondido atrás de um "Não").
+function aoAlternarMaquinaDesligada(valor: boolean | null): void {
+  props.draft.maquinaDesligadaHoje = Boolean(valor);
+  if (!props.draft.maquinaDesligadaHoje) {
+    props.draft.maquinaDesligadaMotivos = [];
+    props.draft.maquinaDesligadaOutroTexto = '';
+  }
+}
+function alternarMotivoMaquina(motivo: MotivoMaquinaDesligada, marcado: boolean): void {
+  const atuais = props.draft.maquinaDesligadaMotivos;
+  if (marcado) {
+    if (!atuais.includes(motivo)) atuais.push(motivo);
+  } else {
+    const indice = atuais.indexOf(motivo);
+    if (indice !== -1) atuais.splice(indice, 1);
+    if (motivo === 'Outro') props.draft.maquinaDesligadaOutroTexto = '';
+  }
+}
+
 // Relatório em accordion por categoria (pedido do usuário, 21/09/2026, réplica da estrutura do
 // "RELATORIO" da planilha antiga do Pralís: Venda/Transferências/Despesas/Mercadorias/Retiradas/
 // Diferença, cada uma clicável pra expandir o detalhe). A planilha antiga tinha, dentro de
@@ -475,6 +501,11 @@ const CAT_VARS = {
     '--cat': 'var(--cat-cancelados-base)',
     '--cat-soft': 'var(--cat-cancelados-soft)',
     '--cat-tinta': 'var(--cat-cancelados-tinta)',
+  },
+  incidente: {
+    '--cat': 'var(--cat-incidente-base)',
+    '--cat-soft': 'var(--cat-incidente-soft)',
+    '--cat-tinta': 'var(--cat-incidente-tinta)',
   },
 } as const;
 </script>
@@ -1000,6 +1031,50 @@ const CAT_VARS = {
               }}
             </v-chip>
           </v-card>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+
+      <v-expansion-panel class="cat-painel" :style="CAT_VARS.incidente">
+        <v-expansion-panel-title class="cat-titulo">
+          <span class="flex-grow-1">Máquina desligada hoje?</span>
+          <v-chip
+            size="small"
+            variant="tonal"
+            :color="draft.maquinaDesligadaHoje ? 'warning' : undefined"
+          >
+            {{ draft.maquinaDesligadaHoje ? 'Sim' : 'Não' }}
+          </v-chip>
+        </v-expansion-panel-title>
+        <v-expansion-panel-text>
+          <v-switch
+            :model-value="draft.maquinaDesligadaHoje"
+            label="A máquina foi desligada hoje?"
+            color="primary"
+            density="compact"
+            hide-details
+            @update:model-value="aoAlternarMaquinaDesligada"
+          />
+          <template v-if="draft.maquinaDesligadaHoje">
+            <p class="cat-subgrupo mt-3">Por quê? (marque tudo o que se aplica)</p>
+            <div class="d-flex flex-column ga-1">
+              <v-checkbox
+                v-for="motivo in MOTIVOS_MAQUINA_DESLIGADA"
+                :key="motivo"
+                :model-value="draft.maquinaDesligadaMotivos.includes(motivo)"
+                :label="motivo"
+                density="compact"
+                hide-details
+                @update:model-value="(marcado) => alternarMotivoMaquina(motivo, Boolean(marcado))"
+              />
+            </div>
+            <v-text-field
+              v-if="draft.maquinaDesligadaMotivos.includes('Outro')"
+              v-model="draft.maquinaDesligadaOutroTexto"
+              label="Descreva o motivo"
+              placeholder="O que aconteceu?"
+              class="mt-3"
+            />
+          </template>
         </v-expansion-panel-text>
       </v-expansion-panel>
     </v-expansion-panels>

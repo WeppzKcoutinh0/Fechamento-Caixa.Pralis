@@ -40,6 +40,9 @@ export default defineNuxtConfig({
     aiVisionApiKey: '',
     aiVisionBaseUrl: 'https://api.openai.com/v1',
     aiVisionModel: '',
+    // Modelo de reforço (28/09/2026, pedido do usuário) — tentado só se o principal falhar por
+    // erro transitório (503/429/timeout) e ainda sobrar orçamento de tempo. Vazio = sem reforço.
+    aiVisionModelFallback: '',
     empresaPralis: 'TNP CENTRAL',
     planilhaColunaInicial: 'F',
     // Religado (21/09/2026) — o Relatório Final do wizard passa a usar `vendas_produto_dia`

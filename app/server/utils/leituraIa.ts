@@ -118,6 +118,7 @@ export async function chamarProvedorIa<T>(mensagens: MensagemIa[]): Promise<T> {
   const apiKey = config.aiVisionApiKey as string;
   const baseUrl = String(config.aiVisionBaseUrl || 'https://api.openai.com/v1').replace(/\/$/, '');
   const modeloPrincipal = config.aiVisionModel as string;
+  const modeloFallback = String(config.aiVisionModelFallback || '').trim();
   if (!apiKey || !modeloPrincipal) {
     throw createError({
       statusCode: 503,
@@ -129,51 +130,73 @@ export async function chamarProvedorIa<T>(mensagens: MensagemIa[]): Promise<T> {
   // Medido direto na API do Gemini em 23/09/2026 (fora do app, pra isolar o problema real): uma
   // extração completa (imagem + detalhamento por bandeira) no modelo configurado
   // (gemini-flash-lite-latest) teve sucesso e levou ~31,6s — ou seja, o modelo NÃO está fora do
-  // ar, só está lento. O timeout anterior (18s) estava abortando a chamada ANTES dela terminar,
-  // e o fallback pra outro modelo só piorava: testado na hora, gemini-flash-latest,
+  // ar, só está lento. Nesse teste, tentar outro modelo só piorava: gemini-flash-latest,
   // gemini-2.0-flash, gemini-2.5-flash-lite e gemini-3.5-flash-lite estavam TODOS fora do ar
-  // (503) ou descontinuados (404) ao mesmo tempo — insistir neles só desperdiçava o orçamento de
-  // tempo da função. Por isso: um único modelo (o configurado), com um timeout que de fato cabe
-  // o tempo real que ele leva quando funciona, dentro do teto de 60s da função Vercel
-  // (nitro.vercel.functions.maxDuration em nuxt.config.ts) — 50s de orçamento, com ~10s de folga
-  // pra rede/parsing. Só tenta de novo se a falha anterior foi RÁPIDA (ex.: 503 instantâneo) e
-  // ainda sobra tempo útil — reter numa falha que já consumiu o timeout inteiro não teria chance
-  // real de terminar antes do teto da função.
+  // (503) ou descontinuados (404) ao mesmo tempo.
+  //
+  // 28/09/2026 (pedido do usuário, "quero que funcione"): reconferido nessa data — o principal
+  // chegou a dar TIMEOUT completo, enquanto gemini-flash-latest respondeu em ~11s. Ou seja, nem
+  // sempre os dois caem juntos (são modelos/cotas diferentes). NUXT_AI_VISION_MODEL_FALLBACK
+  // (opcional) é tentado só depois que o principal esgota seu orçamento — nunca ao mesmo tempo,
+  // pra não gastar cota grátis à toa quando o principal já está respondendo bem.
+  const modelos = [
+    modeloPrincipal,
+    ...(modeloFallback && modeloFallback !== modeloPrincipal ? [modeloFallback] : []),
+  ];
+
+  // Teto de 60s da função Vercel (nitro.vercel.functions.maxDuration em nuxt.config.ts) — 50s de
+  // orçamento total, com ~10s de folga pra rede/parsing, dividido entre os modelos a tentar (se
+  // só há 1 modelo, ele continua com o orçamento inteiro — comportamento idêntico a antes).
   const ORCAMENTO_TOTAL_MS = 50_000;
   const FOLGA_MINIMA_PARA_NOVA_TENTATIVA_MS = 12_000;
-  const corpoRequisicaoIa = {
-    model: modeloPrincipal,
-    temperature: 0,
-    // O detalhamento por bandeira/tipo (VISA/MASTER/ELO/MAESTRO, PLUXEE/ALELO/TICKET/VR...) pode
-    // ter muitos itens numa nota cheia — 1400 tokens já cortava resposta no meio em relatórios
-    // grandes, virando "formato que não pôde ser lido" em vez de um resultado completo.
-    max_tokens: 3000,
-    response_format: { type: 'json_object' },
-    messages: mensagens,
-  };
+  const orcamentoPorModeloMs = Math.floor(ORCAMENTO_TOTAL_MS / modelos.length);
 
   const inicioTotal = Date.now();
   let resposta: unknown;
   let ultimoErro: unknown;
-  for (;;) {
-    const restanteMs = ORCAMENTO_TOTAL_MS - (Date.now() - inicioTotal);
-    if (restanteMs < 3000) break;
-    try {
-      resposta = await $fetch<unknown>(`${baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
-        body: corpoRequisicaoIa,
-        timeout: restanteMs,
-      });
-      ultimoErro = null;
-      break;
-    } catch (erro: unknown) {
-      ultimoErro = erro;
-      if (!ehErroTransitorio(erro)) break;
-      const sobraParaNovaTentativa = ORCAMENTO_TOTAL_MS - (Date.now() - inicioTotal);
-      if (sobraParaNovaTentativa < FOLGA_MINIMA_PARA_NOVA_TENTATIVA_MS) break;
-      await new Promise((resolve) => setTimeout(resolve, 500));
+
+  for (const modelo of modelos) {
+    const restanteTotalMs = ORCAMENTO_TOTAL_MS - (Date.now() - inicioTotal);
+    if (restanteTotalMs < 3000) break;
+    const fimDesteModelo = Date.now() + Math.min(orcamentoPorModeloMs, restanteTotalMs);
+    const corpoRequisicaoIa = {
+      model: modelo,
+      temperature: 0,
+      // O detalhamento por bandeira/tipo (VISA/MASTER/ELO/MAESTRO, PLUXEE/ALELO/TICKET/VR...)
+      // pode ter muitos itens numa nota cheia — 1400 tokens já cortava resposta no meio em
+      // relatórios grandes, virando "formato que não pôde ser lido" em vez de um resultado
+      // completo.
+      max_tokens: 3000,
+      response_format: { type: 'json_object' },
+      messages: mensagens,
+    };
+
+    for (;;) {
+      const restanteMs = fimDesteModelo - Date.now();
+      if (restanteMs < 3000) break;
+      try {
+        resposta = await $fetch<unknown>(`${baseUrl}/chat/completions`, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+          body: corpoRequisicaoIa,
+          timeout: restanteMs,
+        });
+        ultimoErro = null;
+        break;
+      } catch (erro: unknown) {
+        ultimoErro = erro;
+        console.error(`[leituraIa] falha no modelo "${modelo}":`, textoErro(erro));
+        if (!ehErroTransitorio(erro)) break;
+        const sobraParaNovaTentativa = fimDesteModelo - Date.now();
+        if (sobraParaNovaTentativa < FOLGA_MINIMA_PARA_NOVA_TENTATIVA_MS) break;
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
     }
+
+    if (!ultimoErro) break;
+    // Erro permanente (ex.: chave inválida) falharia igual em qualquer modelo — não adianta
+    // trocar. Só passa pro próximo modelo quando o motivo foi mesmo sobrecarga/timeout.
+    if (!ehErroTransitorio(ultimoErro)) break;
   }
 
   if (ultimoErro) {

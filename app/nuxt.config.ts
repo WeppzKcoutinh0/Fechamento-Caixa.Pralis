@@ -34,7 +34,7 @@ export default defineNuxtConfig({
     // ID não é segredo (segurança vem do compartilhamento, não do ID) — default real de propósito,
     // pra funcionar sem precisar configurar env var na Vercel.
     planilhaFechamentosId: '1aiRv_KY0H7c3VWVPAFDRtwd3SXB8cTcAoZQm3ywG8UY',
-    planilhaFechamentosAba: 'fechamentos TNP',
+    planilhaFechamentosAba: 'TNP - SISTEMA/CAIXAS (VND/CT/DES/MER/RET)',
     // Leitura opcional de relatórios de maquininha por visão computacional. Server-only:
     // nunca exponha a chave no navegador.
     aiVisionApiKey: '',

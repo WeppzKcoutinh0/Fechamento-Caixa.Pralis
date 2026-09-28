@@ -61,27 +61,22 @@ function formatDataHora(iso: string | null): string {
   return data.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
 }
 
-function formatHora(iso: string): string {
-  const data = new Date(iso);
-  if (Number.isNaN(data.getTime())) return '—';
-  return data.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
-}
-
 interface EventoMaquinaDesligada {
-  inicio: string;
-  fim: string;
+  descricao: string;
+  confirmadoPelosDados: boolean;
   motivos: string[];
   outroTexto: string;
 }
 
-/** "Máquina desligada" agora é FATO detectado (heartbeat), não autodeclarado — ver
- * useDeteccaoMaquinaDesligada.ts. Cada evento vira "HH:MM–HH:MM (motivos)" na célula. */
+/** "Máquina desligada" é FATO comparado com as vendas reais dos outros caixas (ver
+ * useDeteccaoMaquinaDesligada.ts), exceto quando não havia dado suficiente pra comparar. */
 function resumoMaquinaDesligada(eventos: EventoMaquinaDesligada[] | null): string {
   if (!eventos || eventos.length === 0) return 'Não';
   return eventos
     .map((e) => {
       const motivos = [...e.motivos, e.outroTexto].filter(Boolean).join(', ') || 'sem motivo informado';
-      return `${formatHora(e.inicio)}–${formatHora(e.fim)} (${motivos})`;
+      const prova = e.confirmadoPelosDados ? '' : ' [não confirmado pelos dados]';
+      return `${e.descricao} (${motivos})${prova}`;
     })
     .join('; ');
 }

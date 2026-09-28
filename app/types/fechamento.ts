@@ -32,15 +32,31 @@ export const MOTIVOS_MAQUINA_DESLIGADA = [
 export type MotivoMaquinaDesligada = (typeof MOTIVOS_MAQUINA_DESLIGADA)[number];
 
 /**
- * 28/09/2026 (correção de conceito, pedido do usuário: "tem que ser um FATO"): não é mais um
- * interruptor que o operador liga por conta própria — `useDeteccaoMaquinaDesligada.ts` MEDE (via
- * heartbeat salvo no aparelho) se o app ficou sem sinal de vida por mais de 1 minuto e PREENCHE
- * este evento sozinho, com o horário real. O operador só marca o motivo depois — nunca inventa o
- * "aconteceu ou não".
+ * 28/09/2026 (correção de conceito, pedido do usuário: "tem que ser um FATO"). Duas versões
+ * tentadas e descartadas antes desta: (1) um interruptor sim/não autodeclarado — rejeitado, o
+ * usuário quer prova, não pergunta; (2) heartbeat medido no NAVEGADOR — rejeitado depois, porque
+ * o app só roda no CELULAR do operador, não no computador/PDV físico do caixa — os dois aparelhos
+ * não têm nenhuma ligação entre si, então o celular não tem como saber se o PDV desligou.
+ *
+ * Versão atual: `useDeteccaoMaquinaDesligada.ts` compara, PARA O MESMO DIA E TURNO, o horário da
+ * primeira/última venda REAL (sincronizada do CREARE) deste caixa contra os outros caixas que
+ * também venderam — se este caixa começou muito depois ou parou muito antes dos outros, isso É
+ * evidência real (`confirmadoPelosDados: true`) de que o PDV dele ficou fora do ar, sem precisar
+ * o operador declarar nada. Limitação real, documentada: só pega começo tardio/fim precoce, não
+ * um buraco no MEIO do turno — a sincronização de vendas de hoje só guarda "primeira venda"/
+ * "última venda" por caixa/turno/dia, não o horário de cada venda individual. Sem nenhum outro
+ * caixa pra comparar naquele turno (loja com só 1 caixa aberto, ou vendas ainda não sincronizadas)
+ * cai pro autodeclarado (`confirmadoPelosDados: false`) — o operador informa, mas fica marcado
+ * como não confirmado pelos dados, visivelmente diferente de um evento com prova real.
  */
 export interface EventoMaquinaDesligada {
-  inicio: string; // ISO
-  fim: string; // ISO
+  /** Texto pronto explicando o que foi detectado (ou o que o operador declarou), com os horários
+   * reais já embutidos — ex.: "Começou a vender às 11h32 — os outros caixas do turno já vendiam
+   * desde 09h05." Não separa em campos inicio/fim porque os 3 casos (atraso, encerramento
+   * antecipado, autodeclarado sem horário) têm formatos diferentes demais pra caber num só molde. */
+  descricao: string;
+  /** Veio de comparação real com outros caixas (true) ou o operador informou sem prova (false). */
+  confirmadoPelosDados: boolean;
   motivos: MotivoMaquinaDesligada[];
   outroTexto: string;
 }

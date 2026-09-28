@@ -1,99 +1,68 @@
-import type { EventoMaquinaDesligada } from '~/types/fechamento';
+import { useSupabase } from './useSupabase';
+import { caixaParaNumero, turnoParaLetra } from '~/utils/vendasFechamento';
+import type { Caixa, EventoMaquinaDesligada, Turno } from '~/types/fechamento';
 
 /**
- * "A máquina desligou" tem que ser um FATO, não o operador se autodeclarando (pedido do usuário,
- * 28/09/2026) — um navegador não tem como perguntar direto pro Windows "você foi desligado?", mas
- * dá pra MEDIR: enquanto o fechamento está aberto, este composable grava um "sinal de vida"
- * (heartbeat) no aparelho a cada `INTERVALO_MS`. Se, na próxima vez que o sinal for checado
- * (recarregou a página, voltou de segundo plano, ou o próprio intervalo rodou), o tempo desde o
- * ÚLTIMO sinal for maior que `LIMIAR_MS`, isso É a evidência real de que a máquina ficou
- * desligada/travada/hibernada por esse tempo — o próprio sistema mediu, ninguém precisou avisar.
+ * "A máquina desligou" tem que ser um FATO (pedido do usuário, 28/09/2026) — mas o app só roda no
+ * CELULAR do operador, sem nenhuma ligação com o computador/PDV físico do caixa, então não há
+ * como medir isso diretamente (ver comentário longo em types/fechamento.ts sobre as 2 tentativas
+ * anteriores descartadas). O que dá pra fazer: comparar, no MESMO dia e turno, o horário da
+ * primeira/última venda REAL deste caixa (já sincronizada do CREARE) contra os outros caixas que
+ * também venderam — se este começou bem depois ou parou bem antes dos outros, isso é evidência
+ * real de que o PDV dele ficou fora do ar durante esse intervalo.
  *
- * Guardado em `localStorage` (sobrevive a reiniciar o navegador/computador, ao contrário do
- * estado em memória do formulário) com chave por `cash_session_id` — a MESMA sessão de caixa,
- * ainda aberta no banco, é o que identifica "este turno" depois de a máquina voltar a ligar.
+ * A comparação roda no SERVIDOR (`/vendas/detectar-maquina-desligada`) porque a RLS bloqueia um
+ * caixa comum de ler os dados de vendas dos OUTROS caixas (regra de segurança de 18/09/2026) —
+ * este composable só chama a rota e traduz o resultado.
  */
 
-const INTERVALO_MS = 20_000;
-const LIMIAR_MS = 60_000;
-const PREFIXO_HEARTBEAT = 'fc-heartbeat-';
-const PREFIXO_EVENTOS = 'fc-heartbeat-eventos-';
-
-function lerEventos(chave: string): EventoMaquinaDesligada[] {
-  try {
-    const bruto = localStorage.getItem(PREFIXO_EVENTOS + chave);
-    return bruto ? (JSON.parse(bruto) as EventoMaquinaDesligada[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function salvarEventos(chave: string, eventos: EventoMaquinaDesligada[]): void {
-  try {
-    localStorage.setItem(PREFIXO_EVENTOS + chave, JSON.stringify(eventos));
-  } catch {
-    // localStorage indisponível (modo privado, cota cheia) — a detecção simplesmente não
-    // persiste entre recarregamentos; não é motivo pra travar o fechamento.
-  }
+export interface ResultadoDeteccaoMaquina {
+  eventos: EventoMaquinaDesligada[];
+  /** false = não havia outro caixa pra comparar nesse dia/turno — cai pro autodeclarado. */
+  temDadosSuficientes: boolean;
 }
 
 export function useDeteccaoMaquinaDesligada() {
-  let chaveAtual: string | null = null;
-  let intervalo: ReturnType<typeof setInterval> | null = null;
-  let aoDetectarCallback: ((eventos: EventoMaquinaDesligada[]) => void) | null = null;
+  const supabase = useSupabase();
 
-  function verificarGap(): void {
-    if (!chaveAtual) return;
-    const chaveHb = PREFIXO_HEARTBEAT + chaveAtual;
-    const ultimoBruto = localStorage.getItem(chaveHb);
-    const agora = Date.now();
-    if (ultimoBruto) {
-      const ultimo = Number(ultimoBruto);
-      const gap = agora - ultimo;
-      if (gap > LIMIAR_MS) {
-        const eventos = lerEventos(chaveAtual);
-        eventos.push({
-          inicio: new Date(ultimo).toISOString(),
-          fim: new Date(agora).toISOString(),
+  async function detectarPorVendas(
+    data: string,
+    caixa: Caixa,
+    turno: Turno,
+  ): Promise<ResultadoDeteccaoMaquina> {
+    const numeroCaixa = caixaParaNumero(caixa);
+    const letraTurno = turnoParaLetra(turno);
+    if (!numeroCaixa || !letraTurno) return { eventos: [], temDadosSuficientes: false };
+
+    try {
+      const { data: sessao } = await supabase.auth.getSession();
+      const token = sessao.session?.access_token;
+      if (!token) return { eventos: [], temDadosSuficientes: false };
+
+      const resposta = await $fetch<{
+        eventos: { descricao: string; confirmadoPelosDados: true }[];
+        temDadosSuficientes: boolean;
+      }>('/vendas/detectar-maquina-desligada', {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+        body: { data, caixa: numeroCaixa, turno: letraTurno },
+      });
+
+      return {
+        temDadosSuficientes: resposta.temDadosSuficientes,
+        eventos: resposta.eventos.map((e) => ({
+          descricao: e.descricao,
+          confirmadoPelosDados: true,
           motivos: [],
           outroTexto: '',
-        });
-        salvarEventos(chaveAtual, eventos);
-        aoDetectarCallback?.(eventos);
-      }
+        })),
+      };
+    } catch {
+      // Best-effort: se a checagem falhar (rede, servidor fora do ar), não trava o fechamento —
+      // só cai pro autodeclarado, igual quando não há dados suficientes pra comparar.
+      return { eventos: [], temDadosSuficientes: false };
     }
-    localStorage.setItem(chaveHb, String(agora));
   }
 
-  /**
-   * Liga o heartbeat pra `chave` (o `cash_session_id`). Chama `aoDetectar` toda vez que a lista
-   * de eventos detectados mudar (inclusive na primeira checagem, se já havia um gap esperando).
-   */
-  function iniciar(chave: string, aoDetectar: (eventos: EventoMaquinaDesligada[]) => void): void {
-    parar();
-    chaveAtual = chave;
-    aoDetectarCallback = aoDetectar;
-    verificarGap();
-    intervalo = setInterval(verificarGap, INTERVALO_MS);
-    // Sleep/hibernação pausa o setInterval — ao voltar o foco, checa na hora em vez de esperar
-    // até 20s pelo próximo tick, pra não perder o momento exato de quando voltou.
-    window.addEventListener('focus', verificarGap);
-    document.addEventListener('visibilitychange', verificarGap);
-  }
-
-  function parar(): void {
-    if (intervalo) clearInterval(intervalo);
-    intervalo = null;
-    window.removeEventListener('focus', verificarGap);
-    document.removeEventListener('visibilitychange', verificarGap);
-  }
-
-  /** Chamado depois que o fechamento salva com sucesso — este turno acabou, não precisa mais
-   * detectar nada pra essa sessão. */
-  function limpar(chave: string): void {
-    localStorage.removeItem(PREFIXO_HEARTBEAT + chave);
-    localStorage.removeItem(PREFIXO_EVENTOS + chave);
-  }
-
-  return { iniciar, parar, limpar, lerEventos, salvarEventos };
+  return { detectarPorVendas };
 }

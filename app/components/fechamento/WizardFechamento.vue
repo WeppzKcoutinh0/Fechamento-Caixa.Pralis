@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onUnmounted, watch } from 'vue';
+import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useFechamentoForm } from '~/composables/useFechamentoForm';
 import { useFechamentos } from '~/composables/useFechamentos';
@@ -59,28 +59,31 @@ const TITULOS_SECAO = [
 
 const tituloSecao = computed(() => TITULOS_SECAO[secaoAtual.value - 1] ?? TITULOS_SECAO[0]);
 
-// "Máquina desligada" tem que ser um FATO medido, não autodeclarado (pedido do usuário,
-// 28/09/2026) — liga o heartbeat assim que existir uma sessão de caixa (só faz sentido pra quem
-// está de fato operando um caixa físico; admin criando fechamento direto não tem isso). Reage a
-// `cashSessionId` chegar depois do mount (ver novo.vue: a sessão só é confirmada via API,
-// `contextoDe` roda de novo no onMounted de lá) em vez de só no mount deste componente.
-const deteccaoMaquina = useDeteccaoMaquinaDesligada();
-function aoDetectarDesligamento(eventos: typeof draft.value.maquinaDesligadaEventos): void {
-  draft.value.maquinaDesligadaEventos = eventos;
-}
-watch(
-  () => draft.value.cashSessionId,
-  (sessaoId, sessaoAnterior) => {
-    if (sessaoAnterior) deteccaoMaquina.parar();
-    if (!sessaoId) return;
-    draft.value.maquinaDesligadaEventos = deteccaoMaquina.lerEventos(sessaoId);
-    deteccaoMaquina.iniciar(sessaoId, aoDetectarDesligamento);
-  },
-  { immediate: true },
-);
-onUnmounted(() => deteccaoMaquina.parar());
+// "Máquina desligada" tem que ser um FATO (pedido do usuário, 28/09/2026) — checa de novo aqui,
+// no momento de salvar, mesmo espírito de `validarMotivosProdutosCancelados` logo abaixo: garante
+// a checagem mesmo se o operador nunca abriu o painel "Máquina desligada" no Relatório Final
+// (SecaoRelatorioFinal.vue::aoAbrirMaquinaDesligada já chama isto também, só que sob demanda).
+const { detectarPorVendas } = useDeteccaoMaquinaDesligada();
 
 async function validarMotivosMaquinaDesligada(): Promise<boolean> {
+  if (draft.value.caixa && draft.value.turno) {
+    const { eventos: detectados } = await detectarPorVendas(
+      draft.value.data,
+      draft.value.caixa,
+      draft.value.turno,
+    );
+    const autodeclarados = draft.value.maquinaDesligadaEventos.filter(
+      (e) => !e.confirmadoPelosDados,
+    );
+    const mesclados = detectados.map(
+      (novo) =>
+        draft.value.maquinaDesligadaEventos.find(
+          (e) => e.confirmadoPelosDados && e.descricao === novo.descricao,
+        ) ?? novo,
+    );
+    draft.value.maquinaDesligadaEventos = [...mesclados, ...autodeclarados];
+  }
+
   const faltantes = draft.value.maquinaDesligadaEventos.filter((e) => e.motivos.length === 0);
   if (faltantes.length > 0) {
     erro.value =
@@ -206,9 +209,6 @@ async function onSalvar() {
     // gravado (não se perde), só a sessão fica ABERTA até uma nova tentativa/ação admin.
     if (draft.value.cashSessionId) {
       await fecharSessao(draft.value.cashSessionId, fechamentoId);
-      // Turno encerrado — não precisa mais detectar desligamento pra essa sessão.
-      deteccaoMaquina.parar();
-      deteccaoMaquina.limpar(draft.value.cashSessionId);
     }
     // Retorno automático pro cofre (18/09/2026, pedido do usuário — versão simplificada do que o
     // Sistema Inteligente Pralís faz): melhor esforço, depois do fechamento já salvo — uma falha

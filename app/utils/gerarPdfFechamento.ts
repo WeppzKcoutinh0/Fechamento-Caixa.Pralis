@@ -66,16 +66,6 @@ function formatarQtd(qtd: number): string {
   return qtd.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
 }
 
-function formatarHoraCurta(iso: string): string {
-  const data = new Date(iso);
-  if (Number.isNaN(data.getTime())) return '—';
-  return data.toLocaleTimeString('pt-BR', {
-    timeZone: 'America/Sao_Paulo',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
 const MARGEM_X = 40;
 const LARGURA_PAGINA = 595.28; // A4 em pt
 const LARGURA_UTIL = LARGURA_PAGINA - MARGEM_X * 2;
@@ -395,14 +385,17 @@ export function gerarPdfFechamento(draft: FechamentoDraft, dados: DadosRelatorio
     }
   }
 
-  // "Máquina desligada" (28/09/2026, pedido do usuário: "tem que ser um FATO") — detectado
-  // automaticamente por heartbeat (ver useDeteccaoMaquinaDesligada.ts), não mais autodeclarado.
+  // "Máquina desligada" (28/09/2026, pedido do usuário: "tem que ser um FATO") — comparado com as
+  // vendas reais dos outros caixas (ver useDeteccaoMaquinaDesligada.ts), não autodeclarado, exceto
+  // quando não havia outro caixa pra comparar (marcado como tal).
   pdf.secao('Máquina desligada');
   if (draft.maquinaDesligadaEventos.length === 0) {
     pdf.vazio('Nenhum desligamento detectado durante este turno.');
   } else {
     for (const evento of draft.maquinaDesligadaEventos) {
-      pdf.vazio(`Detectado das ${formatarHoraCurta(evento.inicio)} às ${formatarHoraCurta(evento.fim)}.`);
+      pdf.vazio(
+        `${evento.descricao}${evento.confirmadoPelosDados ? '' : ' (não confirmado pelos dados)'}`,
+      );
       if (evento.motivos.length > 0) pdf.vazio(`  Motivo(s): ${evento.motivos.join(', ')}`);
       if (evento.outroTexto.trim()) pdf.vazio(`  Detalhes: ${evento.outroTexto.trim()}`);
     }

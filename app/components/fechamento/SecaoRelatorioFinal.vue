@@ -8,6 +8,7 @@ import {
   type MotivoVendaCanceladaDraft,
 } from '~/types/fechamento';
 import CartaoValor from '~/components/comum/CartaoValor.vue';
+import { useDeteccaoMaquinaDesligada } from '~/composables/useDeteccaoMaquinaDesligada';
 import { useRelatorioCalculado } from '~/composables/useRelatorioCalculado';
 import { useVendasCanceladas, type VendaCancelada } from '~/composables/useVendasCanceladas';
 import { useVendasProdutoDia } from '~/composables/useVendasProdutoDia';
@@ -322,25 +323,34 @@ function enviarWhatsappCancelados(): void {
   abrirWhatsappVendasCanceladas(props.draft, itensCancelados.value);
 }
 
-// "Máquina desligada" (28/09/2026, pedido do usuário: "tem que ser um FATO") — a lista em
-// `draft.maquinaDesligadaEventos` é preenchida sozinha por `useDeteccaoMaquinaDesligada.ts`
-// (heartbeat), lá em WizardFechamento.vue; aqui só edita o motivo de cada evento já detectado —
-// nunca cria/apaga um evento (isso seria voltar a ser autodeclarado).
-function formatarHoraEvento(iso: string): string {
-  const data = new Date(iso);
-  if (Number.isNaN(data.getTime())) return '—';
-  return data.toLocaleTimeString('pt-BR', {
-    timeZone: 'America/Sao_Paulo',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+// "Máquina desligada" (28/09/2026, pedido do usuário: "tem que ser um FATO") — o app só roda no
+// CELULAR do operador, sem ligação com o computador/PDV físico do caixa, então a única forma real
+// de detectar é comparar a primeira/última venda deste caixa (já sincronizada do CREARE) contra os
+// outros caixas do mesmo dia/turno (ver useDeteccaoMaquinaDesligada.ts). Sem nenhum outro caixa
+// pra comparar (loja com só este caixa aberto, ou vendas ainda não sincronizadas), cai pro
+// autodeclarado — visivelmente marcado como "não confirmado pelos dados".
+const { detectarPorVendas } = useDeteccaoMaquinaDesligada();
+const carregandoDeteccaoMaquina = ref(false);
+const jaChecouMaquina = ref(false);
+const temDadosSuficientesMaquina = ref(true);
+
+async function aoAbrirMaquinaDesligada(): Promise<void> {
+  if (jaChecouMaquina.value || !props.draft.caixa || !props.draft.turno) return;
+  jaChecouMaquina.value = true;
+  carregandoDeteccaoMaquina.value = true;
+  try {
+    const { eventos, temDadosSuficientes } = await detectarPorVendas(
+      props.draft.data,
+      props.draft.caixa,
+      props.draft.turno,
+    );
+    temDadosSuficientesMaquina.value = temDadosSuficientes;
+    if (eventos.length) props.draft.maquinaDesligadaEventos.push(...eventos);
+  } finally {
+    carregandoDeteccaoMaquina.value = false;
+  }
 }
-function duracaoEvento(evento: EventoMaquinaDesligada): string {
-  const minutos = Math.round(
-    (new Date(evento.fim).getTime() - new Date(evento.inicio).getTime()) / 60_000,
-  );
-  return minutos < 1 ? 'menos de 1 min' : `${minutos} min`;
-}
+
 function alternarMotivoMaquina(
   evento: EventoMaquinaDesligada,
   motivo: MotivoMaquinaDesligada,
@@ -352,6 +362,28 @@ function alternarMotivoMaquina(
     const indice = evento.motivos.indexOf(motivo);
     if (indice !== -1) evento.motivos.splice(indice, 1);
     if (motivo === 'Outro') evento.outroTexto = '';
+  }
+}
+
+// Autodeclarado (só aparece quando não há como comparar com outros caixas) — um interruptor cria
+// UM evento sem prova de dados; desligar remove esse evento autodeclarado (não mexe nos que vieram
+// de dados reais).
+const maquinaAutodeclarada = computed(
+  () => props.draft.maquinaDesligadaEventos.find((e) => !e.confirmadoPelosDados) ?? null,
+);
+function aoAlternarMaquinaAutodeclarada(valor: boolean | null): void {
+  if (valor) {
+    if (!maquinaAutodeclarada.value) {
+      props.draft.maquinaDesligadaEventos.push({
+        descricao: 'Informado pelo operador (sem confirmação nos dados de vendas).',
+        confirmadoPelosDados: false,
+        motivos: [],
+        outroTexto: '',
+      });
+    }
+  } else {
+    const indice = props.draft.maquinaDesligadaEventos.findIndex((e) => !e.confirmadoPelosDados);
+    if (indice !== -1) props.draft.maquinaDesligadaEventos.splice(indice, 1);
   }
 }
 
@@ -1047,7 +1079,11 @@ const CAT_VARS = {
         </v-expansion-panel-text>
       </v-expansion-panel>
 
-      <v-expansion-panel class="cat-painel" :style="CAT_VARS.incidente">
+      <v-expansion-panel
+        class="cat-painel"
+        :style="CAT_VARS.incidente"
+        @group:selected="({ value }) => value && aoAbrirMaquinaDesligada()"
+      >
         <v-expansion-panel-title class="cat-titulo">
           <span class="flex-grow-1">Máquina desligada</span>
           <v-chip
@@ -1064,44 +1100,74 @@ const CAT_VARS = {
         </v-expansion-panel-title>
         <v-expansion-panel-text>
           <p class="text-caption text-medium-emphasis mb-3">
-            Detectado automaticamente pelo sistema (não é uma pergunta pro operador) — se o app
-            ficou sem sinal de vida por mais de 1 minuto durante o turno, é porque a máquina
-            desligou, travou ou hibernou.
+            Comparado com as vendas reais dos outros caixas no mesmo dia e turno (não é uma
+            pergunta pro operador) — se este caixa vendeu bem menos ou parou de vender enquanto os
+            outros continuaram, é indício real de que a máquina ficou fora do ar.
           </p>
-          <p v-if="!draft.maquinaDesligadaEventos.length" class="text-body-2">
-            Nenhum desligamento detectado durante este turno.
-          </p>
-          <div
-            v-for="(evento, indice) in draft.maquinaDesligadaEventos"
-            :key="evento.inicio"
-            class="mb-4"
-          >
-            <p class="cat-subgrupo">
-              Desligamento {{ indice + 1 }}: das {{ formatarHoraEvento(evento.inicio) }} às
-              {{ formatarHoraEvento(evento.fim) }} ({{ duracaoEvento(evento) }})
+          <div v-if="carregandoDeteccaoMaquina" class="d-flex justify-center py-4">
+            <v-progress-circular indeterminate color="primary" size="28" />
+          </div>
+          <template v-else>
+            <p
+              v-if="!draft.maquinaDesligadaEventos.length && temDadosSuficientesMaquina"
+              class="text-body-2"
+            >
+              Nenhum desligamento detectado durante este turno.
             </p>
-            <p class="text-caption text-medium-emphasis mb-1">Por quê? (marque tudo o que se aplica)</p>
-            <div class="d-flex flex-column ga-1">
-              <v-checkbox
-                v-for="motivo in MOTIVOS_MAQUINA_DESLIGADA"
-                :key="motivo"
-                :model-value="evento.motivos.includes(motivo)"
-                :label="motivo"
-                density="compact"
-                hide-details
-                @update:model-value="
-                  (marcado) => alternarMotivoMaquina(evento, motivo, Boolean(marcado))
-                "
+            <p
+              v-if="!temDadosSuficientesMaquina"
+              class="text-caption text-medium-emphasis mb-2"
+            >
+              Não havia outro caixa aberto nesse dia/turno pra comparar (ou as vendas ainda não
+              sincronizaram) — sem dados suficientes pra confirmar automaticamente.
+            </p>
+
+            <div
+              v-for="evento in draft.maquinaDesligadaEventos"
+              :key="evento.descricao"
+              class="mb-4"
+            >
+              <p class="cat-subgrupo d-flex align-center ga-2">
+                <span>{{ evento.descricao }}</span>
+                <v-chip size="x-small" :color="evento.confirmadoPelosDados ? 'success' : undefined" variant="tonal">
+                  {{ evento.confirmadoPelosDados ? 'Confirmado pelos dados' : 'Não confirmado pelos dados' }}
+                </v-chip>
+              </p>
+              <p class="text-caption text-medium-emphasis mb-1">Por quê? (marque tudo o que se aplica)</p>
+              <div class="d-flex flex-column ga-1">
+                <v-checkbox
+                  v-for="motivo in MOTIVOS_MAQUINA_DESLIGADA"
+                  :key="motivo"
+                  :model-value="evento.motivos.includes(motivo)"
+                  :label="motivo"
+                  density="compact"
+                  hide-details
+                  @update:model-value="
+                    (marcado) => alternarMotivoMaquina(evento, motivo, Boolean(marcado))
+                  "
+                />
+              </div>
+              <v-text-field
+                v-if="evento.motivos.includes('Outro')"
+                v-model="evento.outroTexto"
+                label="Descreva o motivo"
+                placeholder="O que aconteceu?"
+                class="mt-3"
               />
             </div>
-            <v-text-field
-              v-if="evento.motivos.includes('Outro')"
-              v-model="evento.outroTexto"
-              label="Descreva o motivo"
-              placeholder="O que aconteceu?"
-              class="mt-3"
-            />
-          </div>
+
+            <template v-if="!temDadosSuficientesMaquina">
+              <v-divider class="my-3" />
+              <v-switch
+                :model-value="Boolean(maquinaAutodeclarada)"
+                label="Mesmo sem confirmação nos dados, a máquina foi desligada hoje?"
+                color="primary"
+                density="compact"
+                hide-details
+                @update:model-value="aoAlternarMaquinaAutodeclarada"
+              />
+            </template>
+          </template>
         </v-expansion-panel-text>
       </v-expansion-panel>
     </v-expansion-panels>

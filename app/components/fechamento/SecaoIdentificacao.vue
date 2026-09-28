@@ -44,7 +44,7 @@ const turnoModel = computed<Turno | null>({
 // primeiro PDV do Relatório PDV (passo 4) — mesmo destino/helper do botão "Buscar vendas do dia"
 // de lá. PDVs extras adicionados manualmente não são tocados.
 const dataVendas = ref(props.draft.data);
-const { carregando, erro, resumo, buscarPorData } = useVendasFechamento();
+const { erro, resumo, buscarPorData } = useVendasFechamento();
 const jaBuscou = ref(false);
 
 // Filtro por horário (pedido do usuário): o bot passou a sincronizar por hora cheia da venda,
@@ -104,37 +104,57 @@ const filtroBusca = computed(() => ({
   horaFim: filtrarPorHorario.value ? horaDoCampo(horaFim.value) : null,
 }));
 
+// 28/09/2026 (pedido do usuário: botões devem poder ser apertados separadamente): cada botão tem
+// seu PRÓPRIO estado de "ocupado" — `sincronizando` (compartilhado, de useSincronizarVendas) só
+// entra no TEXTO do botão que de fato está esperando, nunca no loading/disabled dos outros dois.
+const ocupadoBuscarVendas = ref(false);
 async function buscarVendas() {
   jaBuscou.value = true;
-  await sincronizarSilenciosamente();
-  const resultado = await buscarPorData(dataVendas.value, filtroBusca.value);
-  if (!resultado || resultado.registros === 0) return;
-  aplicarResumoAoPrimeiroPdv(props.draft, resultado);
-  aplicarAjustesComoLancamentos(props.draft, resultado);
+  ocupadoBuscarVendas.value = true;
+  try {
+    await sincronizarSilenciosamente();
+    const resultado = await buscarPorData(dataVendas.value, filtroBusca.value);
+    if (!resultado || resultado.registros === 0) return;
+    aplicarResumoAoPrimeiroPdv(props.draft, resultado);
+    aplicarAjustesComoLancamentos(props.draft, resultado);
+  } finally {
+    ocupadoBuscarVendas.value = false;
+  }
 }
 
 /** Botão "Sincronizar vendas agora" — mesma sincronização, só que sem ler depois (o usuário só
  * quer empurrar a planilha pro banco, não necessariamente re-buscar o filtro atual). */
+const ocupadoSincronizarAgora = ref(false);
 async function sincronizarAgora() {
-  await sincronizarSilenciosamente();
-  // Re-busca automaticamente pro filtro atual, pra já mostrar se algo novo chegou.
-  if (jaBuscou.value) await buscarPorData(dataVendas.value, filtroBusca.value);
+  ocupadoSincronizarAgora.value = true;
+  try {
+    await sincronizarSilenciosamente();
+    // Re-busca automaticamente pro filtro atual, pra já mostrar se algo novo chegou.
+    if (jaBuscou.value) await buscarPorData(dataVendas.value, filtroBusca.value);
+  } finally {
+    ocupadoSincronizarAgora.value = false;
+  }
 }
 
 // Vendas canceladas (pedido do usuário, 23/09/2026, ligado de vez em 24/09/2026): mesmo botão
 // espelhado de "Buscar vendas" — o robô já manda os itens cancelados (tipo='C' em
 // vendas_produto_dia), ver useVendasCanceladas.ts.
 const {
-  carregando: buscandoCanceladas,
   erro: erroCanceladas,
   itens: vendasCanceladas,
   buscarPorData: buscarVendasCanceladasBase,
 } = useVendasCanceladas();
 const jaBuscouCanceladas = ref(false);
+const ocupadoCanceladas = ref(false);
 async function buscarVendasCanceladas() {
   jaBuscouCanceladas.value = true;
-  await sincronizarSilenciosamente();
-  await buscarVendasCanceladasBase(dataVendas.value);
+  ocupadoCanceladas.value = true;
+  try {
+    await sincronizarSilenciosamente();
+    await buscarVendasCanceladasBase(dataVendas.value);
+  } finally {
+    ocupadoCanceladas.value = false;
+  }
 }
 function formatarQtd(qtd: number): string {
   return qtd.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
@@ -231,35 +251,47 @@ const ajustesPresentes = computed(() => {
         <v-btn
           color="primary"
           variant="tonal"
-          :loading="sincronizando || carregando"
-          :disabled="sincronizando || carregando || !dataVendas"
+          :loading="ocupadoBuscarVendas"
+          :disabled="ocupadoBuscarVendas || !dataVendas"
           @click="buscarVendas"
         >
-          {{ sincronizando ? 'Sincronizando...' : carregando ? 'Buscando vendas...' : 'Buscar vendas' }}
+          {{
+            !ocupadoBuscarVendas
+              ? 'Buscar vendas'
+              : sincronizando
+                ? 'Sincronizando...'
+                : 'Buscando vendas...'
+          }}
         </v-btn>
         <v-btn
           variant="text"
           size="small"
           prepend-icon="mdi-cloud-sync-outline"
-          :loading="sincronizando"
-          :disabled="sincronizando"
+          :loading="ocupadoSincronizarAgora"
+          :disabled="ocupadoSincronizarAgora"
           @click="sincronizarAgora"
         >
-          {{ sincronizando ? 'Sincronizando...' : 'Sincronizar vendas agora' }}
+          {{ ocupadoSincronizarAgora ? 'Sincronizando...' : 'Sincronizar vendas agora' }}
         </v-btn>
         <v-btn
           variant="outlined"
           size="small"
           prepend-icon="mdi-cancel"
-          :loading="sincronizando || buscandoCanceladas"
-          :disabled="sincronizando || buscandoCanceladas || !dataVendas"
+          :loading="ocupadoCanceladas"
+          :disabled="ocupadoCanceladas || !dataVendas"
           @click="buscarVendasCanceladas"
         >
-          {{ sincronizando ? 'Sincronizando...' : buscandoCanceladas ? 'Buscando...' : 'Buscar vendas canceladas' }}
+          {{
+            !ocupadoCanceladas
+              ? 'Buscar vendas canceladas'
+              : sincronizando
+                ? 'Sincronizando...'
+                : 'Buscando...'
+          }}
         </v-btn>
       </div>
 
-      <template v-if="jaBuscouCanceladas && !sincronizando && !buscandoCanceladas">
+      <template v-if="jaBuscouCanceladas && !ocupadoCanceladas">
         <v-alert v-if="erroCanceladas" type="error" variant="tonal" density="comfortable">
           {{ erroCanceladas }}
         </v-alert>
@@ -314,7 +346,7 @@ const ajustesPresentes = computed(() => {
         {{ sincronizacaoResultado.gravadasProdutos }} de produto gravadas (reenviar não duplica).
       </v-alert>
 
-      <template v-if="jaBuscou && !sincronizando && !carregando">
+      <template v-if="jaBuscou && !ocupadoBuscarVendas">
         <v-alert v-if="erro" type="error" variant="tonal" density="comfortable">
           {{ erro }}
         </v-alert>

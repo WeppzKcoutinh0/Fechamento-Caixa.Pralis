@@ -69,7 +69,9 @@ async function buscarLacre(): Promise<void> {
   }
   buscandoLacre.value = true;
   try {
-    transferenciaEncontrada.value = await buscarPorLacre(lacre);
+    // consumir: false — só ajuda visual, não "usa" o lacre (ver mesma decisão em
+    // SecaoTransferencias.vue, 28/09/2026).
+    transferenciaEncontrada.value = await buscarPorLacre(lacre, hojeISO());
   } catch {
     // Lookup é só uma ajuda visual — se falhar, o operador ainda consegue abrir o caixa
     // normalmente (mesmo espírito do lookup silencioso do wizard).

@@ -126,15 +126,28 @@ export function useTransferenciasTesouraria() {
     return (data as unknown as LinhaRow[]).map(linhaParaTransferencia);
   }
 
-  /** Usado pelo lookup automático no wizard — `null` quando não existe (deixa o usuário digitar o valor à mão, como sempre). */
-  async function buscarPorLacre(lacre: string): Promise<TransferenciaTesouraria | null> {
+  /**
+   * Usado pelo lookup automático no wizard — `null` quando não existe (deixa o usuário digitar o
+   * valor à mão, como sempre). Só casa se `data` for EXATAMENTE a data em que o tesoureiro criou o
+   * lacre (pedido do usuário, 28/09/2026: "era apenas na data que ele escolheu"). `consumir: true`
+   * marca o lacre como usado pra sempre (uso único) — só passe isso no ponto real de "usar o
+   * lacre" (a Entrada do caixa); o lookup informativo do lacre de abertura NUNCA consome, senão
+   * recarregar a página no meio do fechamento zeraria o valor já mostrado.
+   */
+  async function buscarPorLacre(
+    lacre: string,
+    data: string,
+    opcoes: { consumir?: boolean } = {},
+  ): Promise<TransferenciaTesouraria | null> {
     const alvo = lacre.trim();
     if (!alvo) return null;
-    const { data, error } = await supabase.rpc('buscar_transferencia_tesouraria_por_lacre', {
+    const { data: linhas, error } = await supabase.rpc('buscar_transferencia_tesouraria_por_lacre', {
       p_lacre: alvo,
+      p_data: data,
+      p_consumir: opcoes.consumir ?? false,
     });
     if (error) throw error;
-    const linha = (data as unknown as LinhaRow[] | null)?.[0];
+    const linha = (linhas as unknown as LinhaRow[] | null)?.[0];
     return linha ? linhaParaTransferencia(linha) : null;
   }
 

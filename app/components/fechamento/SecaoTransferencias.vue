@@ -58,6 +58,8 @@ const indiceEditando = ref<number | null>(null);
 // /transferencias, admin) cadastra um lacre com valor pré-definido — quando o CAIXA digita esse
 // MESMO número aqui, o valor da Entrada é preenchido sozinho. Não encontrar não é erro: o usuário
 // só digita o valor à mão, como sempre fez.
+// 28/09/2026 (pedido do usuário): o lacre só vale na data exata em que o tesoureiro criou, e é de
+// uso único — `consumir: true` aqui é o ponto real de "usar o lacre" (marca pra nunca mais casar).
 const { buscarPorLacre } = useTransferenciasTesouraria();
 const lacreEncontradoMsg = ref<string | null>(null);
 async function aoSairDoLacreEntrada(): Promise<void> {
@@ -69,7 +71,7 @@ async function aoSairDoLacreEntrada(): Promise<void> {
     return;
   }
   try {
-    const resultado = await buscarPorLacre(alvo);
+    const resultado = await buscarPorLacre(alvo, props.draft.data, { consumir: true });
     if (resultado) {
       entrada.valorCents = resultado.valorCents;
       lacreEncontradoMsg.value = `Valor preenchido automaticamente: R$ ${formatCents(resultado.valorCents)} (transferência ${resultado.caixaOrigem} → ${resultado.caixaDestino}).`;
@@ -218,7 +220,11 @@ onMounted(() => {
 const valorLacreAbertura = ref(0);
 onMounted(async () => {
   if (!props.draft.lacreAbertura) return;
-  const resultado = await buscarPorLacre(props.draft.lacreAbertura).catch(() => null);
+  // consumir: false (padrão) — é só uma consulta informativa, não "usa" o lacre; recarregar a
+  // página no meio do fechamento precisa continuar mostrando o mesmo valor.
+  const resultado = await buscarPorLacre(props.draft.lacreAbertura, props.draft.data).catch(
+    () => null,
+  );
   valorLacreAbertura.value = resultado?.valorCents ?? 0;
 });
 

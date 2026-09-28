@@ -57,7 +57,8 @@ export function useRelatorioCalculado(draft: Ref<FechamentoDraft>) {
     async (lacre) => {
       lacreAberturaValorCents.value = 0;
       if (!lacre) return;
-      const resultado = await buscarPorLacre(lacre).catch(() => null);
+      // consumir: false — só exibe o valor já cadastrado, não "usa" o lacre (28/09/2026).
+      const resultado = await buscarPorLacre(lacre, draft.value.data).catch(() => null);
       lacreAberturaValorCents.value = resultado?.valorCents ?? 0;
     },
     { immediate: true },

@@ -3,6 +3,7 @@ import { onMounted, ref, toRef } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useFechamentos } from '~/composables/useFechamentos';
 import { useRelatorioCalculado } from '~/composables/useRelatorioCalculado';
+import { useExportarFechamentoPlanilha } from '~/composables/useExportarFechamentoPlanilha';
 import { criarFechamentoVazio, type FechamentoDraft } from '~/types/fechamento';
 import { calculateDiscrimination, formatCents } from '~/utils/financeiro';
 import { mensagemDeErro } from '~/utils/erros';
@@ -16,6 +17,16 @@ const { obter } = useFechamentos();
 const carregando = ref(true);
 const erro = ref<string | null>(null);
 const draft = ref<FechamentoDraft>(criarFechamentoVazio());
+const {
+  exportando: exportandoPlanilha,
+  erro: erroExportacao,
+  exportar: exportarParaPlanilha,
+} = useExportarFechamentoPlanilha();
+const exportouComSucesso = ref(false);
+async function reexportarParaPlanilha(): Promise<void> {
+  exportouComSucesso.value = false;
+  exportouComSucesso.value = await exportarParaPlanilha(draft.value.id);
+}
 
 const {
   totalEntradaCents,
@@ -90,8 +101,37 @@ function totalPdvEntrada(p: FechamentoDraft['pdvEntradas'][number]): number {
         >
           Editar
         </v-btn>
+        <v-btn
+          v-if="!carregando && !erro"
+          variant="text"
+          prepend-icon="mdi-google-spreadsheet"
+          :loading="exportandoPlanilha"
+          :disabled="exportandoPlanilha"
+          @click="reexportarParaPlanilha"
+        >
+          Exportar pra planilha
+        </v-btn>
       </template>
     </AppCabecalhoTela>
+
+    <v-alert
+      v-if="erroExportacao"
+      type="error"
+      variant="tonal"
+      density="comfortable"
+      class="mb-4"
+    >
+      {{ erroExportacao }}
+    </v-alert>
+    <v-alert
+      v-if="exportouComSucesso && !exportandoPlanilha"
+      type="success"
+      variant="tonal"
+      density="comfortable"
+      class="mb-4"
+    >
+      Exportado pra planilha com sucesso.
+    </v-alert>
 
     <div v-if="carregando" class="d-flex justify-center py-10">
       <v-progress-circular indeterminate color="primary" />

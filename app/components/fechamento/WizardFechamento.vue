@@ -7,6 +7,7 @@ import { useSessaoCaixa } from '~/composables/useSessaoCaixa';
 import { useTransferenciasTesouraria } from '~/composables/useTransferenciasTesouraria';
 import { useVendasCanceladas } from '~/composables/useVendasCanceladas';
 import { useAnexos } from '~/composables/useAnexos';
+import { useExportarFechamentoPlanilha } from '~/composables/useExportarFechamentoPlanilha';
 import SecaoIdentificacao from '~/components/fechamento/SecaoIdentificacao.vue';
 import SecaoTransferencias from '~/components/fechamento/SecaoTransferencias.vue';
 import SecaoLancamentos from '~/components/fechamento/SecaoLancamentos.vue';
@@ -40,6 +41,7 @@ const {
   erro: erroCancelados,
   buscarPorData: buscarCancelados,
 } = useVendasCanceladas();
+const { exportar: exportarParaPlanilha } = useExportarFechamentoPlanilha();
 const router = useRouter();
 
 const salvando = ref(false);
@@ -211,6 +213,11 @@ async function onSalvar() {
         falhasPosFechamento.push('a sangria automatica para o Cofre Fluxo');
         console.error('[fechamento] falha ao criar sangria automática:', e);
       }
+    }
+    // Exportação pra planilha do usuário (28/09/2026, pedido dele: "assim que salvar o
+    // fechamento ir direto pra planilha") — mesmo espírito de melhor esforço dos dois acima.
+    if (!(await exportarParaPlanilha(fechamentoId))) {
+      falhasPosFechamento.push('a exportação para a planilha');
     }
     if (falhasPosFechamento.length) {
       aviso.value = `Fechamento salvo, mas ${falhasPosFechamento.join(' e ')} nao foi registrado. Verifique sua conexao e clique em Salvar novamente para tentar de novo.`;

@@ -1,16 +1,21 @@
 import { createSign } from 'node:crypto';
 
 /**
- * Leitura read-only da planilha Google Sheets que o `bot_padaria_v3` já preenche, sem depender do
- * pacote `googleapis` (pesado demais só pra isso) — autentica a service account assinando um JWT
- * na mão (RS256, igual o próprio Google documenta pro OAuth2 server-to-server) e troca por um
- * access token em `oauth2.googleapis.com/token`. Mesma credencial que
+ * Leitura E escrita (28/09/2026: exportação do fechamento pra planilha — ver
+ * `server/utils/exportarFechamentoPlanilha.ts`) na Google Sheets, sem depender do pacote
+ * `googleapis` (pesado demais só pra isso) — autentica a service account assinando um JWT na mão
+ * (RS256, igual o próprio Google documenta pro OAuth2 server-to-server) e troca por um access
+ * token em `oauth2.googleapis.com/token`. Mesma credencial que
  * `integracoes-scripts/src/sheetsRepository.js` usa, só que aqui a chave vem de uma env var (JSON
  * da service account) em vez de um arquivo — dentro da função serverless da Vercel não há
  * filesystem persistente pra guardar o .json com segurança.
+ *
+ * Escopo único (`spreadsheets`, leitura+escrita — não só `.readonly` como antes): é um superset,
+ * então o mesmo token serve pra ler a planilha do bot_padaria_v3 E escrever na planilha de
+ * exportação de fechamentos, sem precisar de dois caches/duas credenciais.
  */
 
-interface ServiceAccountCredenciais {
+export interface ServiceAccountCredenciais {
   client_email: string;
   private_key: string;
 }
@@ -25,7 +30,28 @@ function base64Url(input: Buffer | string): string {
     .replace(/=+$/, '');
 }
 
-async function obterAccessToken(credenciais: ServiceAccountCredenciais): Promise<string> {
+export function credenciaisDoRuntimeConfig(
+  credenciaisJson: string | ServiceAccountCredenciais,
+): ServiceAccountCredenciais {
+  let credenciais: ServiceAccountCredenciais;
+  if (typeof credenciaisJson === 'string') {
+    try {
+      credenciais = JSON.parse(credenciaisJson);
+    } catch {
+      throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON inválido (não é um JSON válido).');
+    }
+  } else {
+    credenciais = credenciaisJson;
+  }
+  if (!credenciais?.client_email || !credenciais?.private_key) {
+    throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON sem client_email/private_key.');
+  }
+  return credenciais;
+}
+
+export async function obterAccessToken(
+  credenciais: ServiceAccountCredenciais,
+): Promise<string> {
   if (tokenCache && tokenCache.expiraEm > Date.now() + 60_000) return tokenCache.token;
 
   const agora = Math.floor(Date.now() / 1000);
@@ -33,7 +59,7 @@ async function obterAccessToken(credenciais: ServiceAccountCredenciais): Promise
   const claims = base64Url(
     JSON.stringify({
       iss: credenciais.client_email,
-      scope: 'https://www.googleapis.com/auth/spreadsheets.readonly',
+      scope: 'https://www.googleapis.com/auth/spreadsheets',
       aud: 'https://oauth2.googleapis.com/token',
       iat: agora,
       exp: agora + 3600,
@@ -82,20 +108,7 @@ export async function lerAbaPlanilha({
   aba: string;
   colunaInicial?: string;
 }): Promise<Record<string, string>[]> {
-  let credenciais: ServiceAccountCredenciais;
-  if (typeof credenciaisJson === 'string') {
-    try {
-      credenciais = JSON.parse(credenciaisJson);
-    } catch {
-      throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON inválido (não é um JSON válido).');
-    }
-  } else {
-    credenciais = credenciaisJson;
-  }
-  if (!credenciais?.client_email || !credenciais?.private_key) {
-    throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON sem client_email/private_key.');
-  }
-
+  const credenciais = credenciaisDoRuntimeConfig(credenciaisJson);
   const accessToken = await obterAccessToken(credenciais);
   const range = `${aba}!${colunaInicial}:ZZ`;
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(range)}?valueRenderOption=FORMATTED_VALUE`;
@@ -151,20 +164,7 @@ export async function lerCaudaAbaPlanilha({
   colunaInicial?: string;
   ultimasLinhas: number;
 }): Promise<Record<string, string>[]> {
-  let credenciais: ServiceAccountCredenciais;
-  if (typeof credenciaisJson === 'string') {
-    try {
-      credenciais = JSON.parse(credenciaisJson);
-    } catch {
-      throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON inválido (não é um JSON válido).');
-    }
-  } else {
-    credenciais = credenciaisJson;
-  }
-  if (!credenciais?.client_email || !credenciais?.private_key) {
-    throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON sem client_email/private_key.');
-  }
-
+  const credenciais = credenciaisDoRuntimeConfig(credenciaisJson);
   const accessToken = await obterAccessToken(credenciais);
 
   const metaUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?ranges=${encodeURIComponent(aba)}&fields=sheets.properties.gridProperties.rowCount`;

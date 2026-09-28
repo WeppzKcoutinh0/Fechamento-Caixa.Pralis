@@ -29,6 +29,12 @@ export default defineNuxtConfig({
     googleServiceAccountJson: '',
     googleSpreadsheetId: '',
     googleSpreadsheetIdSecundario: '',
+    // Exportação do fechamento pra planilha (28/09/2026, pedido do usuário) — planilha e aba
+    // diferentes das de leitura acima (essa é escrita, pertence ao usuário, não ao bot da loja).
+    // ID não é segredo (segurança vem do compartilhamento, não do ID) — default real de propósito,
+    // pra funcionar sem precisar configurar env var na Vercel.
+    planilhaFechamentosId: '1aiRv_KY0H7c3VWVPAFDRtwd3SXB8cTcAoZQm3ywG8UY',
+    planilhaFechamentosAba: 'fechamentos TNP',
     // Leitura opcional de relatórios de maquininha por visão computacional. Server-only:
     // nunca exponha a chave no navegador.
     aiVisionApiKey: '',

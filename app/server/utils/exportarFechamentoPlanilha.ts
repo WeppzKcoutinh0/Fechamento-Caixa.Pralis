@@ -111,7 +111,7 @@ export async function exportarFechamentoParaPlanilha(fechamentoId: string): Prom
   const { data: fechamento, error } = await supabase
     .from('fechamentos')
     .select(
-      '*, entradas(*), sangrias(*), transferencias_caixa(*), lancamentos(*), crediario_itens(*)',
+      '*, entradas(*), sangrias(*), transferencias_caixa(*), lancamentos(*), crediario_itens(*), pdv_entradas(*)',
     )
     .eq('id', fechamentoId)
     .single();
@@ -278,7 +278,10 @@ export async function exportarFechamentoParaPlanilha(fechamentoId: string): Prom
     fechamento.maquina_desligada_hoje
       ? `Sim — ${[...(fechamento.maquina_desligada_motivos ?? []), fechamento.maquina_desligada_outro_texto].filter(Boolean).join(', ')}`
       : 'Não',
-    fechamento.nr_clientes ?? 0,
+    (fechamento.pdv_entradas ?? []).reduce(
+      (s: number, p: { nr_clientes: number }) => s + Number(p.nr_clientes ?? 0),
+      0,
+    ),
     formatBRL(Number(fechamento.ticket_medio ?? 0)),
     fotoPdv,
     fotoManha,

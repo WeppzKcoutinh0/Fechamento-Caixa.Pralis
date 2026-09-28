@@ -28,10 +28,24 @@ async function chamarSheetsApi(
   return resposta.json();
 }
 
+/** Índice de coluna (0-based) -> letra A1 (A, B, ..., Z, AA, AB, ...). */
+function colunaLetra(indice: number): string {
+  let n = indice + 1;
+  let letra = '';
+  while (n > 0) {
+    const resto = (n - 1) % 26;
+    letra = String.fromCharCode(65 + resto) + letra;
+    n = Math.floor((n - 1) / 26);
+  }
+  return letra;
+}
+
 /**
  * Garante que a aba `aba` existe (cria se não existir) e que a linha 1 tem `cabecalhos` — nunca
  * sobrescreve um cabeçalho que já esteja lá (só escreve se a linha 1 estiver vazia), pra não
- * embaralhar colunas de alguém que já reordenou manualmente. Devolve o `sheetId` numérico
+ * embaralhar colunas de alguém que já reordenou manualmente. Se o cabeçalho já existe mas tem
+ * MENOS colunas que `cabecalhos` (evolução do export com campos novos, 28/09/2026), completa só
+ * as colunas que faltam no final — sem tocar nas que já existem. Devolve o `sheetId` numérico
  * (diferente do nome — a API de notas/formatação pede o id, não o título).
  */
 export async function garantirAbaComCabecalho({
@@ -73,6 +87,17 @@ export async function garantirAbaComCabecalho({
       `${spreadsheetId}/values/${encodeURIComponent(`${aba}!A1`)}?valueInputOption=RAW`,
       { method: 'PUT', body: JSON.stringify({ values: [cabecalhos] }) },
     );
+  } else {
+    const atual = primeiraLinha.values[0] ?? [];
+    if (atual.length < cabecalhos.length) {
+      const faltantes = cabecalhos.slice(atual.length);
+      const colunaInicial = colunaLetra(atual.length);
+      await chamarSheetsApi(
+        accessToken,
+        `${spreadsheetId}/values/${encodeURIComponent(`${aba}!${colunaInicial}1`)}?valueInputOption=RAW`,
+        { method: 'PUT', body: JSON.stringify({ values: [faltantes] }) },
+      );
+    }
   }
 
   return { sheetId };

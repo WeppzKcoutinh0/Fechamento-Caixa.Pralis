@@ -37,7 +37,17 @@ const CABECALHOS = [
   'Sangrias',
   'Crediário',
   'Salvo em',
+  'Máquina Desligada?',
+  'Nº Clientes',
+  'Ticket Médio',
+  'Foto PDV',
+  'Foto Manhã',
+  'Foto Tarde',
+  'Foto Folha Fechamento',
 ];
+
+const BUCKET_ANEXOS = 'anexos';
+const VALIDADE_LINK_FOTO_SEGUNDOS = 60 * 60 * 24 * 180; // 180 dias
 
 function formatBRL(centavosOuValor: number | string | null): string {
   const numero = Number(centavosOuValor ?? 0);
@@ -68,6 +78,18 @@ function motivoCanceladoPorItem(texto: string | null): Record<string, string> | 
     // não é JSON — formato antigo, texto único compartilhado (tratado fora desta função)
   }
   return null;
+}
+
+async function linkFoto(
+  supabase: ReturnType<typeof useSupabaseAdmin>,
+  path: string | null,
+): Promise<string> {
+  if (!path) return '';
+  const { data, error } = await supabase.storage
+    .from(BUCKET_ANEXOS)
+    .createSignedUrl(path, VALIDADE_LINK_FOTO_SEGUNDOS);
+  if (error || !data) return '';
+  return data.signedUrl;
 }
 
 interface LinhaVendaProdutoDia {
@@ -115,6 +137,13 @@ export async function exportarFechamentoParaPlanilha(fechamentoId: string): Prom
         .eq('data_venda', fechamento.data)
         .eq('status', 'CANCELADA'),
     ]);
+
+  const [fotoPdv, fotoManha, fotoTarde, fotoFolha] = await Promise.all([
+    linkFoto(supabase, fechamento.img_pdv_path),
+    linkFoto(supabase, fechamento.img_manha_path),
+    linkFoto(supabase, fechamento.img_tarde_path),
+    linkFoto(supabase, fechamento.img_folha_fechamento_path),
+  ]);
 
   const motivosPorItem = motivoCanceladoPorItem(fechamento.vendas_canceladas_motivo_texto);
   const motivoUnico =
@@ -246,19 +275,47 @@ export async function exportarFechamentoParaPlanilha(fechamentoId: string): Prom
     `${sangrias.length} sangrias — ${formatBRL(totalSangriasCents / 100)}`,
     `${crediario.length} itens — ${formatBRL(totalCrediarioCents / 100)}`,
     formatDataHora(fechamento.atualizado_em ?? fechamento.criado_em),
+    fechamento.maquina_desligada_hoje
+      ? `Sim — ${[...(fechamento.maquina_desligada_motivos ?? []), fechamento.maquina_desligada_outro_texto].filter(Boolean).join(', ')}`
+      : 'Não',
+    fechamento.nr_clientes ?? 0,
+    formatBRL(Number(fechamento.ticket_medio ?? 0)),
+    fotoPdv,
+    fotoManha,
+    fotoTarde,
+    fotoFolha,
   ];
 
+  const notaCartoes = [
+    `Conferência de cartões — Crédito: ${formatBRL(Number(fechamento.liq_credito))} · Débito: ${formatBRL(Number(fechamento.liq_debito))} · Pix: ${formatBRL(Number(fechamento.liq_pix))} · Voucher: ${formatBRL(Number(fechamento.liq_voucher))}`,
+    `Maquininha manhã (nº ${fechamento.nr_maquininha || '—'}) — Crédito: ${formatBRL(Number(fechamento.credito_manha))} · Débito: ${formatBRL(Number(fechamento.debito_manha))} · Pix: ${formatBRL(Number(fechamento.pix_manha))} · Voucher: ${formatBRL(Number(fechamento.voucher_manha))}`,
+    `Maquininha tarde (nº ${fechamento.nr_maquininha_tarde || '—'}) — Crédito: ${formatBRL(Number(fechamento.credito_tarde))} · Débito: ${formatBRL(Number(fechamento.debito_tarde))} · Pix: ${formatBRL(Number(fechamento.pix_tarde))} · Voucher: ${formatBRL(Number(fechamento.voucher_tarde))}`,
+  ].join('\n');
+
+  const notaDinheiroContado = [
+    `Notas: ${formatBRL(Number(fechamento.dinheiro_contado_notas ?? 0))}`,
+    `Moedas: ${formatBRL(Number(fechamento.dinheiro_contado_moedas ?? 0))}`,
+    `Saldo esperado: ${formatBRL(Number(fechamento.saldo_fisico_esperado ?? 0))}`,
+    `Conferido pelo operador: ${fechamento.dinheiro_contado_confirmado ? 'Sim' : 'Não'}`,
+  ].join('\n');
+
+  const notaCrediarioComTotais = [
+    `Crédito clientes: ${formatBRL(Number(fechamento.total_cred_clientes ?? 0))} · Crédito colaboradores: ${formatBRL(Number(fechamento.total_cred_colab ?? 0))}`,
+    notaCrediario,
+  ].join('\n');
+
   const notas: NotaCelula[] = [
-    { colunaIndice: 5, texto: `Conferência de cartões — Crédito: ${formatBRL(Number(fechamento.liq_credito))} · Débito: ${formatBRL(Number(fechamento.liq_debito))} · Pix: ${formatBRL(Number(fechamento.liq_pix))} · Voucher: ${formatBRL(Number(fechamento.liq_voucher))}` },
+    { colunaIndice: 5, texto: notaCartoes },
     { colunaIndice: 6, texto: notaTransferencias },
     { colunaIndice: 7, texto: notaLancamentos('despesa') },
     { colunaIndice: 8, texto: notaLancamentos('mercadoria') },
     { colunaIndice: 9, texto: notaLancamentos('retirada') },
+    { colunaIndice: 11, texto: notaDinheiroContado },
     { colunaIndice: 13, texto: notaVendidos },
     { colunaIndice: 14, texto: notaCancelados },
     { colunaIndice: 15, texto: notaEntradas },
     { colunaIndice: 16, texto: notaSangrias },
-    { colunaIndice: 17, texto: notaCrediario },
+    { colunaIndice: 17, texto: notaCrediarioComTotais },
   ];
 
   const { sheetId } = await garantirAbaComCabecalho({

@@ -111,7 +111,7 @@ export async function exportarFechamentoParaPlanilha(fechamentoId: string): Prom
         .eq('tipo', 'C'),
       supabase
         .from('vendas')
-        .select('id_creare, pdv, hora_venda, vendas_itens(produto, quantidade, total)')
+        .select('id_creare, pdv, hora_venda, vendas_itens(id, produto, quantidade, total)')
         .eq('data_venda', fechamento.data)
         .eq('status', 'CANCELADA'),
     ]);
@@ -143,14 +143,15 @@ export async function exportarFechamentoParaPlanilha(fechamentoId: string): Prom
     id_creare: string;
     pdv: string | null;
     hora_venda: string | null;
-    vendas_itens: { produto: string; quantidade: string; total: string }[];
+    vendas_itens: { id: string; produto: string; quantidade: string; total: string }[];
   }[]) {
     for (const item of v.vendas_itens ?? []) {
       totalCanceladosCents += Math.round(Number(item.total) * 100);
+      const motivo = motivosPorItem?.[item.id] || motivoUnico || 'Sem motivo informado';
       const hora = v.hora_venda ? ` às ${v.hora_venda.slice(0, 5)}` : '';
       const pdv = v.pdv ? ` (PDV ${v.pdv})` : '';
       canceladosLinhasTexto.push(
-        `${item.produto} — ${formatBRL(Number(item.total))}${hora}${pdv} — Venda ${v.id_creare}`,
+        `${item.produto} — ${formatBRL(Number(item.total))}${hora}${pdv} — Motivo: ${motivo}`,
       );
     }
   }

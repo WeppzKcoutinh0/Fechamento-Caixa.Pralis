@@ -140,6 +140,7 @@ interface FechamentoRow {
   vendas_canceladas_motivo_audio_path: string | null;
   maquina_desligada_eventos: EventoMaquinaDesligada[];
   cash_session_id: string | null;
+  cash_sessions?: { lacre_abertura: string | null } | null;
   entradas: EntradaRow[];
   sangrias: SangriaRow[];
   transferencias_caixa: TransferenciaCaixaRow[];
@@ -406,10 +407,9 @@ function linhaParaDraft(row: FechamentoRow): FechamentoDraft {
     vendasCanceladasMotivos: motivosCanceladosDoBanco(row.vendas_canceladas_motivo_texto),
     maquinaDesligadaEventos: row.maquina_desligada_eventos ?? [],
     cashSessionId: row.cash_session_id,
-    // Só existe pro fluxo de abertura (ver criarFechamentoVazio) — reabrir um fechamento já
-    // salvo pra edição não deve disparar o lookup de novo com um valor de Tesouraria que já
-    // pode ter mudado; o que foi somado na Diferença na hora do Salvar já está gravado.
-    lacreAbertura: '',
+    // A sessão guarda o lacre de abertura. Recuperá-lo ao reabrir é necessário para que o
+    // esperado na gaveta continue incluindo o fundo recebido da Tesouraria.
+    lacreAbertura: row.cash_sessions?.lacre_abertura ?? '',
   };
 }
 
@@ -722,7 +722,7 @@ export function useFechamentos() {
     const { data, error } = await supabase
       .from('fechamentos')
       .select(
-        '*, entradas(*), sangrias(*), transferencias_caixa(*), lancamentos(*), discriminacoes(*), crediario_itens(*), pdv_entradas(*)',
+        '*, cash_sessions(lacre_abertura), entradas(*), sangrias(*), transferencias_caixa(*), lancamentos(*), discriminacoes(*), crediario_itens(*), pdv_entradas(*)',
       )
       .eq('id', id)
       .single();

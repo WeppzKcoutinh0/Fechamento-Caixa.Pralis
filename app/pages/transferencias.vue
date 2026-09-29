@@ -59,6 +59,13 @@ function ehRetorno(t: TransferenciaTesouraria): boolean {
   );
 }
 
+function valorNotificacaoCents(t: TransferenciaTesouraria): number {
+  const valorFinalCents = t.valorNotasCents + t.valorMoedasCents;
+  // Retornos automáticos carregam a decomposição da Transferência Final. A notificação
+  // deve mostrar essa soma, mesmo se uma linha antiga tiver `valorCents` divergente.
+  return ehRetorno(t) && valorFinalCents > 0 ? valorFinalCents : t.valorCents;
+}
+
 function ehTransferenciaEntreContas(t: TransferenciaTesouraria): boolean {
   return CONTAS_CENTRAIS.has(t.caixaOrigem) || CONTAS_CENTRAIS.has(t.caixaDestino);
 }
@@ -140,7 +147,7 @@ async function confirmarRecebimentoDe(id: string): Promise<void> {
                       {{ rotuloComTurno(t.caixaDestino, t.turnoDestino) }}</strong
                     >
                     <v-spacer />
-                    <strong>R$ {{ formatCents(t.valorCents) }}</strong>
+                    <strong>R$ {{ formatCents(valorNotificacaoCents(t)) }}</strong>
                   </div>
                   <span class="text-caption text-medium-emphasis"
                     >Lacre {{ t.lacre }} · {{ formatarDataBr(t.dataLanc) }}</span

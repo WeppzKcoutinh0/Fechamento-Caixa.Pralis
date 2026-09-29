@@ -64,7 +64,7 @@ Copie `.env.producao.example` para `.env.producao` (fora do git) e preencha:
 | `EMPRESA`                                              | rótulo da loja (ex.: `"TNP CENTRAL"`) — vai na coluna EMPRESA         |
 | `PRALIS_VENDAS_API_URL`                                | URL do app na Vercel                                                  |
 | `PRALIS_VENDAS_API_TOKEN`                              | mesmo valor de `NUXT_INTEGRACAO_VENDAS_CHAVE` configurado no app      |
-| `SYNC_INTERVALO_MINUTOS`                               | intervalo do loop (default `10`)                                     |
+| `SYNC_INTERVALO_MINUTOS`                               | intervalo do loop (default `1`)                                      |
 | `SYNC_DIAS_REPROCESSAR`                                | quantos dias pra trás reler a cada ciclo (default `3`)                |
 | `SYNC_LOCK_MAX_MINUTOS`                                | idade máxima do lock (default `30`)                                  |
 | `SYNC_RETRY_TENTATIVAS` / `SYNC_RETRY_BASE_MS`         | retry de rede por lote (default `4` / `500`)                         |
@@ -82,8 +82,8 @@ que muda de FINALIZADA pra CANCELADA depois atualiza a MESMA linha no próximo c
 criar uma duplicada — por isso o ciclo relê o dia inteiro (`SYNC_DIAS_REPROCESSAR`), nunca depende
 de um cursor incremental.
 
-Pra ver cancelamentos quase em tempo real, recomendado `SYNC_INTERVALO_MINUTOS="1"` (em vez do
-default `10`) quando `SYNC_ENVIAR_VENDAS` estiver ligado.
+Para sincronização em tempo real, mantenha `SYNC_INTERVALO_MINUTOS="1"` quando
+`SYNC_ENVIAR_VENDAS` estiver ligado (já é o padrão).
 
 Depois de cada envio, o agente confere (best-effort, nunca derruba o ciclo) se toda venda que ele
 leu como CANCELADA no CREARE realmente existe como CANCELADA no sistema — loga um aviso se faltar

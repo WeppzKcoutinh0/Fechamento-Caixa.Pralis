@@ -9,17 +9,8 @@ import type {
 import CampoFoto from '~/components/comum/CampoFoto.vue';
 import CartaoValor from '~/components/comum/CartaoValor.vue';
 import DetalhesPagamentoMaquininha from './DetalhesPagamentoMaquininha.vue';
-import { useVendasFechamento } from '~/composables/useVendasFechamento';
-import { useSincronizarVendas } from '~/composables/useSincronizarVendas';
 import { useLeituraMaquininha } from '~/composables/useLeituraMaquininha';
 import { calculatePdvEntradas, formatCents, toCents } from '~/utils/financeiro';
-import {
-  aplicarAjustesComoLancamentos,
-  aplicarResumoAoPrimeiroPdv,
-  caixaParaNumero,
-  formatarDataBr,
-  turnoParaLetra,
-} from '~/utils/vendasFechamento';
 import { mensagemDeErro } from '~/utils/erros';
 
 const props = defineProps<{ draft: FechamentoDraft }>();
@@ -81,52 +72,6 @@ const NEUTRO_VARS = {
 // Identificação, com o mesmo filtro por caixa/turno (um fechamento é de UM caixa, não da loja
 // toda — sem caixa selecionado ainda, cai pra todos juntos). Os campos continuam editáveis
 // manualmente depois de preenchidos: isto é um atalho que poupa digitação, não um valor travado.
-const {
-  carregando: buscandoVendas,
-  erro: erroVendas,
-  resumo: resumoVendas,
-  buscarPorData,
-} = useVendasFechamento();
-// 28/09/2026 (bug real em produção): o cron automático da Vercel (1x/dia) parou de disparar por 2
-// dias sem nenhum aviso — "Buscar vendas" só lia o que já estava sincronizado, nunca puxava a
-// planilha sozinho. Sincroniza ANTES de ler, mesmo composable de SecaoIdentificacao.vue.
-const { sincronizando: sincronizandoVendas, sincronizar: sincronizarVendas } =
-  useSincronizarVendas();
-const jaBuscouVendas = ref(false);
-const vendasEncontradas = ref(false);
-const rotuloFiltroVendas = computed(() => {
-  const partes = [props.draft.caixa, props.draft.turno].filter(Boolean);
-  return partes.length ? partes.join(' - ') : 'todos os caixas';
-});
-
-async function buscarVendasDoDia(): Promise<void> {
-  jaBuscouVendas.value = true;
-  await sincronizarVendas();
-  const resumo = await buscarPorData(props.draft.data, {
-    caixa: caixaParaNumero(props.draft.caixa),
-    turno: turnoParaLetra(props.draft.turno),
-  });
-  vendasEncontradas.value = Boolean(resumo && resumo.registros > 0);
-  if (!resumo || resumo.registros === 0) return;
-  aplicarResumoAoPrimeiroPdv(props.draft, resumo);
-  aplicarAjustesComoLancamentos(props.draft, resumo);
-}
-
-// Colaboradores/Alimentação/Furto-Roubo/Sócios/Sobra-Perda — mesmo comportamento de
-// SecaoIdentificacao.vue: `buscarVendasDoDia` já lança automaticamente (aplicarAjustesComoLancamentos),
-// isto aqui só lista o que foi lançado.
-const ajustesPresentesRelatorios = computed(() => {
-  if (!resumoVendas.value) return [];
-  const { colaboradores, alimentacao, rouboFurto, socios, sobraPerda } = resumoVendas.value.ajustes;
-  return [
-    ['Colaboradores', colaboradores],
-    ['Alimentação', alimentacao],
-    ['Furto/Roubo', rouboFurto],
-    ['Sócios', socios],
-    ['Sobra/Perda', sobraPerda],
-  ].filter(([, valor]) => Math.abs(Number(valor)) >= 0.005) as [string, number][];
-});
-
 function aoDigitarCentavos(valorBruto: string | number | null): number {
   const digitos = String(valorBruto ?? '').replace(/\D/g, '');
   return digitos ? parseInt(digitos, 10) : 0;
@@ -394,69 +339,11 @@ function alternarTurnoMaquininha(turno: 'manha' | 'tarde'): void {
       </button>
       <v-expand-transition>
         <div v-if="pdvAberto" class="lc-painel-corpo">
-          <div class="d-flex flex-column ga-2 mb-4">
-            <v-btn
-              color="primary"
-              variant="tonal"
-              size="small"
-              :loading="sincronizandoVendas || buscandoVendas"
-              :disabled="sincronizandoVendas || buscandoVendas"
-              @click="buscarVendasDoDia"
-            >
-              {{
-                sincronizandoVendas
-                  ? 'Sincronizando...'
-                  : buscandoVendas
-                    ? 'Buscando vendas...'
-                    : 'Buscar vendas do dia'
-              }}
-            </v-btn>
-
-            <v-alert
-              v-if="jaBuscouVendas && !sincronizandoVendas && !buscandoVendas && erroVendas"
-              type="error"
-              variant="tonal"
-              density="comfortable"
-            >
-              {{ erroVendas }}
-            </v-alert>
-            <v-alert
-              v-else-if="jaBuscouVendas && !sincronizandoVendas && !buscandoVendas && !vendasEncontradas"
-              type="info"
-              variant="tonal"
-              density="comfortable"
-            >
-              Nenhuma venda sincronizada para {{ rotuloFiltroVendas }} em
-              {{ formatarDataBr(draft.data) }}. Preencha manualmente ou verifique se o bot está
-              rodando.
-            </v-alert>
-            <v-alert
-              v-else-if="jaBuscouVendas && !sincronizandoVendas && !buscandoVendas && vendasEncontradas"
-              type="success"
-              variant="tonal"
-              density="comfortable"
-            >
-              Campos preenchidos com as vendas de {{ rotuloFiltroVendas }} em
-              {{ formatarDataBr(draft.data) }}. Confira e ajuste se precisar.
-            </v-alert>
-
-            <v-alert
-              v-if="ajustesPresentesRelatorios.length"
-              type="success"
-              variant="tonal"
-              density="comfortable"
-            >
-              <div class="text-caption font-weight-bold">
-                O CREARE também registrou estes ajustes — já lançados automaticamente como Despesa
-                (passo 3), já entram no cálculo do fechamento:
-              </div>
-              <ul class="text-caption mt-1 pl-4">
-                <li v-for="[nome, valor] in ajustesPresentesRelatorios" :key="nome">
-                  {{ nome }}: R$ {{ formatCents(toCents(valor)) }}
-                </li>
-              </ul>
-            </v-alert>
-          </div>
+          <v-alert type="info" variant="tonal" density="comfortable" class="mb-4">
+            Os valores de vendas são preenchidos uma única vez em <strong>Identificação</strong>.
+            Revise-os aqui antes de concluir, sem uma segunda busca que possa sobrescrever o
+            fechamento.
+          </v-alert>
 
           <label class="lc-campo">
             <span class="lc-campo-lbl">Relatório PDV</span>

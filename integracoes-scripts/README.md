@@ -1,7 +1,8 @@
 # Sincronização de vendas CREARE -> Pralis (Fechamento de Caixa)
 
 Agente que lê o banco do PDV **CREARE/Compilart** (MySQL, na própria loja) e envia o resumo diário
-de vendas por caixa/PDV/operador para o app (`POST /vendas/importar`). Roda na máquina da loja.
+de vendas por caixa/PDV/operador para o app (`POST /vendas/importar`). Roda somente no computador
+central que tem acesso ao CREARE; não precisa nem deve ser instalado no computador da Kaylane.
 
 **Mesmo modelo do `bot_padaria_v3`** (o bot que já está em produção há meses — ver
 `app/PRALIS-INTELIGENTE DESIGNER/bot.rar`): mesma query SQL, mesmo cálculo de HASH pra

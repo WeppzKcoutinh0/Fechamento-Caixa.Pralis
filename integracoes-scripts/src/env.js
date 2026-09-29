@@ -33,7 +33,8 @@ export function obterConfig() {
       token: obterObrigatoria('PRALIS_VENDAS_API_TOKEN'),
     },
     sincronizacao: {
-      intervaloMinutos: obterNumero('SYNC_INTERVALO_MINUTOS', 10),
+      // Atualiza o CREARE a cada minuto por padrão; pode ser sobrescrito explicitamente.
+      intervaloMinutos: obterNumero('SYNC_INTERVALO_MINUTOS', 1),
       diasReprocessar: obterNumero('SYNC_DIAS_REPROCESSAR', 3),
       lockMaxMinutos: obterNumero('SYNC_LOCK_MAX_MINUTOS', 30),
       retryTentativas: obterNumero('SYNC_RETRY_TENTATIVAS', 4),

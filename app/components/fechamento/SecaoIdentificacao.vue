@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { CAIXAS, TURNOS, type Caixa, type FechamentoDraft, type Turno } from '~/types/fechamento';
 import { useVendasCanceladas } from '~/composables/useVendasCanceladas';
 import { useVendasFechamento } from '~/composables/useVendasFechamento';
@@ -112,15 +112,51 @@ async function buscarVendas() {
   jaBuscou.value = true;
   ocupadoBuscarVendas.value = true;
   try {
-    await sincronizarSilenciosamente();
     const resultado = await buscarPorData(dataVendas.value, filtroBusca.value);
-    if (!resultado || resultado.registros === 0) return;
-    aplicarResumoAoPrimeiroPdv(props.draft, resultado);
-    aplicarAjustesComoLancamentos(props.draft, resultado);
+    aplicarResultadoVendas(resultado);
   } finally {
     ocupadoBuscarVendas.value = false;
   }
 }
+
+function aplicarResultadoVendas(resultado: Awaited<ReturnType<typeof buscarPorData>>): void {
+  if (!resultado || resultado.registros === 0) return;
+  aplicarResumoAoPrimeiroPdv(props.draft, resultado);
+  aplicarAjustesComoLancamentos(props.draft, resultado);
+}
+
+// O robô local envia CREARE -> API -> Supabase a cada minuto. Depois que o operador faz a
+// primeira busca, esta tela só relê o Supabase a cada 60s: não relê a planilha nem disputa com o
+// robô. Assim os números reais novos aparecem no próprio fechamento sem apertar o botão de novo.
+let atualizacaoAutomatica: ReturnType<typeof setInterval> | undefined;
+let atualizandoAutomaticamente = false;
+async function atualizarVendasAutomaticamente(): Promise<void> {
+  if (
+    !jaBuscou.value ||
+    atualizandoAutomaticamente ||
+    ocupadoBuscarVendas.value ||
+    ocupadoCanceladas.value
+  )
+    return;
+  atualizandoAutomaticamente = true;
+  try {
+    const resultado = await buscarPorData(dataVendas.value, filtroBusca.value);
+    aplicarResultadoVendas(resultado);
+    if (jaBuscouCanceladas.value) await buscarVendasCanceladasBase(dataVendas.value);
+  } finally {
+    atualizandoAutomaticamente = false;
+  }
+}
+
+onMounted(() => {
+  atualizacaoAutomatica = setInterval(() => {
+    void atualizarVendasAutomaticamente();
+  }, 60_000);
+});
+
+onBeforeUnmount(() => {
+  if (atualizacaoAutomatica) clearInterval(atualizacaoAutomatica);
+});
 
 /** Botão "Sincronizar vendas agora" — mesma sincronização, só que sem ler depois (o usuário só
  * quer empurrar a planilha pro banco, não necessariamente re-buscar o filtro atual). */
@@ -150,7 +186,6 @@ async function buscarVendasCanceladas() {
   jaBuscouCanceladas.value = true;
   ocupadoCanceladas.value = true;
   try {
-    await sincronizarSilenciosamente();
     await buscarVendasCanceladasBase(dataVendas.value);
   } finally {
     ocupadoCanceladas.value = false;

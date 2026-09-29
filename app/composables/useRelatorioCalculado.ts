@@ -3,7 +3,7 @@ import type { FechamentoDraft } from '~/types/fechamento';
 import { useTransferenciasRecebidas } from './useTransferenciasRecebidas';
 import { useTransferenciasTesouraria } from './useTransferenciasTesouraria';
 import {
-  calculateCardNet,
+  calculateCardNetPorTurno,
   calculateCrediarioTotais,
   calculateLancamentosPorTipo,
   calculatePdvEntradas,
@@ -82,16 +82,28 @@ export function useRelatorioCalculado(draft: Ref<FechamentoDraft>) {
   );
 
   const liqCreditoCents = computed(() =>
-    calculateCardNet(draft.value.creditoManhaCents, draft.value.creditoTardeCents),
+    calculateCardNetPorTurno(
+      draft.value.turno,
+      draft.value.creditoManhaCents,
+      draft.value.creditoTardeCents,
+    ),
   );
   const liqDebitoCents = computed(() =>
-    calculateCardNet(draft.value.debitoManhaCents, draft.value.debitoTardeCents),
+    calculateCardNetPorTurno(
+      draft.value.turno,
+      draft.value.debitoManhaCents,
+      draft.value.debitoTardeCents,
+    ),
   );
   const liqPixCents = computed(() =>
-    calculateCardNet(draft.value.pixManhaCents, draft.value.pixTardeCents),
+    calculateCardNetPorTurno(draft.value.turno, draft.value.pixManhaCents, draft.value.pixTardeCents),
   );
   const liqVoucherCents = computed(() =>
-    calculateCardNet(draft.value.voucherManhaCents, draft.value.voucherTardeCents),
+    calculateCardNetPorTurno(
+      draft.value.turno,
+      draft.value.voucherManhaCents,
+      draft.value.voucherTardeCents,
+    ),
   );
 
   const crediarioTotais = computed(() =>
@@ -133,6 +145,10 @@ export function useRelatorioCalculado(draft: Ref<FechamentoDraft>) {
     }),
   );
 
+  // A diferença oficial do fechamento é a conferência física da gaveta:
+  // dinheiro contado - dinheiro esperado. A conciliação PDV x maquininha
+  // continua disponível nos detalhes do relatório, mas não pode alterar a
+  // sobra/falta física do caixa.
   const fisico = computed(() =>
     calculatePhysicalClosing({
       pdvCashCents: pdv.value.dinheiroCents,

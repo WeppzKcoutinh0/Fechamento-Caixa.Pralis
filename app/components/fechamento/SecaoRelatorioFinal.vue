@@ -111,6 +111,10 @@ const rotuloDiferenca = computed(() => {
   if (d === 0) return 'Igualado (sem diferença)';
   return d > 0 ? 'Sobra (contado − esperado)' : 'Falta (contado − esperado)';
 });
+const statusFisico = computed<'zero' | 'sobra' | 'falta'>(() => {
+  const d = fisico.value.differenceCents;
+  return d === 0 ? 'zero' : d > 0 ? 'sobra' : 'falta';
+});
 
 // Detalhe do "Esperado na gaveta" (pedido do usuário, 25/09/2026): mesma fórmula do
 // calculatePhysicalClosing (ver financeiro.ts) quebrada linha a linha, pra explicar de onde
@@ -570,18 +574,18 @@ const CAT_VARS = {
     </v-btn>
 
     <v-card
-      :color="STATUS_COR[relatorio.status]"
-      :variant="relatorio.status === 'zero' ? 'outlined' : 'tonal'"
+      :color="STATUS_COR[statusFisico]"
+      :variant="statusFisico === 'zero' ? 'outlined' : 'tonal'"
       class="pa-4"
       rounded="lg"
     >
-      <div class="text-caption">Diferença Geral</div>
-      <div class="text-h5">R$ {{ formatCents(Math.abs(relatorio.diferencaCents)) }}</div>
+      <div class="text-caption">Diferença de Caixa</div>
+      <div class="text-h5">R$ {{ formatCents(Math.abs(fisico.differenceCents)) }}</div>
       <div class="text-body-2">
-        {{ STATUS_TEXTO[relatorio.status]
+        {{ STATUS_TEXTO[statusFisico]
         }}{{
-          relatorio.status !== 'zero'
-            ? ` de R$ ${formatCents(Math.abs(relatorio.diferencaCents))}`
+          statusFisico !== 'zero'
+            ? ` de R$ ${formatCents(Math.abs(fisico.differenceCents))}`
             : ''
         }}
       </div>
@@ -997,7 +1001,7 @@ const CAT_VARS = {
       <v-expansion-panel class="cat-painel" :style="CAT_VARS.resultado">
         <v-expansion-panel-title class="cat-titulo">
           <span class="flex-grow-1">Diferença</span>
-          <strong class="cat-valor">R$ {{ formatCents(relatorio.diferencaCents) }}</strong>
+          <strong class="cat-valor">R$ {{ formatCents(fisico.differenceCents) }}</strong>
         </v-expansion-panel-title>
         <v-expansion-panel-text>
           <p class="cat-subgrupo">Conferência por forma de pagamento</p>

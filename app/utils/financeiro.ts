@@ -190,6 +190,22 @@ export function calculateCardNet(initialCents: number, finalCents: number): Cent
   return assertCents(finalCents, 'valor final') - assertCents(initialCents, 'valor inicial');
 }
 
+/**
+ * Calcula as vendas de cartão do turno que está sendo fechado.
+ *
+ * No turno da tarde a maquininha não zera: o relatório da tarde é acumulado,
+ * então a venda do turno é tarde - manhã. Já no fechamento da manhã, o valor
+ * informado em "Manhã" é a própria venda do turno e não um saldo inicial.
+ */
+export function calculateCardNetPorTurno(
+  turno: 'Manhã' | 'Tarde' | '',
+  manhaCents: number,
+  tardeCents: number,
+): Cents {
+  if (turno === 'Manhã') return assertCents(manhaCents, 'valor da manhã');
+  return calculateCardNet(manhaCents, tardeCents);
+}
+
 export function calculateCardNets(
   cards: Record<string, { initialCents: number; finalCents: number }>,
 ): {

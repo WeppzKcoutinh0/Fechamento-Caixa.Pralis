@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   calculateCardNet,
+  calculateCardNetPorTurno,
   calculateCardNets,
   calculateCrediarioTotais,
   calculateDiscrimination,
@@ -36,6 +37,20 @@ describe('formatCents', () => {
 
   it('rejeita centavos fracionários', () => {
     expect(() => formatCents(10.5)).toThrow(/inteiro seguro/);
+  });
+});
+
+describe('calculateCardNetPorTurno', () => {
+  it('usa os valores da manhã como vendas no fechamento da manhã', () => {
+    expect(calculateCardNetPorTurno('Manhã', 105418, 0)).toBe(105418);
+  });
+
+  it('mantém a diferença acumulada no fechamento da tarde', () => {
+    expect(calculateCardNetPorTurno('Tarde', 105418, 130000)).toBe(24582);
+  });
+
+  it('mantém o comportamento antigo enquanto o turno ainda não foi escolhido', () => {
+    expect(calculateCardNetPorTurno('', 105418, 0)).toBe(-105418);
   });
 });
 
@@ -322,6 +337,23 @@ describe('calculateRelatorioFinal — fórmula principal do fechamento', () => {
 });
 
 describe('calculatePhysicalClosing — card aditivo esperado × contado', () => {
+  it('usa contado menos esperado como diferença oficial do dinheiro', () => {
+    const result = calculatePhysicalClosing({
+      pdvCashCents: 86144,
+      entriesCents: 3900,
+      cashDropsCents: 0,
+      expensesCents: 0,
+      merchandiseCents: 0,
+      withdrawalsCents: 0,
+      transferOutCents: 0,
+      transferInCents: 27630,
+      countedCents: 128210,
+    });
+
+    expect(result.expectedCents).toBe(117674);
+    expect(result.differenceCents).toBe(10536);
+  });
+
   it('calcula esperado e diferença com centavos inteiros', () => {
     expect(
       calculatePhysicalClosing({

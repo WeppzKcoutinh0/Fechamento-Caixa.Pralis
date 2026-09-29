@@ -1,6 +1,6 @@
 import { useSupabase } from './useSupabase';
 import {
-  calculateCardNet,
+  calculateCardNetPorTurno,
   calculateCrediarioTotais,
   calculateDiscrimination,
   calculateLancamentosPorTipo,
@@ -499,10 +499,26 @@ export function useFechamentos() {
       })),
     );
 
-    const liqCreditoCents = calculateCardNet(draft.creditoManhaCents, draft.creditoTardeCents);
-    const liqDebitoCents = calculateCardNet(draft.debitoManhaCents, draft.debitoTardeCents);
-    const liqPixCents = calculateCardNet(draft.pixManhaCents, draft.pixTardeCents);
-    const liqVoucherCents = calculateCardNet(draft.voucherManhaCents, draft.voucherTardeCents);
+    const liqCreditoCents = calculateCardNetPorTurno(
+      draft.turno,
+      draft.creditoManhaCents,
+      draft.creditoTardeCents,
+    );
+    const liqDebitoCents = calculateCardNetPorTurno(
+      draft.turno,
+      draft.debitoManhaCents,
+      draft.debitoTardeCents,
+    );
+    const liqPixCents = calculateCardNetPorTurno(
+      draft.turno,
+      draft.pixManhaCents,
+      draft.pixTardeCents,
+    );
+    const liqVoucherCents = calculateCardNetPorTurno(
+      draft.turno,
+      draft.voucherManhaCents,
+      draft.voucherTardeCents,
+    );
 
     const crediarioTotais = calculateCrediarioTotais(
       draft.crediario.map((c) => ({ tipo: c.tipo, valorCents: c.valorCents })),
@@ -593,7 +609,9 @@ export function useFechamentos() {
         rel_retiradas: cents(lancamentosPorTipo.retiradaCents),
         rel_cartoes: cents(relatorio.cartoesCents),
         valor_total_final: cents(relatorio.valorTotalFinalCents),
-        diferenca: cents(relatorio.diferencaCents),
+        // O resultado oficial é a conferência física da gaveta. A diferença
+        // entre PDV e maquininha permanece nos campos de conciliação.
+        diferenca: cents(fisico.differenceCents),
         rel_pdv_diferenca: cents(relatorio.relPdvDiferencaCents),
         dinheiro_contado: cents(draft.dinheiroContadoCents),
         dinheiro_contado_notas: cents(draft.dinheiroContadoNotasCents),

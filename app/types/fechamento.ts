@@ -118,6 +118,11 @@ export interface EntradaDraft {
   valorCents: number;
   descricao: string;
   tipoConta: TipoContaEntrada | '';
+  // Origem/destino fixos (pedido do usuário, 29/09/2026): toda Entrada representa dinheiro vindo
+  // do Caixa de Troco pro caixa deste fechamento — nunca escolhido pelo operador, preenchido
+  // sozinho na criação (ver novaEntrada() em SecaoTransferencias.vue).
+  caixaOrigem: string;
+  caixaDestino: string;
 }
 
 export interface SangriaDraft {

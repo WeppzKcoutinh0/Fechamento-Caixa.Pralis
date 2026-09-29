@@ -31,8 +31,17 @@ const ENTRADA_VARS = TRANSFERENCIAS_VARS;
 const SANGRIA_VARS = TRANSFERENCIAS_VARS;
 const TRANSFERENCIA_VARS = TRANSFERENCIAS_VARS;
 
+// Origem/destino fixos (pedido do usuário, 29/09/2026): toda Entrada vem do Caixa de Troco pro
+// caixa deste fechamento — nunca uma escolha do operador.
 function novaEntrada(): EntradaDraft {
-  return { lacre: '', valorCents: 0, descricao: '', tipoConta: '' };
+  return {
+    lacre: '',
+    valorCents: 0,
+    descricao: '',
+    tipoConta: '',
+    caixaOrigem: 'Caixa de Troco',
+    caixaDestino: props.draft.caixa || '',
+  };
 }
 function novaSangria(): SangriaDraft {
   return { descricao: '', lacre: '', valorCents: 0 };
@@ -546,6 +555,19 @@ const totalTransferenciasAutomaticasCents = computed(() =>
               <label class="lc-campo">
                 <span class="lc-campo-lbl">Conta de destino fixa</span>
                 <input class="lc-input" value="Cofre Fluxo" readonly />
+              </label>
+            </div>
+
+            <!-- Entrada sempre vem do Caixa de Troco pra ESTE caixa — mesmo espírito informativo
+                 da sangria acima (pedido do usuário, 29/09/2026). -->
+            <div v-if="tipoModal === 'entrada'" class="lc-dois">
+              <label class="lc-campo">
+                <span class="lc-campo-lbl">Conta de origem fixa</span>
+                <input class="lc-input" value="Caixa de Troco" readonly />
+              </label>
+              <label class="lc-campo">
+                <span class="lc-campo-lbl">Conta de destino fixa</span>
+                <input class="lc-input" :value="draft.caixa || '—'" readonly />
               </label>
             </div>
 

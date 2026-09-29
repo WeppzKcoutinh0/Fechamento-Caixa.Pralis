@@ -96,6 +96,8 @@ export function draftDoRegistroAntigo(reg: RegistroAntigo): FechamentoDraft {
     valorCents: toCents(e.valor ?? 0),
     descricao: textoDe(e.descricao),
     tipoConta: '' as const,
+    caixaOrigem: 'Caixa de Troco',
+    caixaDestino: draft.caixa || '',
   }));
   draft.sangrias = (reg.sangrias ?? []).map((s) => ({
     descricao: textoDe(s.descricao),

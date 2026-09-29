@@ -37,6 +37,8 @@ interface EntradaRow {
   valor: string;
   descricao: string;
   tipo_conta: string | null;
+  caixa_origem: string;
+  caixa_destino: string;
 }
 interface SangriaRow {
   ordem: number;
@@ -307,6 +309,8 @@ function linhaParaDraft(row: FechamentoRow): FechamentoDraft {
       valorCents: toCents(e.valor),
       descricao: e.descricao,
       tipoConta: (e.tipo_conta ?? '') as TipoContaEntrada | '',
+      caixaOrigem: e.caixa_origem ?? '',
+      caixaDestino: e.caixa_destino ?? '',
     })),
     sangrias: ordenado(row.sangrias).map((s): SangriaDraft => ({
       descricao: s.descricao,
@@ -634,6 +638,8 @@ export function useFechamentos() {
         valor: cents(e.valorCents),
         descricao: e.descricao,
         tipoConta: e.tipoConta,
+        caixaOrigem: e.caixaOrigem,
+        caixaDestino: e.caixaDestino,
       })),
       sangrias: draft.sangrias.map((s) => ({
         descricao: s.descricao,

@@ -7,8 +7,8 @@
 // Saldo de cada cofre é sempre CALCULADO (soma de entradas − saídas em transferencias_tesouraria)
 // — não existe campo de saldo gravado em lugar nenhum, mesmo espírito de nunca confiar num campo
 // espelho já documentado em useFechamentos.ts.
-import { computed, onMounted, ref } from 'vue';
-import { CAIXAS, hojeISO } from '~/types/fechamento';
+import { computed, onMounted, ref, watch } from 'vue';
+import { CAIXAS, hojeISO, type Caixa } from '~/types/fechamento';
 import {
   useTransferenciasTesouraria,
   COFRES_CENTRAIS,
@@ -74,6 +74,10 @@ const fluxoLancamentos = ref<FluxoLancamento[]>([]);
 const entradasCofreCents = ref(0);
 const fluxoBancoDisponivel = ref(true);
 const confirmandoId = ref<string | null>(null);
+// Caixas com sessão ABERTA agora (pedido do usuário, 29/09/2026: "Transferências de Entrada" do
+// Caixa de Troco tem origem sempre fixa em Caixa de Troco, e destino só pode ser um caixa que
+// esteja realmente aberto — evita mandar dinheiro pra um caixa que nem está operando hoje).
+const caixasAbertos = ref<Caixa[]>([]);
 
 // `carregando` controla o `v-if` que troca todo o conteúdo pelo spinner — ótimo na carga
 // inicial, mas recarregar depois de registrar uma entrada/saída/confirmação com o MESMO `v-if`
@@ -94,6 +98,12 @@ async function carregar(mostrarSpinner = true): Promise<void> {
       (soma, entrada) => soma + Math.round(Number(entrada.valor) * 100),
       0,
     );
+    const { data: sessoesAbertas, error: erroSessoes } = await supabase
+      .from('cash_sessions')
+      .select('caixa')
+      .eq('status', 'ABERTO');
+    if (erroSessoes) throw erroSessoes;
+    caixasAbertos.value = [...new Set((sessoesAbertas ?? []).map((s) => s.caixa as Caixa))].sort();
     fluxoBancoDisponivel.value = true;
     try {
       fluxoLancamentos.value = await listarFluxo();
@@ -322,6 +332,62 @@ async function registrarSaidaParaTroco(): Promise<void> {
   }
 }
 
+// "Transferências de Entrada" do Caixa de Troco (pedido do usuário, 29/09/2026): origem sempre
+// fixa em Caixa de Troco (sem seletor — só existe uma origem possível aqui), destino é o caixa
+// que estiver com sessão aberta agora — pré-preenchido sozinho quando só há um aberto, e limpo
+// (pra escolher entre os abertos) quando há mais de um ou nenhum.
+const entradaTrocoData = ref(hojeISO());
+const entradaTrocoValorCents = ref(0);
+const entradaTrocoDestino = ref<Caixa | null>(null);
+const salvandoEntradaTroco = ref(false);
+
+watch(
+  caixasAbertos,
+  (abertos) => {
+    if (abertos.length === 1) {
+      entradaTrocoDestino.value = abertos[0]!;
+    } else if (!entradaTrocoDestino.value || !abertos.includes(entradaTrocoDestino.value)) {
+      entradaTrocoDestino.value = null;
+    }
+  },
+  { immediate: true },
+);
+
+const fraseEntradaTroco = computed(() => {
+  if (!entradaTrocoData.value || !entradaTrocoValorCents.value || !entradaTrocoDestino.value)
+    return '';
+  return `${formatarDataCurta(entradaTrocoData.value)} + ${formatCents(entradaTrocoValorCents.value)} para ${entradaTrocoDestino.value}`;
+});
+
+async function registrarEntradaTroco(): Promise<void> {
+  if (!fraseEntradaTroco.value || !entradaTrocoDestino.value) return;
+  salvandoEntradaTroco.value = true;
+  try {
+    await criar({
+      valorCents: entradaTrocoValorCents.value,
+      valorNotasCents: 0,
+      valorMoedasCents: 0,
+      lacre: `TROCO-ENT-${Date.now()}`,
+      agendamento: false,
+      caixaOrigem: 'Caixa de Troco',
+      caixaDestino: entradaTrocoDestino.value,
+      multiploDestino: false,
+      destinosExtra: [],
+      tempoConfirmacao: false,
+      transferenciaRetorno: false,
+      observacao: `Entrada do Caixa de Troco para ${entradaTrocoDestino.value}`,
+      dataLanc: entradaTrocoData.value,
+    });
+    entradaTrocoValorCents.value = 0;
+    entradaTrocoData.value = hojeISO();
+    await carregar(false);
+  } catch (e) {
+    erro.value = mensagemDeErro(e, 'Não foi possível registrar a entrada.');
+  } finally {
+    salvandoEntradaTroco.value = false;
+  }
+}
+
 const fluxoData = ref(hojeISO());
 const fluxoValorCents = ref(0);
 const fluxoConta = ref<FluxoConta>('Conta Cofre');
@@ -540,6 +606,51 @@ async function confirmarExclusaoCofre(): Promise<void> {
               </div>
               <p v-if="fraseSaida" class="text-caption text-error mt-1 mb-0">{{ fraseSaida }}</p>
             </div>
+          </div>
+
+          <!-- Transferências de Entrada do Caixa de Troco (pedido do usuário, 29/09/2026): origem
+               sempre fixa (Caixa de Troco, sem seletor), destino é o caixa aberto agora. -->
+          <div v-if="cofre === 'Caixa de Troco'" class="lancamento-rapido mb-4">
+            <p class="text-caption font-weight-bold mb-2">Transferência de entrada (Caixa de Troco → caixa aberto)</p>
+            <v-alert
+              v-if="!caixasAbertos.length"
+              type="info"
+              variant="tonal"
+              density="compact"
+              class="mb-3"
+            >
+              Nenhum caixa está com sessão aberta agora.
+            </v-alert>
+            <div v-else class="d-flex flex-wrap ga-2 align-end">
+              <v-text-field
+                v-model="entradaTrocoData"
+                type="date"
+                label="Data"
+                density="compact"
+                hide-details
+                style="max-width: 160px"
+              />
+              <CampoDinheiro v-model="entradaTrocoValorCents" label="Valor" />
+              <v-select
+                v-model="entradaTrocoDestino"
+                :items="caixasAbertos"
+                label="Caixa destino"
+                density="compact"
+                hide-details
+                style="max-width: 160px"
+              />
+              <v-btn
+                size="small"
+                color="primary"
+                variant="tonal"
+                :loading="salvandoEntradaTroco"
+                :disabled="!fraseEntradaTroco"
+                @click="registrarEntradaTroco"
+              >
+                Registrar
+              </v-btn>
+            </div>
+            <p v-if="fraseEntradaTroco" class="text-caption text-success mt-1 mb-0">{{ fraseEntradaTroco }}</p>
           </div>
 
           <div v-if="cofre === 'Fluxo'" class="lancamento-rapido mb-4">

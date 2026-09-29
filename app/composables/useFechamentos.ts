@@ -707,13 +707,6 @@ export function useFechamentos() {
     const { data, error } = await supabase.rpc('salvar_fechamento', { payload });
     if (error) throw error;
     const fechamentoId = data as string;
-    // A coluna da folha foi adicionada depois do RPC legado. Atualiza-a separadamente
-    // para preservar o fluxo atômico existente e também permitir remover a foto.
-    const { error: erroFolha } = await supabase
-      .from('fechamentos')
-      .update({ img_folha_fechamento_path: draft.imgFolhaFechamentoPath })
-      .eq('id', fechamentoId);
-    if (erroFolha) throw erroFolha;
     return fechamentoId;
   }
 

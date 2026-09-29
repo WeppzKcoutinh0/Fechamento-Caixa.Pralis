@@ -1,19 +1,9 @@
--- "Máquina desligada" tem que ser um FATO, não o operador se autodeclarando (pedido do usuário,
--- 28/09/2026) — troca o boolean+motivos autodeclarado por uma lista de eventos DETECTADOS
--- automaticamente (heartbeat no navegador, ver useDeteccaoMaquinaDesligada.ts): cada gap real de
--- sinal de vida > 1 min vira um evento com horário de início/fim reais; o operador só marca o
--- motivo de cada evento já detectado, nunca declara que aconteceu ou não.
+-- Corrige o salvamento do fechamento (29/09/2026).
 --
--- A tabela fechamentos está praticamente vazia (incidente de perda de dados de 28/09/2026, ainda
--- sendo reconstruída) — seguro trocar as 3 colunas por uma só, sem migração de dados.
-alter table public.fechamentos
-  drop column if exists maquina_desligada_hoje,
-  drop column if exists maquina_desligada_motivos,
-  drop column if exists maquina_desligada_outro_texto,
-  add column if not exists maquina_desligada_eventos jsonb not null default '[]'::jsonb;
-
--- Base: a versão de 20260928120000 (maquina_desligada_hoje/motivos/outro_texto) — troca só a
--- linha do coalesce e o `set` do upsert pela coluna nova.
+-- A foto da folha era atualizada em uma segunda chamada direta ao PostgREST, depois
+-- do RPC `salvar_fechamento`. Essa chamada passava pela policy de UPDATE e podia ser
+-- bloqueada pela condição de sessão aberta, mesmo quando o RPC já havia salvo o
+-- fechamento. O campo agora é persistido pelo próprio upsert atômico.
 create or replace function public.salvar_fechamento(payload jsonb)
 returns uuid
 language plpgsql

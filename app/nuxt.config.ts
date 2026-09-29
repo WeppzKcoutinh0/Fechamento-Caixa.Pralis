@@ -25,7 +25,9 @@ export default defineNuxtConfig({
     integracaoVendasChave: '',
     // Usados só por server/routes/cron/importar-planilha.get.ts (sync automático diário da
     // planilha Google Sheets que o bot_padaria_v3 já preenche). Ver TASKS.md pro contexto.
-    cronSecret: '',
+    // Aceita o nome legado usado pelo workflow e o nome canÃ´nico do Nuxt. Nunca Ã© exposto em
+    // runtimeConfig.public; a rota de contingÃªncia da planilha continua protegida no servidor.
+    cronSecret: process.env.NUXT_CRON_SECRET ?? process.env.CRON_SECRET ?? '',
     googleServiceAccountJson: '',
     googleSpreadsheetId: '',
     googleSpreadsheetIdSecundario: '',

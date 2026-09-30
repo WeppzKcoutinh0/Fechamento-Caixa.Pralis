@@ -104,9 +104,11 @@ function confirmarDinheiroFinal(): void {
   if (lacreFinalVazio.value || !props.draft.dinheiroContadoValoresConfirmados) return;
   props.draft.dinheiroContadoConfirmado = true;
 }
-const tomDiferenca = computed<'neutro' | 'positivo' | 'negativo'>(() => {
+// Cores pedidas pelo usuário (30/09/2026): igualado = verde, falta = vermelho, sobra = laranja
+// (não verde — por isso 'sobra' é um tom à parte de 'positivo' no CartaoValor).
+const tomDiferenca = computed<'positivo' | 'negativo' | 'sobra'>(() => {
   const d = fisico.value.differenceCents;
-  return d === 0 ? 'neutro' : d > 0 ? 'positivo' : 'negativo';
+  return d === 0 ? 'positivo' : d > 0 ? 'sobra' : 'negativo';
 });
 const rotuloDiferenca = computed(() => {
   const d = fisico.value.differenceCents;
@@ -117,6 +119,18 @@ const statusFisico = computed<'zero' | 'sobra' | 'falta'>(() => {
   const d = fisico.value.differenceCents;
   return d === 0 ? 'zero' : d > 0 ? 'sobra' : 'falta';
 });
+// Valor com sinal explícito (pedido do usuário, 30/09/2026): "+R$" pra sobra, "-R$" pra falta
+// (formatCents já traz o "-" sozinho, só falta o "+"), "R$ 0,00" sem sinal pro igualado.
+const valorDiferencaComSinal = computed(() => {
+  const d = fisico.value.differenceCents;
+  if (d === 0) return `R$ ${formatCents(0)}`;
+  return `${d > 0 ? '+' : '-'}R$ ${formatCents(Math.abs(d))}`;
+});
+// Linha pequena abaixo do valor (pedido do usuário, 30/09/2026): "=0" quando igualado, ou o
+// mesmo valor com sinal repetido quando há sobra/falta — reforço visual do resultado.
+const subvalorDiferenca = computed(() =>
+  statusFisico.value === 'zero' ? '=0' : valorDiferencaComSinal.value,
+);
 
 // Confirmação do RESULTADO (pedido do usuário, 30/09/2026), separada da confirmação dos valores
 // contados acima: só depois que a diferença é revelada (dinheiroContadoConfirmado) é que dá pra
@@ -1382,7 +1396,8 @@ const CAT_VARS = {
       v-if="draft.dinheiroContadoConfirmado"
       class="mt-3"
       :rotulo="rotuloDiferenca"
-      :valor="`R$ ${formatCents(fisico.differenceCents)}`"
+      :valor="valorDiferencaComSinal"
+      :subvalor="subvalorDiferenca"
       :tom="tomDiferenca"
     />
 
@@ -1517,7 +1532,8 @@ const CAT_VARS = {
             </div>
             <CartaoValor
               :rotulo="rotuloDiferenca"
-              :valor="`R$ ${formatCents(fisico.differenceCents)}`"
+              :valor="valorDiferencaComSinal"
+              :subvalor="subvalorDiferenca"
               :tom="tomDiferenca"
             />
 

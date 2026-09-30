@@ -333,6 +333,12 @@ export interface FechamentoDraft {
   // `dinheiroContadoConfirmado` também fica true (confirmação final, com o lacre), esse
   // intermediário já fica implícito/redundante — só existe em memória no client.
   dinheiroContadoValoresConfirmados: boolean;
+  // Confirmação do RESULTADO (pedido do usuário, 30/09/2026), separada da confirmação dos
+  // valores contados acima: depois que a diferença aparece, o botão pede "Confirmar quebra?"
+  // (falta) ou "Confirmar valor correspondido?" (sobra/bateu certinho) — o rótulo muda sozinho
+  // conforme o sinal, mas só isto aqui precisa ser marcado true pra liberar o Salvar do wizard
+  // (ver SecaoRelatorioFinal.vue/WizardFechamento.vue).
+  resultadoFinalConfirmado: boolean;
 
   // "A máquina foi desligada hoje?" (pedido do usuário, 28/09/2026) — bloco clicável no Relatório
   // Final, mesmo espírito informativo de "Vendas/Produtos Cancelados": não afeta nenhum cálculo,
@@ -459,6 +465,7 @@ export function criarFechamentoVazio(contexto?: ContextoSessaoCaixa): Fechamento
     imgFolhaFechamentoPath: null,
     dinheiroContadoConfirmado: false,
     dinheiroContadoValoresConfirmados: false,
+    resultadoFinalConfirmado: false,
     maquinaDesligadaEventos: [],
     cashSessionId: contexto?.id ?? null,
     lacreAbertura: contexto?.lacreAbertura ?? '',

@@ -118,6 +118,19 @@ const statusFisico = computed<'zero' | 'sobra' | 'falta'>(() => {
   return d === 0 ? 'zero' : d > 0 ? 'sobra' : 'falta';
 });
 
+// Confirmação do RESULTADO (pedido do usuário, 30/09/2026), separada da confirmação dos valores
+// contados acima: só depois que a diferença é revelada (dinheiroContadoConfirmado) é que dá pra
+// saber se é quebra (falta) ou não (zero/sobra) — o rótulo do botão muda sozinho conforme o
+// sinal, forçando o operador a reconhecer explicitamente o resultado antes de poder fechar o
+// modal/salvar, em vez de simplesmente ver o número e seguir em frente sem perceber uma quebra.
+const rotuloConfirmarResultado = computed(() =>
+  statusFisico.value === 'falta' ? 'Confirmar quebra?' : 'Confirmar valor correspondido?',
+);
+function confirmarResultadoFinal(): void {
+  if (!props.draft.dinheiroContadoConfirmado) return;
+  props.draft.resultadoFinalConfirmado = true;
+}
+
 // Detalhe do "Esperado na gaveta" (pedido do usuário, 25/09/2026): mesma fórmula do
 // calculatePhysicalClosing (ver financeiro.ts) quebrada linha a linha, pra explicar de onde
 // veio o número em vez de só mostrar o total. Lacre de abertura entra separado de
@@ -1507,6 +1520,14 @@ const CAT_VARS = {
               :valor="`R$ ${formatCents(fisico.differenceCents)}`"
               :tom="tomDiferenca"
             />
+
+            <p v-if="!draft.resultadoFinalConfirmado" class="text-caption text-medium-emphasis mt-2 mb-0">
+              {{
+                statusFisico === 'falta'
+                  ? 'O caixa fechou com falta — confirme que está ciente da quebra pra poder salvar.'
+                  : 'Confirme o resultado pra poder salvar.'
+              }}
+            </p>
           </template>
         </div>
 
@@ -1519,6 +1540,15 @@ const CAT_VARS = {
             @click="confirmarDinheiroFinal"
           >
             Confirmar
+          </button>
+          <button
+            v-else-if="!draft.resultadoFinalConfirmado"
+            type="button"
+            class="lc-salvar"
+            :class="{ 'lc-salvar-quebra': statusFisico === 'falta' }"
+            @click="confirmarResultadoFinal"
+          >
+            {{ rotuloConfirmarResultado }}
           </button>
           <button v-else type="button" class="lc-salvar" @click="modalDinheiroAberto = false">
             Fechar
@@ -1533,6 +1563,12 @@ const CAT_VARS = {
 /* .cat-* (accordion por categoria colorida) agora vive em assets/main.css — era só daqui
    ("scoped"), então nunca aplicava nos accordions equivalentes de outras telas (mesmo bug já
    corrigido uma vez com .lc-painel/.lc-painel-corpo). */
+
+/* Confirmação de quebra (pedido do usuário, 30/09/2026): vermelho em vez da cor padrão do modal
+   (--cat-faixa, laranja) — reforço visual de que é uma confirmação de problema, não um "ok" comum. */
+.lc-salvar-quebra {
+  background: var(--cx-negative) !important;
+}
 
 .tabela-produtos-wrap {
   overflow-x: auto;

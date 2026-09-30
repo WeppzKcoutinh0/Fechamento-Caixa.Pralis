@@ -347,6 +347,13 @@ async function onSalvar() {
           Confirme a "Transferência Final" (Notas/Moedas/Lacre) no fim do Relatório Final pra
           liberar o Salvar.
         </p>
+        <p
+          v-else-if="mostrarSalvar && !draft.resultadoFinalConfirmado"
+          class="text-caption text-medium-emphasis text-right mb-2"
+        >
+          Confirme o resultado ("Confirmar quebra?"/"Confirmar valor correspondido?") na
+          Transferência Final pra liberar o Salvar.
+        </p>
         <div class="d-flex justify-space-between">
           <v-btn v-if="mostrarVoltar" variant="text" @click="voltar">Voltar</v-btn>
           <v-spacer />
@@ -355,7 +362,7 @@ async function onSalvar() {
             v-if="mostrarSalvar"
             color="primary"
             :loading="salvando"
-            :disabled="!draft.dinheiroContadoConfirmado"
+            :disabled="!draft.dinheiroContadoConfirmado || !draft.resultadoFinalConfirmado"
             @click="onSalvar"
             >Salvar</v-btn
           >

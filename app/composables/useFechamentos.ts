@@ -137,6 +137,7 @@ interface FechamentoRow {
   lacre_fechamento: string;
   img_folha_fechamento_path: string | null;
   dinheiro_contado_confirmado: boolean;
+  resultado_final_confirmado: boolean;
   vendas_canceladas_motivo_tipo: string;
   vendas_canceladas_motivo_texto: string;
   vendas_canceladas_motivo_audio_path: string | null;
@@ -399,6 +400,7 @@ function linhaParaDraft(row: FechamentoRow): FechamentoDraft {
     // Sem coluna própria no banco (ver types/fechamento.ts) — se a confirmação final já
     // aconteceu, o passo intermediário (Notas/Moedas) necessariamente também já aconteceu.
     dinheiroContadoValoresConfirmados: row.dinheiro_contado_confirmado ?? false,
+    resultadoFinalConfirmado: row.resultado_final_confirmado ?? false,
     vendasCanceladasMotivoTipo: row.vendas_canceladas_motivo_tipo === 'audio' ? 'audio' : 'texto',
     // Bug real corrigido (25/09/2026): quando a coluna já guarda o JSON por item (ver
     // `salvar()`), este campo legado tem que ficar vazio — senão a migração de compatibilidade
@@ -623,6 +625,7 @@ export function useFechamentos() {
         lacre_fechamento: draft.lacreFechamento,
         img_folha_fechamento_path: draft.imgFolhaFechamentoPath,
         dinheiro_contado_confirmado: draft.dinheiroContadoConfirmado,
+        resultado_final_confirmado: draft.resultadoFinalConfirmado,
         vendas_canceladas_motivo_tipo: draft.vendasCanceladasMotivoTipo,
         vendas_canceladas_motivo_texto:
           Object.keys(draft.vendasCanceladasMotivos).length > 0

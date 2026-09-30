@@ -216,10 +216,22 @@ async function confirmarRecebimentoDe(id: string): Promise<void> {
                     >{{ rotuloComTurno(t.caixaOrigem, t.turnoOrigem) }} →
                     {{ rotuloComTurno(t.caixaDestino, t.turnoDestino) }}</strong
                   >
-                  <span class="text-caption text-medium-emphasis">Lacre {{ t.lacre }}</span>
+                  <span
+                    class="text-caption text-medium-emphasis"
+                    :class="{ 'lacre-riscado': grupo.id === 'lacres' && t.lacreUsadoEm }"
+                    >Lacre {{ t.lacre }}</span
+                  >
                   <span class="text-caption text-medium-emphasis">{{
                     formatarDataBr(t.dataLanc)
                   }}</span>
+                  <v-chip
+                    v-if="grupo.id === 'lacres' && t.lacreUsadoEm"
+                    size="small"
+                    variant="tonal"
+                    color="secondary"
+                  >
+                    Usado
+                  </v-chip>
                   <v-spacer />
                   <strong>R$ {{ formatCents(t.valorCents) }}</strong>
                   <v-btn
@@ -262,5 +274,11 @@ async function confirmarRecebimentoDe(id: string): Promise<void> {
   border-radius: 50%;
   background: var(--cat-retiradas-base, #1e88e5);
   color: #fff;
+}
+/* Lacre já usado (pedido do usuário, 30/09/2026): "ficará com um risco encima" — risco visual
+   assim que consumido pela abertura de caixa ou pela Entrada do wizard. */
+.lacre-riscado {
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
 }
 </style>

@@ -52,6 +52,10 @@ export interface TransferenciaTesouraria {
   transferenciaRetorno: boolean;
   observacao: string;
   criadoEm: string;
+  // Uso único do lacre (pedido do usuário, 30/09/2026, ver 20260928140000_lacre_valido_so_na_data.sql):
+  // preenchido quando o lacre foi consumido (Entrada no wizard OU abertura de caixa) — null enquanto
+  // ainda está disponível. A UI usa isto pra "riscar" o lacre já usado na tela da Tesouraria.
+  lacreUsadoEm: string | null;
 }
 
 interface LinhaRow {
@@ -74,6 +78,7 @@ interface LinhaRow {
   transferencia_retorno: boolean;
   observacao: string;
   criado_em: string;
+  lacre_usado_em: string | null;
 }
 
 function linhaParaTransferencia(l: LinhaRow): TransferenciaTesouraria {
@@ -100,12 +105,13 @@ function linhaParaTransferencia(l: LinhaRow): TransferenciaTesouraria {
     transferenciaRetorno: l.transferencia_retorno,
     observacao: l.observacao,
     criadoEm: l.criado_em,
+    lacreUsadoEm: l.lacre_usado_em,
   };
 }
 
 const SELECT_COLUNAS =
   'id, valor, valor_notas, valor_moedas, lacre, data_lanc, agendamento, data_recebimento, confirmado_em, caixa_origem, caixa_destino, ' +
-  'turno_origem, turno_destino, multiplo_destino, destinos_extra, tempo_confirmacao, transferencia_retorno, observacao, criado_em';
+  'turno_origem, turno_destino, multiplo_destino, destinos_extra, tempo_confirmacao, transferencia_retorno, observacao, criado_em, lacre_usado_em';
 
 /**
  * Tesouraria central (18/09/2026, pedido do usuário) — transferências independentes de qualquer

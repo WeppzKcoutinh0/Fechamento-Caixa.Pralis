@@ -44,39 +44,56 @@ watch(
 );
 const lacreAbertura = ref('');
 const maquininhaAbertura = ref('');
-const lacreValido = computed(() => lacreAbertura.value.trim().length > 0);
+// Lacre precisa bater com um cadastro real da Tesouraria pra hoje (mudança pedida pelo usuário,
+// 30/09/2026: "usuários de caixa não poderem criar lacres, colocar qualquer numero no campo") —
+// deixou de bastar digitar qualquer texto não vazio. `transferenciaEncontrada` (achado no blur,
+// ver buscarLacre abaixo) é a prova de que o número existe — sem ela, "Abrir Caixa" fica travado.
+const lacreValido = computed(() => !!transferenciaEncontrada.value);
 
 // Conferência de fundo (pedido do usuário, 23/09/2026): ao sair do campo de lacre, busca a
 // transferência cadastrada na Tesouraria pra esse lacre e mostra o valor em notas/moedas que o
-// ADMIN registrou, pro operador conferir contra o que tem fisicamente no caixa. Diferente do
-// lookup silencioso que já existe lá no wizard de fechamento (useRelatorioCalculado.ts) — aqui
-// precisa ser visível e bloquear "Abrir Caixa" até o operador escolher Confirmar/Não confirmar,
-// porque é sobre o fundo físico que ele está recebendo agora, não sobre o cálculo do fechamento.
+// ADMIN registrou, pro operador conferir contra o que tem fisicamente no caixa. Este lookup
+// continua sem consumir (consumir: false) — é só a conferência visual; o "uso" de verdade (marca
+// lacre_usado_em, uso único) só acontece em confirmar() abaixo, no exato momento de abrir o caixa
+// pra valer, não a cada vez que o campo perde o foco.
 const transferenciaEncontrada = ref<TransferenciaTesouraria | null>(null);
 const buscandoLacre = ref(false);
+const jaBuscouLacre = ref(false);
 const fundoConfirmado = ref<boolean | null>(null);
 const notasContadasCents = ref(0);
 const moedasContadasCents = ref(0);
+const erroConsumoLacre = ref<string | null>(null);
+const consumindoLacre = ref(false);
+
+// Mostra "lacre não encontrado" só depois de uma busca de verdade (nunca no campo ainda vazio) —
+// evita mostrar erro antes do operador terminar de digitar.
+const lacreNaoEncontrado = computed(
+  () =>
+    jaBuscouLacre.value &&
+    !buscandoLacre.value &&
+    !transferenciaEncontrada.value &&
+    lacreAbertura.value.trim().length > 0,
+);
 
 async function buscarLacre(): Promise<void> {
   const lacre = lacreAbertura.value.trim();
   fundoConfirmado.value = null;
   notasContadasCents.value = 0;
   moedasContadasCents.value = 0;
+  erroConsumoLacre.value = null;
   if (!lacre) {
     transferenciaEncontrada.value = null;
+    jaBuscouLacre.value = false;
     return;
   }
   buscandoLacre.value = true;
   try {
-    // consumir: false — só ajuda visual, não "usa" o lacre (ver mesma decisão em
-    // SecaoTransferencias.vue, 28/09/2026).
+    // consumir: false — só ajuda visual, não "usa" o lacre ainda (ver comentário acima).
     transferenciaEncontrada.value = await buscarPorLacre(lacre, hojeISO());
   } catch {
-    // Lookup é só uma ajuda visual — se falhar, o operador ainda consegue abrir o caixa
-    // normalmente (mesmo espírito do lookup silencioso do wizard).
     transferenciaEncontrada.value = null;
   } finally {
+    jaBuscouLacre.value = true;
     buscandoLacre.value = false;
   }
 }
@@ -108,6 +125,11 @@ const MAQUININHAS_OPCOES: string[] = [
   'MAQ.cx-entrega-J9BB07901119',
 ];
 
+// Uso único (pedido do usuário, 30/09/2026): "assim que usou e fechou o caixa também não pode
+// colocá-lo novamente" — o lacre é marcado usado (lacre_usado_em) NESTE clique, atomicamente
+// (buscar_transferencia_tesouraria_por_lacre com p_consumir=true só atualiza se ainda não tiver
+// dono — ver 20260928140000_lacre_valido_so_na_data.sql), nunca antes. Reaproveita o mesmo número
+// noutro dia continua permitido — a trava é por (lacre, data), não pelo número sozinho.
 async function confirmar(): Promise<void> {
   if (
     !caixaSelecionado.value ||
@@ -116,6 +138,26 @@ async function confirmar(): Promise<void> {
     conferenciaPendente.value
   )
     return;
+  erroConsumoLacre.value = null;
+  consumindoLacre.value = true;
+  let consumido: TransferenciaTesouraria | null;
+  try {
+    consumido = await buscarPorLacre(lacreAbertura.value, hojeISO(), { consumir: true });
+  } catch {
+    erroConsumoLacre.value = 'Não foi possível confirmar o lacre. Tente novamente.';
+    consumindoLacre.value = false;
+    return;
+  }
+  consumindoLacre.value = false;
+  if (!consumido) {
+    // Outro caixa pode ter usado o mesmo lacre entre o blur e este clique — o achado do blur
+    // (transferenciaEncontrada) fica obsoleto, força reconferência.
+    transferenciaEncontrada.value = null;
+    jaBuscouLacre.value = true;
+    erroConsumoLacre.value =
+      'Este lacre já foi usado por outro caixa ou não é mais válido para hoje. Confira o número ou peça um novo à administração.';
+    return;
+  }
   const resultado = await abrirSessao({
     caixa: caixaSelecionado.value,
     turno: turnoSelecionado.value,
@@ -160,11 +202,20 @@ async function confirmar(): Promise<void> {
           :rules="[(valor: string) => Boolean(valor?.trim()) || 'Informe o número do lacre.']"
           required
           label="Transf. Entrada / N° Lacre"
-          hint="Identifica o lacre do malote que trouxe o fundo ao caixa — se já estiver cadastrado na Tesouraria, o valor aparece sozinho em Transferências Automáticas. Não é o lacre usado no fechamento."
+          hint="Precisa ser um lacre cadastrado pela administração na Tesouraria para hoje — uso único, não dá pra digitar um número qualquer nem reusar um lacre já utilizado."
           persistent-hint
           :loading="buscandoLacre"
           @blur="buscarLacre"
         />
+
+        <v-alert v-if="lacreNaoEncontrado" type="warning" variant="tonal" density="comfortable">
+          Nenhum lacre cadastrado com esse número para hoje. Confira o número ou peça pra
+          administração cadastrar na Tesouraria.
+        </v-alert>
+
+        <v-alert v-if="erroConsumoLacre" type="error" variant="tonal" density="comfortable">
+          {{ erroConsumoLacre }}
+        </v-alert>
 
         <div v-if="transferenciaEncontrada" class="conferencia-fundo">
           <p class="text-caption font-weight-bold mb-2">
@@ -237,7 +288,7 @@ async function confirmar(): Promise<void> {
         <v-btn
           color="primary"
           prepend-icon="mdi-point-of-sale"
-          :loading="carregando"
+          :loading="carregando || consumindoLacre"
           :disabled="!caixaSelecionado || !turnoSelecionado || !lacreValido || conferenciaPendente"
           @click="confirmar"
         >

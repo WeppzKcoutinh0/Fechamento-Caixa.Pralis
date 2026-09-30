@@ -5,13 +5,7 @@ import { useVendasCanceladas } from '~/composables/useVendasCanceladas';
 import { useVendasFechamento } from '~/composables/useVendasFechamento';
 import { useSincronizarVendas } from '~/composables/useSincronizarVendas';
 import { formatCents, toCents } from '~/utils/financeiro';
-import {
-  aplicarAjustesComoLancamentos,
-  aplicarResumoAoPrimeiroPdv,
-  caixaParaNumero,
-  formatarDataBr,
-  turnoParaLetra,
-} from '~/utils/vendasFechamento';
+import { caixaParaNumero, formatarDataBr, turnoParaLetra } from '~/utils/vendasFechamento';
 
 const props = defineProps<{ draft: FechamentoDraft }>();
 
@@ -40,9 +34,12 @@ const turnoModel = computed<Turno | null>({
 // um fechamento é de UM caixa, não da loja toda. Sem caixa selecionado ainda, busca todos juntos
 // (comportamento anterior, como fallback).
 //
-// Já conta pro cálculo do fechamento (pedido do usuário): toda busca com resultado preenche o
-// primeiro PDV do Relatório PDV (passo 4) — mesmo destino/helper do botão "Buscar vendas do dia"
-// de lá. PDVs extras adicionados manualmente não são tocados.
+// NÃO entra no cálculo do fechamento (mudança pedida pelo usuário, 30/09/2026): esta busca é só
+// leitura/conferência — nunca preenche o Relatório PDV (passo 4) nem lança nada automaticamente.
+// O total aqui é exibido aqui mesmo e comparado lado a lado com o Relatório de Maquininhas no
+// Relatório Final (passo 5, ver aoAbrirComparacaoVendas em SecaoRelatorioFinal.vue). O fechamento
+// fecha com exatamente os mesmos números de quando ninguém aperta este botão — quem preenche o
+// Relatório PDV continua sendo só o "Buscar vendas do dia"/digitação manual de SecaoRelatorios.vue.
 const dataVendas = ref(props.draft.data);
 const { erro, resumo, buscarPorData } = useVendasFechamento();
 const jaBuscou = ref(false);
@@ -112,17 +109,10 @@ async function buscarVendas() {
   jaBuscou.value = true;
   ocupadoBuscarVendas.value = true;
   try {
-    const resultado = await buscarPorData(dataVendas.value, filtroBusca.value);
-    aplicarResultadoVendas(resultado);
+    await buscarPorData(dataVendas.value, filtroBusca.value);
   } finally {
     ocupadoBuscarVendas.value = false;
   }
-}
-
-function aplicarResultadoVendas(resultado: Awaited<ReturnType<typeof buscarPorData>>): void {
-  if (!resultado || resultado.registros === 0) return;
-  aplicarResumoAoPrimeiroPdv(props.draft, resultado);
-  aplicarAjustesComoLancamentos(props.draft, resultado);
 }
 
 // O robô local envia CREARE -> API -> Supabase a cada minuto. Depois que o operador faz a
@@ -140,8 +130,7 @@ async function atualizarVendasAutomaticamente(): Promise<void> {
     return;
   atualizandoAutomaticamente = true;
   try {
-    const resultado = await buscarPorData(dataVendas.value, filtroBusca.value);
-    aplicarResultadoVendas(resultado);
+    await buscarPorData(dataVendas.value, filtroBusca.value);
     if (jaBuscouCanceladas.value) await buscarVendasCanceladasBase(dataVendas.value);
   } finally {
     atualizandoAutomaticamente = false;
@@ -214,10 +203,8 @@ const formasPagamento = computed(() => {
 });
 
 // Colaboradores/Alimentação/Furto-Roubo/Sócios/Sobra-Perda: o CREARE já manda esses valores (ver
-// types/vendasFechamento.ts ResumoVendasDia.ajustes) — pedido do usuário (16/09/2026): não é mais
-// só informativo, `buscarVendas` já cria/atualiza uma Despesa por categoria automaticamente (ver
-// aplicarAjustesComoLancamentos em utils/vendasFechamento.ts). Isto aqui só lista o que foi
-// lançado, pra você conferir/editar no passo 3 se precisar.
+// types/vendasFechamento.ts ResumoVendasDia.ajustes) — puramente informativo (mudança 30/09/2026:
+// voltou a não lançar nada sozinho), só pra você decidir se lança manualmente no passo 3.
 const ajustesPresentes = computed(() => {
   if (!resumo.value) return [];
   const { colaboradores, alimentacao, rouboFurto, socios, sobraPerda } = resumo.value.ajustes;
@@ -409,7 +396,8 @@ const ajustesPresentes = computed(() => {
             </li>
           </ul>
           <div class="text-caption mt-2 font-weight-bold">
-            Já preenchido no Relatório PDV (passo 4) — já entra no cálculo do fechamento.
+            Só pra conferência — não altera o Relatório PDV nem o cálculo do fechamento. Veja a
+            comparação lado a lado com o Relatório de Maquininhas no Relatório Final (passo 5).
           </div>
         </v-alert>
 
@@ -420,8 +408,8 @@ const ajustesPresentes = computed(() => {
           density="comfortable"
         >
           <div class="text-caption font-weight-bold">
-            O CREARE também registrou estes ajustes — já lançados automaticamente na categoria
-            correspondente (passo 3), já entram no cálculo do fechamento:
+            O CREARE também registrou estes ajustes neste dia (só pra conferência — não são
+            lançados automaticamente; lance manualmente no passo 3 se quiser considerá-los):
           </div>
           <ul class="text-caption mt-1 pl-4">
             <li v-for="[nome, valor] in ajustesPresentes" :key="nome">

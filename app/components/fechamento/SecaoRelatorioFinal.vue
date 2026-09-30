@@ -11,13 +11,15 @@ import CartaoValor from '~/components/comum/CartaoValor.vue';
 import { useDeteccaoMaquinaDesligada } from '~/composables/useDeteccaoMaquinaDesligada';
 import { useRelatorioCalculado } from '~/composables/useRelatorioCalculado';
 import { useVendasCanceladas, type VendaCancelada } from '~/composables/useVendasCanceladas';
+import { useVendasFechamento } from '~/composables/useVendasFechamento';
 import { useVendasProdutoDia } from '~/composables/useVendasProdutoDia';
 import GravadorAudio from '~/components/comum/GravadorAudio.vue';
 import CampoFoto from '~/components/comum/CampoFoto.vue';
-import { formatCents } from '~/utils/financeiro';
+import { formatCents, toCents } from '~/utils/financeiro';
 import { baixarPdfFechamento } from '~/utils/gerarPdfFechamento';
 import { baixarPdfVendasCanceladas } from '~/utils/gerarPdfVendasCanceladas';
 import { abrirWhatsappVendasCanceladas } from '~/utils/whatsappVendasCanceladas';
+import { caixaParaNumero, turnoParaLetra } from '~/utils/vendasFechamento';
 
 const props = defineProps<{ draft: FechamentoDraft }>();
 
@@ -326,6 +328,76 @@ function baixarPdfCancelados(): void {
 function enviarWhatsappCancelados(): void {
   abrirWhatsappVendasCanceladas(props.draft, itensCancelados.value);
 }
+
+// Comparar vendas: CREARE x Maquininhas (pedido do usuário, 30/09/2026) — desde que "Buscar
+// vendas" da Identificação parou de preencher o Relatório PDV/lançar ajustes automaticamente
+// (mesmo pedido: o CREARE nunca mais deve mexer no cálculo do fechamento sozinho), o número que
+// o CREARE tem pro dia só aparece aqui, lado a lado com o que foi digitado/importado no Relatório
+// PDV (passo 4) — puramente pra conferência visual, não afeta `pdv`/`relatorio` em nada. Busca
+// independente sob demanda (mesmo padrão de aoAbrirCancelados/aoAbrirProdutos acima), filtrada
+// pelo caixa/turno deste fechamento (mesma lógica de SecaoIdentificacao.vue).
+const {
+  carregando: carregandoVendasCreare,
+  erro: erroVendasCreare,
+  resumo: resumoVendasCreare,
+  buscarPorData: buscarVendasCreare,
+} = useVendasFechamento();
+const comparacaoVendasJaBuscada = ref(false);
+async function aoAbrirComparacaoVendas(): Promise<void> {
+  if (comparacaoVendasJaBuscada.value) return;
+  comparacaoVendasJaBuscada.value = true;
+  await buscarVendasCreare(props.draft.data, {
+    caixa: caixaParaNumero(props.draft.caixa),
+    turno: turnoParaLetra(props.draft.turno),
+  });
+}
+const comparacaoFormasPagamento = computed(() => {
+  const r = resumoVendasCreare.value;
+  return [
+    {
+      rotulo: 'Dinheiro',
+      creareCents: r ? toCents(r.porForma.dinheiro) : 0,
+      maquininhaCents: pdv.value.dinheiroCents,
+    },
+    {
+      rotulo: 'Crédito',
+      creareCents: r ? toCents(r.porForma.credito) : 0,
+      maquininhaCents: pdv.value.creditoCents,
+    },
+    {
+      rotulo: 'Débito',
+      creareCents: r ? toCents(r.porForma.debito) : 0,
+      maquininhaCents: pdv.value.debitoCents,
+    },
+    {
+      rotulo: 'Pix',
+      creareCents: r ? toCents(r.porForma.pix) : 0,
+      maquininhaCents: pdv.value.pixCents,
+    },
+    {
+      rotulo: 'Voucher',
+      creareCents: r ? toCents(r.porForma.voucher) : 0,
+      maquininhaCents: pdv.value.voucherCents,
+    },
+    {
+      rotulo: 'Crediário',
+      creareCents: r ? toCents(r.porForma.crediario) : 0,
+      maquininhaCents: pdv.value.crediarioCents,
+    },
+  ].map((item) => ({ ...item, diffCents: item.creareCents - item.maquininhaCents }));
+});
+const totalCreareCents = computed(() =>
+  resumoVendasCreare.value ? toCents(resumoVendasCreare.value.totalPagamento) : 0,
+);
+// Resumo "onde está o erro" (pedido do usuário, 30/09/2026): em vez de precisar abrir cada card
+// pra achar qual forma de pagamento diverge, conta quantas divergem e soma o valor — mostrado já
+// no título do painel (chip) e num aviso no topo do corpo, antes da lista card a card.
+const divergenciasVendas = computed(() =>
+  comparacaoFormasPagamento.value.filter((f) => f.diffCents !== 0),
+);
+const totalDivergenciaVendasCents = computed(() =>
+  divergenciasVendas.value.reduce((soma, f) => soma + Math.abs(f.diffCents), 0),
+);
 
 // "Máquina desligada" (28/09/2026, pedido do usuário: "tem que ser um FATO") — o app só roda no
 // CELULAR do operador, sem ligação com o computador/PDV físico do caixa, então a única forma real
@@ -821,6 +893,93 @@ const CAT_VARS = {
               Enviar por WhatsApp
             </v-btn>
           </div>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+
+      <v-expansion-panel
+        class="cat-painel"
+        :style="CAT_VARS.cancelados"
+        @group:selected="({ value }) => value && aoAbrirComparacaoVendas()"
+      >
+        <v-expansion-panel-title class="cat-titulo">
+          <span class="flex-grow-1">Vendas: CREARE x Maquininhas</span>
+          <v-chip
+            v-if="comparacaoVendasJaBuscada && !carregandoVendasCreare && !erroVendasCreare"
+            size="small"
+            variant="tonal"
+            class="mr-2"
+            :color="
+              !resumoVendasCreare || resumoVendasCreare.registros === 0
+                ? undefined
+                : divergenciasVendas.length
+                  ? 'warning'
+                  : 'success'
+            "
+          >
+            {{
+              !resumoVendasCreare || resumoVendasCreare.registros === 0
+                ? 'Sem dados do CREARE'
+                : divergenciasVendas.length
+                  ? `${divergenciasVendas.length} diverg${divergenciasVendas.length === 1 ? 'ência' : 'ências'}`
+                  : 'Tudo bate'
+            }}
+          </v-chip>
+          <strong class="cat-valor">R$ {{ formatCents(totalCreareCents) }}</strong>
+        </v-expansion-panel-title>
+        <v-expansion-panel-text>
+          <p class="text-caption text-medium-emphasis mb-3">
+            Só pra conferência — o valor do CREARE aqui NÃO entra no cálculo do fechamento (o que
+            conta pro fechamento é sempre o Relatório PDV do passo 4).
+          </p>
+          <div v-if="carregandoVendasCreare" class="d-flex justify-center py-4">
+            <v-progress-circular indeterminate color="primary" size="24" />
+          </div>
+          <v-alert v-else-if="erroVendasCreare" type="error" variant="tonal" density="comfortable">
+            {{ erroVendasCreare }}
+          </v-alert>
+          <template v-else>
+            <v-alert
+              v-if="!resumoVendasCreare || resumoVendasCreare.registros === 0"
+              type="info"
+              variant="tonal"
+              density="comfortable"
+              class="mb-3"
+            >
+              Nenhuma venda do CREARE sincronizada para {{ draft.data }}
+              {{ draft.caixa && draft.turno ? `(${draft.caixa} - ${draft.turno})` : '' }}.
+            </v-alert>
+            <v-alert
+              v-else-if="divergenciasVendas.length"
+              type="warning"
+              variant="tonal"
+              density="comfortable"
+              class="mb-3"
+            >
+              {{ divergenciasVendas.length }} forma{{ divergenciasVendas.length === 1 ? '' : 's' }}
+              de pagamento com diferença — total R$ {{ formatCents(totalDivergenciaVendasCents) }}.
+              Veja qual abaixo ({{ divergenciasVendas.map((f) => f.rotulo).join(', ') }}).
+            </v-alert>
+            <v-alert v-else type="success" variant="tonal" density="comfortable" class="mb-3">
+              Tudo bate — nenhuma diferença entre CREARE e Maquininhas.
+            </v-alert>
+            <v-card
+              v-for="forma in comparacaoFormasPagamento"
+              :key="forma.rotulo"
+              variant="outlined"
+              class="pa-3 mb-2"
+              rounded="lg"
+            >
+              <div class="text-caption text-medium-emphasis mb-1">{{ forma.rotulo }}</div>
+              <div class="d-flex justify-space-between text-body-2">
+                <span>CREARE: R$ {{ formatCents(forma.creareCents) }}</span>
+                <span>Maquininha: R$ {{ formatCents(forma.maquininhaCents) }}</span>
+              </div>
+              <v-chip size="small" class="mt-1" :color="forma.diffCents === 0 ? 'success' : 'warning'">
+                Diferença: R$ {{ formatCents(Math.abs(forma.diffCents)) }}
+                {{ forma.diffCents > 0 ? '(CREARE maior)' : forma.diffCents < 0 ? '(Maquininha maior)' : '' }}
+              </v-chip>
+            </v-card>
+          </template>
         </v-expansion-panel-text>
       </v-expansion-panel>
 

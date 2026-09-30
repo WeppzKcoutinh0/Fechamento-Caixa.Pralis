@@ -8,7 +8,6 @@ import {
   type MotivoVendaCanceladaDraft,
 } from '~/types/fechamento';
 import CartaoValor from '~/components/comum/CartaoValor.vue';
-import { useDeteccaoMaquinaDesligada } from '~/composables/useDeteccaoMaquinaDesligada';
 import { useRelatorioCalculado } from '~/composables/useRelatorioCalculado';
 import { useVendasCanceladas, type VendaCancelada } from '~/composables/useVendasCanceladas';
 import { useVendasFechamento } from '~/composables/useVendasFechamento';
@@ -426,34 +425,11 @@ const totalDivergenciaVendasCents = computed(() =>
   divergenciasVendas.value.reduce((soma, f) => soma + Math.abs(f.diffCents), 0),
 );
 
-// "Máquina desligada" (28/09/2026, pedido do usuário: "tem que ser um FATO") — o app só roda no
-// CELULAR do operador, sem ligação com o computador/PDV físico do caixa, então a única forma real
-// de detectar é comparar a primeira/última venda deste caixa (já sincronizada do CREARE) contra os
-// outros caixas do mesmo dia/turno (ver useDeteccaoMaquinaDesligada.ts). Sem nenhum outro caixa
-// pra comparar (loja com só este caixa aberto, ou vendas ainda não sincronizadas), cai pro
-// autodeclarado — visivelmente marcado como "não confirmado pelos dados".
-const { detectarPorVendas } = useDeteccaoMaquinaDesligada();
-const carregandoDeteccaoMaquina = ref(false);
-const jaChecouMaquina = ref(false);
-const temDadosSuficientesMaquina = ref(true);
-
-async function aoAbrirMaquinaDesligada(): Promise<void> {
-  if (jaChecouMaquina.value || !props.draft.caixa || !props.draft.turno) return;
-  jaChecouMaquina.value = true;
-  carregandoDeteccaoMaquina.value = true;
-  try {
-    const { eventos, temDadosSuficientes } = await detectarPorVendas(
-      props.draft.data,
-      props.draft.caixa,
-      props.draft.turno,
-    );
-    temDadosSuficientesMaquina.value = temDadosSuficientes;
-    if (eventos.length) props.draft.maquinaDesligadaEventos.push(...eventos);
-  } finally {
-    carregandoDeteccaoMaquina.value = false;
-  }
-}
-
+// "Máquina desligada" (30/09/2026, pedido do usuário: volta a ser manual por enquanto) — antes
+// comparava vendas com os outros caixas do turno pra detectar sozinho (ver
+// useDeteccaoMaquinaDesligada.ts, continua existindo mas não é mais chamado daqui). Agora é só um
+// interruptor: começa desmarcado; só vira "desligada" se o operador marcar, e só então abrem os
+// motivos. Se ninguém marcar, fica sempre desmarcado — sem detecção automática.
 function alternarMotivoMaquina(
   evento: EventoMaquinaDesligada,
   motivo: MotivoMaquinaDesligada,
@@ -468,25 +444,19 @@ function alternarMotivoMaquina(
   }
 }
 
-// Autodeclarado (só aparece quando não há como comparar com outros caixas) — um interruptor cria
-// UM evento sem prova de dados; desligar remove esse evento autodeclarado (não mexe nos que vieram
-// de dados reais).
-const maquinaAutodeclarada = computed(
-  () => props.draft.maquinaDesligadaEventos.find((e) => !e.confirmadoPelosDados) ?? null,
-);
-function aoAlternarMaquinaAutodeclarada(valor: boolean | null): void {
+const maquinaDesligadaMarcada = computed(() => props.draft.maquinaDesligadaEventos.length > 0);
+function aoAlternarMaquinaDesligada(valor: boolean | null): void {
   if (valor) {
-    if (!maquinaAutodeclarada.value) {
+    if (!props.draft.maquinaDesligadaEventos.length) {
       props.draft.maquinaDesligadaEventos.push({
-        descricao: 'Informado pelo operador (sem confirmação nos dados de vendas).',
+        descricao: 'Informado pelo operador.',
         confirmadoPelosDados: false,
         motivos: [],
         outroTexto: '',
       });
     }
   } else {
-    const indice = props.draft.maquinaDesligadaEventos.findIndex((e) => !e.confirmadoPelosDados);
-    if (indice !== -1) props.draft.maquinaDesligadaEventos.splice(indice, 1);
+    props.draft.maquinaDesligadaEventos = [];
   }
 }
 
@@ -1269,61 +1239,33 @@ const CAT_VARS = {
         </v-expansion-panel-text>
       </v-expansion-panel>
 
-      <v-expansion-panel
-        class="cat-painel"
-        :style="CAT_VARS.incidente"
-        @group:selected="({ value }) => value && aoAbrirMaquinaDesligada()"
-      >
+      <v-expansion-panel class="cat-painel" :style="CAT_VARS.incidente">
         <v-expansion-panel-title class="cat-titulo">
           <span class="flex-grow-1">Máquina desligada</span>
-          <v-chip
-            size="small"
-            variant="tonal"
-            :color="draft.maquinaDesligadaEventos.length ? 'warning' : undefined"
-          >
-            {{
-              draft.maquinaDesligadaEventos.length
-                ? `${draft.maquinaDesligadaEventos.length} detectado${draft.maquinaDesligadaEventos.length === 1 ? '' : 's'}`
-                : 'Nenhum'
-            }}
+          <v-chip size="small" variant="tonal" :color="maquinaDesligadaMarcada ? 'warning' : undefined">
+            {{ maquinaDesligadaMarcada ? 'Marcado' : 'Não marcado' }}
           </v-chip>
         </v-expansion-panel-title>
         <v-expansion-panel-text>
           <p class="text-caption text-medium-emphasis mb-3">
-            Comparado com as vendas reais dos outros caixas no mesmo dia e turno (não é uma
-            pergunta pro operador) — se este caixa vendeu bem menos ou parou de vender enquanto os
-            outros continuaram, é indício real de que a máquina ficou fora do ar.
+            Marque só se a máquina realmente ficou desligada em algum momento deste turno — se
+            ninguém marcar, fica registrado que não houve desligamento.
           </p>
-          <div v-if="carregandoDeteccaoMaquina" class="d-flex justify-center py-4">
-            <v-progress-circular indeterminate color="primary" size="28" />
-          </div>
-          <template v-else>
-            <p
-              v-if="!draft.maquinaDesligadaEventos.length && temDadosSuficientesMaquina"
-              class="text-body-2"
-            >
-              Nenhum desligamento detectado durante este turno.
-            </p>
-            <p
-              v-if="!temDadosSuficientesMaquina"
-              class="text-caption text-medium-emphasis mb-2"
-            >
-              Não havia outro caixa aberto nesse dia/turno pra comparar (ou as vendas ainda não
-              sincronizaram) — sem dados suficientes pra confirmar automaticamente.
-            </p>
+          <v-switch
+            :model-value="maquinaDesligadaMarcada"
+            label="A máquina ficou desligada em algum momento deste turno?"
+            color="primary"
+            density="compact"
+            hide-details
+            @update:model-value="aoAlternarMaquinaDesligada"
+          />
 
-            <div
-              v-for="evento in draft.maquinaDesligadaEventos"
-              :key="evento.descricao"
-              class="mb-4"
-            >
-              <p class="cat-subgrupo d-flex align-center ga-2">
-                <span>{{ evento.descricao }}</span>
-                <v-chip size="x-small" :color="evento.confirmadoPelosDados ? 'success' : undefined" variant="tonal">
-                  {{ evento.confirmadoPelosDados ? 'Confirmado pelos dados' : 'Não confirmado pelos dados' }}
-                </v-chip>
+          <template v-if="maquinaDesligadaMarcada">
+            <v-divider class="my-3" />
+            <div v-for="evento in draft.maquinaDesligadaEventos" :key="evento.descricao" class="mb-2">
+              <p class="text-caption text-medium-emphasis mb-1">
+                Por quê? (marque tudo o que se aplica)
               </p>
-              <p class="text-caption text-medium-emphasis mb-1">Por quê? (marque tudo o que se aplica)</p>
               <div class="d-flex flex-column ga-1">
                 <v-checkbox
                   v-for="motivo in MOTIVOS_MAQUINA_DESLIGADA"
@@ -1345,18 +1287,6 @@ const CAT_VARS = {
                 class="mt-3"
               />
             </div>
-
-            <template v-if="!temDadosSuficientesMaquina">
-              <v-divider class="my-3" />
-              <v-switch
-                :model-value="Boolean(maquinaAutodeclarada)"
-                label="Mesmo sem confirmação nos dados, a máquina foi desligada hoje?"
-                color="primary"
-                density="compact"
-                hide-details
-                @update:model-value="aoAlternarMaquinaAutodeclarada"
-              />
-            </template>
           </template>
         </v-expansion-panel-text>
       </v-expansion-panel>

@@ -8,7 +8,6 @@ import { useTransferenciasTesouraria } from '~/composables/useTransferenciasTeso
 import { useVendasCanceladas } from '~/composables/useVendasCanceladas';
 import { useAnexos } from '~/composables/useAnexos';
 import { useExportarFechamentoPlanilha } from '~/composables/useExportarFechamentoPlanilha';
-import { useDeteccaoMaquinaDesligada } from '~/composables/useDeteccaoMaquinaDesligada';
 import SecaoIdentificacao from '~/components/fechamento/SecaoIdentificacao.vue';
 import SecaoTransferencias from '~/components/fechamento/SecaoTransferencias.vue';
 import SecaoLancamentos from '~/components/fechamento/SecaoLancamentos.vue';
@@ -59,37 +58,14 @@ const TITULOS_SECAO = [
 
 const tituloSecao = computed(() => TITULOS_SECAO[secaoAtual.value - 1] ?? TITULOS_SECAO[0]);
 
-// "Máquina desligada" tem que ser um FATO (pedido do usuário, 28/09/2026) — checa de novo aqui,
-// no momento de salvar, mesmo espírito de `validarMotivosProdutosCancelados` logo abaixo: garante
-// a checagem mesmo se o operador nunca abriu o painel "Máquina desligada" no Relatório Final
-// (SecaoRelatorioFinal.vue::aoAbrirMaquinaDesligada já chama isto também, só que sob demanda).
-const { detectarPorVendas } = useDeteccaoMaquinaDesligada();
-
+// "Máquina desligada" (30/09/2026, pedido do usuário: volta a ser manual por enquanto) — checa
+// só se o(s) evento(s) que o operador marcou manualmente no painel (SecaoRelatorioFinal.vue) já
+// têm motivo preenchido, mesmo espírito de `validarMotivosProdutosCancelados` logo abaixo. Sem
+// detecção automática aqui — o operador que nunca marcar o interruptor não tem nada a validar.
 async function validarMotivosMaquinaDesligada(): Promise<boolean> {
-  if (draft.value.caixa && draft.value.turno) {
-    const { eventos: detectados } = await detectarPorVendas(
-      draft.value.data,
-      draft.value.caixa,
-      draft.value.turno,
-    );
-    const autodeclarados = draft.value.maquinaDesligadaEventos.filter(
-      (e) => !e.confirmadoPelosDados,
-    );
-    const mesclados = detectados.map(
-      (novo) =>
-        draft.value.maquinaDesligadaEventos.find(
-          (e) => e.confirmadoPelosDados && e.descricao === novo.descricao,
-        ) ?? novo,
-    );
-    draft.value.maquinaDesligadaEventos = [...mesclados, ...autodeclarados];
-  }
-
   const faltantes = draft.value.maquinaDesligadaEventos.filter((e) => e.motivos.length === 0);
   if (faltantes.length > 0) {
-    erro.value =
-      faltantes.length === 1
-        ? 'Foi detectado um desligamento da máquina — informe o motivo antes de salvar.'
-        : `Foram detectados ${faltantes.length} desligamentos da máquina — informe o motivo de cada um antes de salvar.`;
+    erro.value = 'Você marcou que a máquina ficou desligada — informe o motivo antes de salvar.';
     return false;
   }
   return true;

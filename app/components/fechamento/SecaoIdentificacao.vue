@@ -3,7 +3,6 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { CAIXAS, TURNOS, type Caixa, type FechamentoDraft, type Turno } from '~/types/fechamento';
 import { useVendasCanceladas } from '~/composables/useVendasCanceladas';
 import { useVendasFechamento } from '~/composables/useVendasFechamento';
-import { useSincronizarVendas } from '~/composables/useSincronizarVendas';
 import { formatCents, toCents } from '~/utils/financeiro';
 import { caixaParaNumero, formatarDataBr, turnoParaLetra } from '~/utils/vendasFechamento';
 
@@ -87,13 +86,6 @@ const rotuloFiltro = computed(() => {
 // sincronizado, nunca puxa a planilha sozinho. `useSincronizarVendas` (compartilhado com
 // SecaoRelatorios.vue) agora é chamado ANTES de ler, aqui e no botão separado, tirando a
 // dependência de alguém lembrar de clicar em dois botões — e do cron precisar funcionar sozinho.
-const {
-  sincronizando,
-  erro: sincronizacaoErro,
-  resultado: sincronizacaoResultado,
-  sincronizar: sincronizarSilenciosamente,
-} = useSincronizarVendas();
-
 const filtroBusca = computed(() => ({
   caixa: caixaParaNumero(props.draft.caixa),
   turno: turnoParaLetra(props.draft.turno),
@@ -149,18 +141,6 @@ onBeforeUnmount(() => {
 
 /** Botão "Sincronizar vendas agora" — mesma sincronização, só que sem ler depois (o usuário só
  * quer empurrar a planilha pro banco, não necessariamente re-buscar o filtro atual). */
-const ocupadoSincronizarAgora = ref(false);
-async function sincronizarAgora() {
-  ocupadoSincronizarAgora.value = true;
-  try {
-    await sincronizarSilenciosamente();
-    // Re-busca automaticamente pro filtro atual, pra já mostrar se algo novo chegou.
-    if (jaBuscou.value) await buscarPorData(dataVendas.value, filtroBusca.value);
-  } finally {
-    ocupadoSincronizarAgora.value = false;
-  }
-}
-
 // Vendas canceladas (pedido do usuário, 23/09/2026, ligado de vez em 24/09/2026): mesmo botão
 // espelhado de "Buscar vendas" — o robô já manda os itens cancelados (tipo='C' em
 // vendas_produto_dia), ver useVendasCanceladas.ts.
@@ -280,20 +260,8 @@ const ajustesPresentes = computed(() => {
           {{
             !ocupadoBuscarVendas
               ? 'Buscar vendas'
-              : sincronizando
-                ? 'Sincronizando...'
-                : 'Buscando vendas...'
+              : 'Buscando vendas...'
           }}
-        </v-btn>
-        <v-btn
-          variant="text"
-          size="small"
-          prepend-icon="mdi-cloud-sync-outline"
-          :loading="ocupadoSincronizarAgora"
-          :disabled="ocupadoSincronizarAgora"
-          @click="sincronizarAgora"
-        >
-          {{ ocupadoSincronizarAgora ? 'Sincronizando...' : 'Sincronizar vendas agora' }}
         </v-btn>
         <v-btn
           variant="outlined"
@@ -306,9 +274,7 @@ const ajustesPresentes = computed(() => {
           {{
             !ocupadoCanceladas
               ? 'Buscar vendas canceladas'
-              : sincronizando
-                ? 'Sincronizando...'
-                : 'Buscando...'
+              : 'Buscando...'
           }}
         </v-btn>
       </div>
@@ -356,17 +322,9 @@ const ajustesPresentes = computed(() => {
         </v-alert>
       </template>
       <p class="text-caption text-medium-emphasis mt-n2">
-        Puxa a planilha do bot na hora, sem esperar o sync automático de madrugada — mas só traz o
-        que o bot da loja já escreveu lá. Vendas de HOJE só aparecem depois que o bot rodar hoje à
-        noite (22h10), mesmo sincronizando agora.
+        Os dados são recebidos pelo robô de integração. Após a primeira busca, esta tela relê o
+        banco a cada minuto sem alterar o filtro nem disparar uma segunda importação.
       </p>
-      <v-alert v-if="sincronizacaoErro" type="error" variant="tonal" density="comfortable">
-        {{ sincronizacaoErro }}
-      </v-alert>
-      <v-alert v-else-if="sincronizacaoResultado" type="info" variant="tonal" density="comfortable">
-        Planilha relida: {{ sincronizacaoResultado.gravadasFechamento }} linha(s) de fechamento e
-        {{ sincronizacaoResultado.gravadasProdutos }} de produto gravadas (reenviar não duplica).
-      </v-alert>
 
       <template v-if="jaBuscou && !ocupadoBuscarVendas">
         <v-alert v-if="erro" type="error" variant="tonal" density="comfortable">

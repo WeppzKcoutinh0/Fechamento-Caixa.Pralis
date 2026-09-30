@@ -74,18 +74,8 @@ const rotuloFiltro = computed(() => {
   return `${base}, ${rotuloHora}`;
 });
 
-// "Sincronizar vendas agora" (pedido do usuário, 17/09/2026): puxa a planilha na hora, sem
-// esperar o cron automático (1x/dia, de madrugada — ver server/utils/sincronizarPlanilha.ts).
-// ATENÇÃO, real: isto NUNCA traz vendas de HOJE enquanto a loja ainda está aberta — o bot da loja
-// só escreve na planilha à noite (22h10). Isto só evita esperar até o cron da manhã SEGUINTE
-// depois que o bot já rodou — não é tempo real durante o dia (a mensagem abaixo do botão deixa
-// isso explícito, pra não parecer que "sincronizar" traz venda que ainda nem existe na origem).
-//
-// 28/09/2026 (bug real em produção): o cron automático da Vercel simplesmente não disparou por 2
-// dias seguidos — sem nenhum aviso, "Buscar vendas" voltava vazio porque só lê o que já está
-// sincronizado, nunca puxa a planilha sozinho. `useSincronizarVendas` (compartilhado com
-// SecaoRelatorios.vue) agora é chamado ANTES de ler, aqui e no botão separado, tirando a
-// dependência de alguém lembrar de clicar em dois botões — e do cron precisar funcionar sozinho.
+// Fluxo oficial (29/09/2026): o robô CREARE grava direto em vendas_fechamento_caixa_dia a cada
+// minuto — não depende mais de planilha/cron/sincronização manual (ver SecaoRelatorios.vue).
 const filtroBusca = computed(() => ({
   caixa: caixaParaNumero(props.draft.caixa),
   turno: turnoParaLetra(props.draft.turno),
@@ -93,9 +83,6 @@ const filtroBusca = computed(() => ({
   horaFim: filtrarPorHorario.value ? horaDoCampo(horaFim.value) : null,
 }));
 
-// 28/09/2026 (pedido do usuário: botões devem poder ser apertados separadamente): cada botão tem
-// seu PRÓPRIO estado de "ocupado" — `sincronizando` (compartilhado, de useSincronizarVendas) só
-// entra no TEXTO do botão que de fato está esperando, nunca no loading/disabled dos outros dois.
 const ocupadoBuscarVendas = ref(false);
 async function buscarVendas() {
   jaBuscou.value = true;
@@ -139,8 +126,6 @@ onBeforeUnmount(() => {
   if (atualizacaoAutomatica) clearInterval(atualizacaoAutomatica);
 });
 
-/** Botão "Sincronizar vendas agora" — mesma sincronização, só que sem ler depois (o usuário só
- * quer empurrar a planilha pro banco, não necessariamente re-buscar o filtro atual). */
 // Vendas canceladas (pedido do usuário, 23/09/2026, ligado de vez em 24/09/2026): mesmo botão
 // espelhado de "Buscar vendas" — o robô já manda os itens cancelados (tipo='C' em
 // vendas_produto_dia), ver useVendasCanceladas.ts.

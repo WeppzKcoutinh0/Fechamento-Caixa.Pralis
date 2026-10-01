@@ -220,27 +220,22 @@ function movimentacoesDe(cofre: CofreCentral): TransferenciaTesouraria[] {
   return itens.sort((a, b) => (a.criadoEm < b.criadoEm ? 1 : -1));
 }
 
+// Bug real corrigido (01/10/2026, achado do usuário: "criei 4 lacres... deveria ter sido
+// descontado no Cofre Fluxo e não foi"): isto só contava transferências automáticas de retorno/
+// sangria (origem = um Caixa) como "movimento do Fluxo" — qualquer transferência manual com
+// ORIGEM no próprio Fluxo (ex.: "Fluxo → Caixa 4", os lacres que o usuário criou na Tesouraria)
+// ficava de fora da lista inteira, e por isso nunca era descontada do saldo. Fluxo agora usa o
+// mesmo filtro genérico dos outros cofres (qualquer transferência onde ele é origem OU destino).
 function movimentacoesDoFluxo(): TransferenciaTesouraria[] {
   return transferencias.value
     .filter(
       (t) =>
-        (CAIXAS as readonly string[]).includes(t.caixaOrigem) &&
-        (t.transferenciaRetorno ||
-          t.lacre.toUpperCase().startsWith('RETORNO-') ||
-          /retorno|sangria/i.test(t.observacao)) &&
-        depoisDoCorte('Fluxo', t.dataLanc),
+        (t.caixaOrigem === 'Fluxo' || t.caixaDestino === 'Fluxo') && depoisDoCorte('Fluxo', t.dataLanc),
     )
     .sort((a, b) => (a.criadoEm < b.criadoEm ? 1 : -1));
 }
 function saldoDe(cofre: CofreCentral): number {
   const inicialCents = saldoInicialCentsDe(cofre);
-  if (cofre === 'Fluxo') {
-    const transferenciasDeEntrada = movimentacoesDe(cofre).reduce((soma, t) => soma + t.valorCents, 0);
-    const lancamentosManuais = fluxoLancamentos.value
-      .filter((l) => depoisDoCorte(cofre, l.data))
-      .reduce((soma, l) => soma + l.valorCents, 0);
-    return inicialCents + transferenciasDeEntrada + lancamentosManuais;
-  }
   const saldoTransferencias = transferencias.value
     .filter((t) => depoisDoCorte(cofre, t.dataLanc))
     .reduce((soma, t) => {
@@ -248,6 +243,12 @@ function saldoDe(cofre: CofreCentral): number {
       if (t.caixaOrigem === cofre) return soma - t.valorCents;
       return soma;
     }, 0);
+  if (cofre === 'Fluxo') {
+    const lancamentosManuais = fluxoLancamentos.value
+      .filter((l) => depoisDoCorte(cofre, l.data))
+      .reduce((soma, l) => soma + l.valorCents, 0);
+    return inicialCents + saldoTransferencias + lancamentosManuais;
+  }
   if (cofre === 'Caixa de Troco') {
     const entradasCents = entradasTroco.value
       .filter((e) => depoisDoCorte(cofre, e.dataLanc))
@@ -890,11 +891,11 @@ async function confirmarExclusaoCofre(): Promise<void> {
               :key="t.id"
               class="d-flex align-center flex-wrap ga-2 pa-2 movimentacao-item"
             >
-              <v-icon size="16" :color="cofre === 'Fluxo' || t.caixaDestino === cofre ? 'success' : 'error'">
-                {{ cofre === 'Fluxo' || t.caixaDestino === cofre ? 'mdi-arrow-bottom-left' : 'mdi-arrow-top-right' }}
+              <v-icon size="16" :color="t.caixaDestino === cofre ? 'success' : 'error'">
+                {{ t.caixaDestino === cofre ? 'mdi-arrow-bottom-left' : 'mdi-arrow-top-right' }}
               </v-icon>
               <span class="text-caption">
-                {{ cofre === 'Fluxo' || t.caixaDestino === cofre ? t.caixaOrigem : t.caixaDestino }}
+                {{ t.caixaDestino === cofre ? t.caixaOrigem : t.caixaDestino }}
               </span>
               <span v-if="t.observacao" class="text-caption text-medium-emphasis">{{ t.observacao }}</span>
               <span v-else class="text-caption text-medium-emphasis">Lacre {{ t.lacre }}</span>

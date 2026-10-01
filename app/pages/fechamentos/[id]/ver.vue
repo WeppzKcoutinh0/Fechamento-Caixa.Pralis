@@ -351,6 +351,9 @@ function totalPdvEntrada(p: FechamentoDraft['pdvEntradas'][number]): number {
           :mercadorias-cents="lancamentosPorTipo.mercadoriaCents"
           :retiradas-cents="lancamentosPorTipo.retiradaCents"
           :resultado-cents="relatorio.diferencaCents"
+          :saidas-totais-cents="relatorio.totalSaidasCents"
+          :cartoes-cents="relatorio.cartoesCents"
+          :crediario-cents="crediarioTotais.totalCents"
         />
       </div>
 

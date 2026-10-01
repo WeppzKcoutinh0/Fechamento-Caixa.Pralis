@@ -394,8 +394,11 @@ function formatarDataCurta(iso: string): string {
 // Lançamentos rápidos do Caixa Principal (pedido do usuário, 23/09/2026) — dois atalhos que criam
 // uma transferência de verdade (mesma tabela `transferencias_tesouraria` de sempre) sem passar
 // pelo modal completo "Nova Transferência", com uma frase de confirmação formada em tempo real:
-//   Entrada: "22/09 + 5.250 caixa do dia 21/09" — dinheiro que veio do Fluxo (é de lá que o
-//   dinheiro do fechamento de um caixa passa antes de eventualmente voltar pro Principal).
+//   Entrada: "22/09 + 5.250 caixa do dia 21/09" — valor que o admin está DECLARANDO que já está
+//   fisicamente no Principal (ex.: contagem do dia), não dinheiro saindo de outro cofre rastreado
+//   aqui — por isso origem = 'Cofre' (o genérico antigo, fora do cálculo dos 3 cofres centrais;
+//   correção real, 01/10/2026: usava 'Fluxo' antes, descontando sem motivo um cofre que nunca
+//   perdeu esse dinheiro).
 //   Saída: "23/09 - 2.000 para caixa troco" — destino sempre fixo em Caixa de Troco (decisão
 //   explícita do usuário: sem seletor de destino aqui, só Data + Valor).
 const entradaData = ref(hojeISO());
@@ -418,7 +421,7 @@ async function registrarEntradaPrincipal(): Promise<void> {
       valorMoedasCents: 0,
       lacre: `PRINCIPAL-ENT-${Date.now()}`,
       agendamento: false,
-      caixaOrigem: 'Fluxo',
+      caixaOrigem: 'Cofre',
       caixaDestino: 'Caixa Principal',
       multiploDestino: false,
       destinosExtra: [],

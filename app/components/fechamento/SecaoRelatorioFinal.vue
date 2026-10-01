@@ -174,15 +174,13 @@ const detalhesEsperado = computed(() => {
 });
 
 // Geração 100% client-side (jsPDF) — reusa os mesmos valores já calculados acima, não recalcula
-// nada por conta própria (ver utils/gerarPdfFechamento.ts). Assíncrona (pedido do usuário,
-// 25/09/2026: "todos os produtos" no PDF completo) — busca Produtos/Cancelados antes de gerar,
-// mesmo se o usuário nunca abriu esses painéis na tela (aoAbrirProdutos/aoAbrirCancelados já
-// pulam a busca se já tiver sido feita, ver os `*JaBuscados` refs).
+// nada por conta própria (ver utils/gerarPdfFechamento.ts). Produtos/Cancelados SÓ entram no PDF
+// se o operador já tiver aberto esses painéis antes (pedido do usuário, 01/10/2026: "só aparecer
+// se eu apertar" — antes isto buscava sozinho ao baixar o PDF, mesmo sem o operador ter pedido).
 const gerandoPdf = ref(false);
 async function baixarPdf(): Promise<void> {
   gerandoPdf.value = true;
   try {
-    await Promise.all([aoAbrirProdutos(), aoAbrirCancelados()]);
     baixarPdfFechamento(props.draft, {
       totalEntradaCents: totalEntradaCents.value,
       totalSaidaCents: totalSaidaCents.value,

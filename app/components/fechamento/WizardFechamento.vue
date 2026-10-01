@@ -5,7 +5,6 @@ import { useFechamentoForm } from '~/composables/useFechamentoForm';
 import { useFechamentos } from '~/composables/useFechamentos';
 import { useSessaoCaixa } from '~/composables/useSessaoCaixa';
 import { useTransferenciasTesouraria } from '~/composables/useTransferenciasTesouraria';
-import { useVendasCanceladas } from '~/composables/useVendasCanceladas';
 import { useAnexos } from '~/composables/useAnexos';
 import { useExportarFechamentoPlanilha } from '~/composables/useExportarFechamentoPlanilha';
 import SecaoIdentificacao from '~/components/fechamento/SecaoIdentificacao.vue';
@@ -36,11 +35,6 @@ const { salvar } = useFechamentos();
 const { fecharSessao } = useSessaoCaixa();
 const { criarRetornoAutomatico, criarSangriaAutomatica } = useTransferenciasTesouraria();
 const { enviar: enviarAnexo } = useAnexos();
-const {
-  itens: itensCancelados,
-  erro: erroCancelados,
-  buscarPorData: buscarCancelados,
-} = useVendasCanceladas();
 const { exportar: exportarParaPlanilha } = useExportarFechamentoPlanilha();
 const router = useRouter();
 
@@ -71,21 +65,17 @@ async function validarMotivosMaquinaDesligada(): Promise<boolean> {
   return true;
 }
 
-async function validarMotivosProdutosCancelados(): Promise<boolean> {
-  await buscarCancelados(draft.value.data);
-  if (erroCancelados.value) {
-    erro.value = erroCancelados.value;
-    return false;
-  }
-
+// (01/10/2026, pedido do usuário: "só aparecer se eu apertar") — não busca mais vendas canceladas
+// sozinho aqui; checa só os itens que já estão em draft.vendasCanceladasMotivos, ou seja, que o
+// operador já viu de verdade por ter aberto o painel "Vendas/Produtos Cancelados" (ver
+// SecaoRelatorioFinal.vue::aoAbrirCancelados, que é quem cria essas entradas). Quem nunca abriu o
+// painel tem o registro vazio e não tem nada a validar aqui.
+function validarMotivosProdutosCancelados(): boolean {
   const arquivosPendentes = draft.value.arquivosPendentes ?? {};
-  const faltantes = itensCancelados.value.filter((item) => {
-    const motivo = draft.value.vendasCanceladasMotivos[item.id];
+  const faltantes = Object.entries(draft.value.vendasCanceladasMotivos).filter(([id, motivo]) => {
     const temTexto = Boolean(motivo?.texto.trim());
     const temAudio = Boolean(motivo?.audioPath);
-    const temAudioPendente = Boolean(
-      arquivosPendentes[`audio-vendas-canceladas-motivo-${item.id}`],
-    );
+    const temAudioPendente = Boolean(arquivosPendentes[`audio-vendas-canceladas-motivo-${id}`]);
     return !temTexto && !temAudio && !temAudioPendente;
   });
 
@@ -105,7 +95,7 @@ async function onSalvar() {
   salvando.value = true;
   try {
     if (!(await validarMotivosMaquinaDesligada())) return;
-    if (!(await validarMotivosProdutosCancelados())) return;
+    if (!validarMotivosProdutosCancelados()) return;
     const fechamentoId = await salvar(draft.value);
     const arquivosPendentes = draft.value.arquivosPendentes ?? {};
     const camposCaminho: Record<

@@ -32,6 +32,41 @@ export async function obterTokenValido(supabase: SupabaseClient): Promise<string
 }
 
 /**
+ * `$fetch` com Authorization automático + 1 nova tentativa se o servidor MESMO ASSIM devolver 401
+ * (achado real, 01/10/2026: mesmo com `obterTokenValido` acima, um 401 ainda apareceu em
+ * `/exportar-planilha` no meio do fluxo de Salvar — o fechamento inteiro tem várias chamadas
+ * autenticadas em sequência, e uma renovação de token no meio do caminho, concorrente com o timer
+ * interno do SDK, pode invalidar a renovação de uma das duas corridas — Supabase usa refresh token
+ * de uso único). Em vez de tentar prever/evitar a corrida, reage a ela: se o 401 acontecer mesmo
+ * assim, força uma renovação de verdade e tenta de novo, só uma vez — e só pra 401 (qualquer outro
+ * erro sobe direto, sem mascarar).
+ */
+export async function fetchAutenticado<T>(
+  supabase: SupabaseClient,
+  url: string,
+  opcoes: { method?: 'GET' | 'POST'; body?: unknown } = {},
+): Promise<T> {
+  const token = await obterTokenValido(supabase);
+  try {
+    return await $fetch<T>(url, { ...opcoes, headers: { authorization: `Bearer ${token}` } });
+  } catch (erro) {
+    const status =
+      (erro as { statusCode?: number; status?: number; response?: { status?: number } })
+        ?.statusCode ??
+      (erro as { status?: number; response?: { status?: number } })?.status ??
+      (erro as { response?: { status?: number } })?.response?.status;
+    if (status !== 401) throw erro;
+
+    const { data: atualizado, error } = await supabase.auth.refreshSession();
+    if (error || !atualizado.session) throw erro;
+    return await $fetch<T>(url, {
+      ...opcoes,
+      headers: { authorization: `Bearer ${atualizado.session.access_token}` },
+    });
+  }
+}
+
+/**
  * Cliente Supabase único do app. Usa só `NUXT_PUBLIC_SUPABASE_URL`/`NUXT_PUBLIC_SUPABASE_ANON_KEY`
  * (chave pública/anon) — nunca `service_role` aqui. Toda regra de acesso vem da RLS do banco.
  */

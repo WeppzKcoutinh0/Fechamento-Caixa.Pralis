@@ -1,4 +1,4 @@
-import { obterTokenValido, useSupabase } from './useSupabase';
+import { fetchAutenticado, useSupabase } from './useSupabase';
 import { blobParaBase64 } from '~/utils/blobParaBase64';
 
 interface ItemLeitura {
@@ -23,11 +23,8 @@ export function useLeituraNotaFiscal() {
   const supabase = useSupabase();
 
   async function enviarParaLeitura(arquivo: Blob): Promise<ResultadoLeitura> {
-    const token = await obterTokenValido(supabase);
-
-    return await $fetch<ResultadoLeitura>('/ia/ler-discriminacao-nota', {
+    return await fetchAutenticado<ResultadoLeitura>(supabase, '/ia/ler-discriminacao-nota', {
       method: 'POST',
-      headers: { authorization: `Bearer ${token}` },
       body: {
         mimeType: arquivo.type || 'image/jpeg',
         imageBase64: await blobParaBase64(arquivo),

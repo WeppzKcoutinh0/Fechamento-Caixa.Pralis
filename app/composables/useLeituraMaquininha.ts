@@ -1,4 +1,4 @@
-import { obterTokenValido, useSupabase } from './useSupabase';
+import { fetchAutenticado, useSupabase } from './useSupabase';
 import type { FechamentoDraft } from '~/types/fechamento';
 import { blobParaBase64 } from '~/utils/blobParaBase64';
 
@@ -47,11 +47,9 @@ export function useLeituraMaquininha() {
 
   async function enviarParaLeitura(arquivo: Blob, turno: Turno): Promise<ResultadoLeitura> {
     const imagem = await otimizarImagemParaIa(arquivo);
-    const token = await obterTokenValido(supabase);
 
-    return await $fetch<ResultadoLeitura>('/ia/ler-relatorio-maquininha', {
+    return await fetchAutenticado<ResultadoLeitura>(supabase, '/ia/ler-relatorio-maquininha', {
       method: 'POST',
-      headers: { authorization: `Bearer ${token}` },
       body: {
         turno,
         mimeType: imagem.type || 'image/jpeg',

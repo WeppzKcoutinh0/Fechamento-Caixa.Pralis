@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import { obterTokenValido, useSupabase } from './useSupabase';
+import { fetchAutenticado, useSupabase } from './useSupabase';
 import { mensagemDeErro } from '~/utils/erros';
 
 /**
@@ -17,11 +17,8 @@ export function useExportarFechamentoPlanilha() {
     erro.value = '';
     try {
       const supabase = useSupabase();
-      const token = await obterTokenValido(supabase);
-
-      await $fetch(`/fechamentos/${fechamentoId}/exportar-planilha`, {
+      await fetchAutenticado(supabase, `/fechamentos/${fechamentoId}/exportar-planilha`, {
         method: 'POST',
-        headers: { authorization: `Bearer ${token}` },
       });
       return true;
     } catch (e) {

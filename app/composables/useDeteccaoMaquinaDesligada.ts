@@ -1,4 +1,4 @@
-import { obterTokenValido, useSupabase } from './useSupabase';
+import { fetchAutenticado, useSupabase } from './useSupabase';
 import { caixaParaNumero, turnoParaLetra } from '~/utils/vendasFechamento';
 import type { Caixa, EventoMaquinaDesligada, Turno } from '~/types/fechamento';
 
@@ -35,14 +35,11 @@ export function useDeteccaoMaquinaDesligada() {
     if (!numeroCaixa || !letraTurno) return { eventos: [], temDadosSuficientes: false };
 
     try {
-      const token = await obterTokenValido(supabase);
-
-      const resposta = await $fetch<{
+      const resposta = await fetchAutenticado<{
         eventos: { descricao: string; confirmadoPelosDados: true }[];
         temDadosSuficientes: boolean;
-      }>('/vendas/detectar-maquina-desligada', {
+      }>(supabase, '/vendas/detectar-maquina-desligada', {
         method: 'POST',
-        headers: { authorization: `Bearer ${token}` },
         body: { data, caixa: numeroCaixa, turno: letraTurno },
       });
 

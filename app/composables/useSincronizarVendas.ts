@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import { obterTokenValido, useSupabase } from './useSupabase';
+import { fetchAutenticado, useSupabase } from './useSupabase';
 import { mensagemDeErro } from '~/utils/erros';
 
 /**
@@ -42,15 +42,10 @@ export function useSincronizarVendas() {
   async function executarSincronizacao(): Promise<void> {
     try {
       const supabase = useSupabase();
-      const token = await obterTokenValido(supabase);
-
-      const resposta = await $fetch<{
+      const resposta = await fetchAutenticado<{
         fechamentoCaixa: { gravadas: number };
         vendasProdutos: { gravadas: number };
-      }>('/vendas/sincronizar', {
-        method: 'POST',
-        headers: { authorization: `Bearer ${token}` },
-      });
+      }>(supabase, '/vendas/sincronizar', { method: 'POST' });
       resultado.value = {
         gravadasFechamento: resposta.fechamentoCaixa.gravadas,
         gravadasProdutos: resposta.vendasProdutos.gravadas,

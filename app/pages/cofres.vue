@@ -17,6 +17,7 @@ import {
   type TransferenciaTesouraria,
 } from '~/composables/useTransferenciasTesouraria';
 import { useCofreNotas, type CofreNota } from '~/composables/useCofreNotas';
+import { useCofreSaldoInicial, type CofreSaldoInicial } from '~/composables/useCofreSaldoInicial';
 import {
   FLUXO_CONTAS,
   useFluxoLancamentos,
@@ -65,13 +66,17 @@ const {
   excluir: excluirFluxo,
 } = useFluxoLancamentos();
 const { listar: listarNotas, adicionar: adicionarNota, remover: removerNota } = useCofreNotas();
+const {
+  listar: listarSaldosIniciais,
+  definir: definirSaldoInicial,
+  remover: removerSaldoInicial,
+} = useCofreSaldoInicial();
 const supabase = useSupabase();
 
 const carregando = ref(true);
 const erro = ref<string | null>(null);
 const transferencias = ref<TransferenciaTesouraria[]>([]);
 const fluxoLancamentos = ref<FluxoLancamento[]>([]);
-const entradasCofreCents = ref(0);
 interface EntradaTroco {
   id: string;
   valorCents: number;
@@ -80,6 +85,17 @@ interface EntradaTroco {
   responsavel: string;
 }
 const entradasTroco = ref<EntradaTroco[]>([]);
+const saldosIniciais = ref<Record<CofreCentral, CofreSaldoInicial | null>>({
+  'Caixa Principal': null,
+  'Caixa de Troco': null,
+  Fluxo: null,
+});
+function dataCorteDe(cofre: CofreCentral): string | null {
+  return saldosIniciais.value[cofre]?.dataCorte ?? null;
+}
+function saldoInicialCentsDe(cofre: CofreCentral): number {
+  return saldosIniciais.value[cofre]?.saldoCents ?? 0;
+}
 const fluxoBancoDisponivel = ref(true);
 const confirmandoId = ref<string | null>(null);
 // Caixas com sessão ABERTA agora (pedido do usuário, 29/09/2026: "Transferências de Entrada" do
@@ -123,10 +139,10 @@ async function carregar(mostrarSpinner = true): Promise<void> {
       caixaDestino: e.caixa_destino,
       responsavel: e.fechamentos?.responsavel ?? '',
     }));
-    entradasCofreCents.value = entradasTroco.value.reduce(
-      (soma, entrada) => soma + entrada.valorCents,
-      0,
-    );
+    const todosSaldosIniciais = await listarSaldosIniciais();
+    for (const cofre of COFRES_CENTRAIS) {
+      saldosIniciais.value[cofre] = todosSaldosIniciais.find((s) => s.cofre === cofre) ?? null;
+    }
     const { data: sessoesAbertas, error: erroSessoes } = await supabase
       .from('cash_sessions')
       .select('caixa')
@@ -190,12 +206,27 @@ function entradaTrocoParaMovimentacao(e: EntradaTroco): TransferenciaTesouraria 
     criadoEm: e.dataLanc,
   };
 }
+// "Zerar o histórico e recomeçar" (pedido do usuário, 01/10/2026): com `dataCorteDe(cofre)`
+// definido, tanto o saldo quanto a lista de Movimentações ignoram tudo com data ANTERIOR ao
+// corte — não apaga nada real, só para de contar/mostrar aqui. Sem corte definido (cofre nunca
+// usou "Definir saldo inicial"), conta tudo, exatamente como sempre foi.
+function depoisDoCorte(cofre: CofreCentral, data: string): boolean {
+  const corte = dataCorteDe(cofre);
+  return !corte || data >= corte;
+}
 function movimentacoesDe(cofre: CofreCentral): TransferenciaTesouraria[] {
   if (cofre === 'Fluxo') return movimentacoesDoFluxo();
-  const base = transferencias.value.filter((t) => t.caixaOrigem === cofre || t.caixaDestino === cofre);
+  const base = transferencias.value.filter(
+    (t) => (t.caixaOrigem === cofre || t.caixaDestino === cofre) && depoisDoCorte(cofre, t.dataLanc),
+  );
   const itens =
     cofre === 'Caixa de Troco'
-      ? [...base, ...entradasTroco.value.map(entradaTrocoParaMovimentacao)]
+      ? [
+          ...base,
+          ...entradasTroco.value
+            .filter((e) => depoisDoCorte(cofre, e.dataLanc))
+            .map(entradaTrocoParaMovimentacao),
+        ]
       : base;
   return itens.sort((a, b) => (a.criadoEm < b.criadoEm ? 1 : -1));
 }
@@ -207,23 +238,34 @@ function movimentacoesDoFluxo(): TransferenciaTesouraria[] {
         (CAIXAS as readonly string[]).includes(t.caixaOrigem) &&
         (t.transferenciaRetorno ||
           t.lacre.toUpperCase().startsWith('RETORNO-') ||
-          /retorno|sangria/i.test(t.observacao)),
+          /retorno|sangria/i.test(t.observacao)) &&
+        depoisDoCorte('Fluxo', t.dataLanc),
     )
     .sort((a, b) => (a.criadoEm < b.criadoEm ? 1 : -1));
 }
 function saldoDe(cofre: CofreCentral): number {
+  const inicialCents = saldoInicialCentsDe(cofre);
   if (cofre === 'Fluxo') {
     const transferenciasDeEntrada = movimentacoesDe(cofre).reduce((soma, t) => soma + t.valorCents, 0);
-    const lancamentosManuais = fluxoLancamentos.value.reduce((soma, l) => soma + l.valorCents, 0);
-    return transferenciasDeEntrada + lancamentosManuais;
+    const lancamentosManuais = fluxoLancamentos.value
+      .filter((l) => depoisDoCorte(cofre, l.data))
+      .reduce((soma, l) => soma + l.valorCents, 0);
+    return inicialCents + transferenciasDeEntrada + lancamentosManuais;
   }
-  const saldoTransferencias = transferencias.value.reduce((soma, t) => {
-    if (t.caixaDestino === cofre) return soma + t.valorCents;
-    if (t.caixaOrigem === cofre) return soma - t.valorCents;
-    return soma;
-  }, 0);
-  if (cofre === 'Caixa de Troco') return saldoTransferencias - entradasCofreCents.value;
-  return saldoTransferencias;
+  const saldoTransferencias = transferencias.value
+    .filter((t) => depoisDoCorte(cofre, t.dataLanc))
+    .reduce((soma, t) => {
+      if (t.caixaDestino === cofre) return soma + t.valorCents;
+      if (t.caixaOrigem === cofre) return soma - t.valorCents;
+      return soma;
+    }, 0);
+  if (cofre === 'Caixa de Troco') {
+    const entradasCents = entradasTroco.value
+      .filter((e) => depoisDoCorte(cofre, e.dataLanc))
+      .reduce((soma, e) => soma + e.valorCents, 0);
+    return inicialCents + saldoTransferencias - entradasCents;
+  }
+  return inicialCents + saldoTransferencias;
 }
 
 function nomeCofre(cofre: CofreCentral): string {
@@ -293,6 +335,62 @@ async function excluirNota(cofre: CofreCentral, id: string): Promise<void> {
     notasPorCofre.value[cofre] = notasPorCofre.value[cofre].filter((n) => n.id !== id);
   } catch (e) {
     erro.value = mensagemDeErro(e, 'Não foi possível excluir a anotação.');
+  }
+}
+
+// "Definir saldo inicial" (pedido do usuário, 01/10/2026): formulário Data + Valor por cofre,
+// mesmo padrão visual de "Registrar caixa do dia" do Caixa Principal logo abaixo.
+const saldoInicialAberto = ref<Record<CofreCentral, boolean>>({
+  'Caixa Principal': false,
+  'Caixa de Troco': false,
+  Fluxo: false,
+});
+const saldoInicialDataForm = ref<Record<CofreCentral, string>>({
+  'Caixa Principal': hojeISO(),
+  'Caixa de Troco': hojeISO(),
+  Fluxo: hojeISO(),
+});
+const saldoInicialValorForm = ref<Record<CofreCentral, number>>({
+  'Caixa Principal': 0,
+  'Caixa de Troco': 0,
+  Fluxo: 0,
+});
+const salvandoSaldoInicial = ref<CofreCentral | null>(null);
+
+function abrirFormSaldoInicial(cofre: CofreCentral): void {
+  const atual = saldosIniciais.value[cofre];
+  saldoInicialDataForm.value[cofre] = atual?.dataCorte ?? hojeISO();
+  saldoInicialValorForm.value[cofre] = atual?.saldoCents ?? 0;
+  saldoInicialAberto.value[cofre] = !saldoInicialAberto.value[cofre];
+}
+async function salvarSaldoInicial(cofre: CofreCentral): Promise<void> {
+  salvandoSaldoInicial.value = cofre;
+  try {
+    const dataCorte = saldoInicialDataForm.value[cofre];
+    const saldoCents = saldoInicialValorForm.value[cofre];
+    await definirSaldoInicial(cofre, saldoCents, dataCorte);
+    saldosIniciais.value[cofre] = {
+      cofre,
+      saldoCents,
+      dataCorte,
+      atualizadoEm: new Date().toISOString(),
+    };
+    saldoInicialAberto.value[cofre] = false;
+  } catch (e) {
+    erro.value = mensagemDeErro(e, 'Não foi possível definir o saldo inicial.');
+  } finally {
+    salvandoSaldoInicial.value = null;
+  }
+}
+async function removerCorteDe(cofre: CofreCentral): Promise<void> {
+  salvandoSaldoInicial.value = cofre;
+  try {
+    await removerSaldoInicial(cofre);
+    saldosIniciais.value[cofre] = null;
+  } catch (e) {
+    erro.value = mensagemDeErro(e, 'Não foi possível remover o saldo inicial.');
+  } finally {
+    salvandoSaldoInicial.value = null;
   }
 }
 
@@ -596,6 +694,65 @@ async function confirmarExclusaoCofre(): Promise<void> {
         </v-expansion-panel-title>
         <v-expansion-panel-text>
           <p class="text-caption text-medium-emphasis">{{ DESCRICAO_COFRE[cofre] }}</p>
+
+          <!-- Saldo inicial / corte de histórico (pedido do usuário, 01/10/2026) -->
+          <div class="mb-4">
+            <div
+              v-if="saldosIniciais[cofre]"
+              class="text-caption text-medium-emphasis d-flex align-center ga-2 flex-wrap"
+            >
+              <span>
+                Contando a partir de {{ formatarDataBr(saldosIniciais[cofre]!.dataCorte) }},
+                começando em R$ {{ formatCents(saldosIniciais[cofre]!.saldoCents) }} — o histórico
+                anterior continua salvo, só não entra mais nessa conta.
+              </span>
+              <v-btn size="x-small" variant="text" @click="abrirFormSaldoInicial(cofre)">
+                Editar
+              </v-btn>
+              <v-btn
+                size="x-small"
+                variant="text"
+                color="error"
+                :loading="salvandoSaldoInicial === cofre"
+                @click="removerCorteDe(cofre)"
+              >
+                Remover corte
+              </v-btn>
+            </div>
+            <v-btn
+              v-else
+              size="small"
+              variant="text"
+              prepend-icon="mdi-restart"
+              @click="abrirFormSaldoInicial(cofre)"
+            >
+              Definir saldo inicial
+            </v-btn>
+
+            <div v-if="saldoInicialAberto[cofre]" class="d-flex flex-wrap ga-2 align-end mt-2">
+              <v-text-field
+                v-model="saldoInicialDataForm[cofre]"
+                type="date"
+                label="A partir de"
+                density="compact"
+                hide-details
+                style="max-width: 160px"
+              />
+              <CampoDinheiro v-model="saldoInicialValorForm[cofre]" label="Saldo inicial" />
+              <v-btn
+                size="small"
+                color="primary"
+                variant="tonal"
+                :loading="salvandoSaldoInicial === cofre"
+                @click="salvarSaldoInicial(cofre)"
+              >
+                Salvar
+              </v-btn>
+              <v-btn size="small" variant="text" @click="saldoInicialAberto[cofre] = false">
+                Cancelar
+              </v-btn>
+            </div>
+          </div>
 
           <!-- Lançamentos rápidos — só no Caixa Principal (pedido do usuário, 23/09/2026) -->
           <div v-if="cofre === 'Caixa Principal'" class="lancamento-rapido mb-4">

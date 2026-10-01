@@ -72,6 +72,14 @@ const erro = ref<string | null>(null);
 const transferencias = ref<TransferenciaTesouraria[]>([]);
 const fluxoLancamentos = ref<FluxoLancamento[]>([]);
 const entradasCofreCents = ref(0);
+interface EntradaTroco {
+  id: string;
+  valorCents: number;
+  dataLanc: string;
+  caixaDestino: string;
+  responsavel: string;
+}
+const entradasTroco = ref<EntradaTroco[]>([]);
 const fluxoBancoDisponivel = ref(true);
 const confirmandoId = ref<string | null>(null);
 // Caixas com sessão ABERTA agora (pedido do usuário, 29/09/2026: "Transferências de Entrada" do
@@ -89,13 +97,34 @@ async function carregar(mostrarSpinner = true): Promise<void> {
   erro.value = null;
   try {
     transferencias.value = await listar();
+    // Suprimento que os caixas registram em "Entrada" (origem sempre fixa em Caixa de Troco, ver
+    // SecaoTransferencias.vue::novaEntrada) tem que sair automaticamente do saldo do Caixa de
+    // Troco — bug real corrigido (01/10/2026, pedido do usuário): o filtro antigo (`tipo_conta =
+    // 'COFRE'`) nunca batia com nenhuma linha de verdade (o campo fica 'DINHEIRO' ou vazio aqui),
+    // então o saldo do Troco nunca descontava o que os caixas já tinham pego. O filtro certo é
+    // `caixa_origem = 'Caixa de Troco'` — e pedido junto: "descrito o dia, quem pegou e os
+    // valores", por isso o join com fechamentos (pra saber qual caixa/turno/responsável pegou).
     const { data: entradasCofre, error: erroEntradasCofre } = await supabase
       .from('entradas')
-      .select('valor')
-      .eq('tipo_conta', 'COFRE');
+      .select('id, valor, caixa_destino, fechamentos(data, responsavel)')
+      .eq('caixa_origem', 'Caixa de Troco');
     if (erroEntradasCofre) throw erroEntradasCofre;
-    entradasCofreCents.value = (entradasCofre ?? []).reduce(
-      (soma, entrada) => soma + Math.round(Number(entrada.valor) * 100),
+    type LinhaEntradaTroco = {
+      id: string;
+      valor: string;
+      caixa_destino: string;
+      fechamentos: { data?: string; responsavel?: string } | null;
+    };
+    const linhas = (entradasCofre ?? []) as unknown as LinhaEntradaTroco[];
+    entradasTroco.value = linhas.map((e) => ({
+      id: e.id,
+      valorCents: Math.round(Number(e.valor) * 100),
+      dataLanc: e.fechamentos?.data ?? '',
+      caixaDestino: e.caixa_destino,
+      responsavel: e.fechamentos?.responsavel ?? '',
+    }));
+    entradasCofreCents.value = entradasTroco.value.reduce(
+      (soma, entrada) => soma + entrada.valorCents,
       0,
     );
     const { data: sessoesAbertas, error: erroSessoes } = await supabase
@@ -135,11 +164,40 @@ onMounted(async () => {
   await Promise.all(COFRES_CENTRAIS.map((cofre) => aoAbrirCofre(cofre)));
 });
 
+// Prefixo reconhecido no template pra esconder editar/excluir desses itens sintéticos — uma
+// Entrada só se edita/exclui dentro do fechamento dela, nunca por aqui.
+const PREFIXO_ENTRADA_TROCO = 'entrada-troco-';
+function entradaTrocoParaMovimentacao(e: EntradaTroco): TransferenciaTesouraria {
+  return {
+    id: `${PREFIXO_ENTRADA_TROCO}${e.id}`,
+    valorCents: e.valorCents,
+    valorNotasCents: 0,
+    valorMoedasCents: 0,
+    lacre: '',
+    dataLanc: e.dataLanc,
+    agendamento: false,
+    dataRecebimento: e.dataLanc,
+    confirmadoEm: e.dataLanc,
+    caixaOrigem: 'Caixa de Troco',
+    caixaDestino: e.caixaDestino,
+    turnoOrigem: null,
+    turnoDestino: null,
+    multiploDestino: false,
+    destinosExtra: [],
+    tempoConfirmacao: false,
+    transferenciaRetorno: false,
+    observacao: `Suprimento entregue${e.responsavel ? ' — ' + e.responsavel : ''}`,
+    criadoEm: e.dataLanc,
+  };
+}
 function movimentacoesDe(cofre: CofreCentral): TransferenciaTesouraria[] {
   if (cofre === 'Fluxo') return movimentacoesDoFluxo();
-  return transferencias.value
-    .filter((t) => t.caixaOrigem === cofre || t.caixaDestino === cofre)
-    .sort((a, b) => (a.criadoEm < b.criadoEm ? 1 : -1));
+  const base = transferencias.value.filter((t) => t.caixaOrigem === cofre || t.caixaDestino === cofre);
+  const itens =
+    cofre === 'Caixa de Troco'
+      ? [...base, ...entradasTroco.value.map(entradaTrocoParaMovimentacao)]
+      : base;
+  return itens.sort((a, b) => (a.criadoEm < b.criadoEm ? 1 : -1));
 }
 
 function movimentacoesDoFluxo(): TransferenciaTesouraria[] {
@@ -780,21 +838,26 @@ async function confirmarExclusaoCofre(): Promise<void> {
               <span class="text-caption text-medium-emphasis">{{ formatarDataBr(t.dataLanc) }}</span>
               <v-spacer />
               <strong class="text-caption">R$ {{ formatCents(t.valorCents) }}</strong>
-              <v-btn
-                icon="mdi-delete-outline"
-                size="x-small"
-                variant="text"
-                color="error"
-                aria-label="Excluir movimentação"
-                @click="pedirExclusaoTransferencia(t.id)"
-              />
-              <v-btn
-                icon="mdi-pencil-outline"
-                size="x-small"
-                variant="text"
-                aria-label="Editar movimentação"
-                @click="abrirEdicaoTransferencia(t)"
-              />
+              <template v-if="!t.id.startsWith('entrada-troco-')">
+                <v-btn
+                  icon="mdi-delete-outline"
+                  size="x-small"
+                  variant="text"
+                  color="error"
+                  aria-label="Excluir movimentação"
+                  @click="pedirExclusaoTransferencia(t.id)"
+                />
+                <v-btn
+                  icon="mdi-pencil-outline"
+                  size="x-small"
+                  variant="text"
+                  aria-label="Editar movimentação"
+                  @click="abrirEdicaoTransferencia(t)"
+                />
+              </template>
+              <span v-else class="text-caption text-medium-emphasis font-italic"
+                >vem do fechamento</span
+              >
             </div>
             <template v-if="cofre === 'Fluxo'">
               <div

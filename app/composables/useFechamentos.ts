@@ -719,12 +719,23 @@ export function useFechamentos() {
     return fechamentoId;
   }
 
-  /** Busca um fechamento salvo com todos os itens filhos e devolve pronto pro formulário. */
+  /**
+   * Busca um fechamento salvo com todos os itens filhos e devolve pronto pro formulário.
+   *
+   * `cash_sessions!fechamentos_cash_session_id_fkey` (bug real, 01/10/2026 — admin não
+   * conseguia abrir NENHUM fechamento): desde que `cash_sessions.fechamento_id` existe (a sessão
+   * aponta de volta pro fechamento que a fechou), há DUAS relações entre as duas tabelas —
+   * `fechamentos.cash_session_id -> cash_sessions.id` (a que queremos: de qual sessão este
+   * fechamento veio) e `cash_sessions.fechamento_id -> fechamentos.id` (o inverso). Sem apontar
+   * explicitamente a constraint, o PostgREST não sabe mais qual usar e rejeita a query inteira
+   * (erro PGRST201, "more than one relationship was found") — a chave da resposta continua sendo
+   * `cash_sessions` (o `!constraint` é só a desambiguação, não um alias).
+   */
   async function obter(id: string): Promise<FechamentoDraft> {
     const { data, error } = await supabase
       .from('fechamentos')
       .select(
-        '*, cash_sessions(lacre_abertura), entradas(*), sangrias(*), transferencias_caixa(*), lancamentos(*), discriminacoes(*), crediario_itens(*), pdv_entradas(*)',
+        '*, cash_sessions!fechamentos_cash_session_id_fkey(lacre_abertura), entradas(*), sangrias(*), transferencias_caixa(*), lancamentos(*), discriminacoes(*), crediario_itens(*), pdv_entradas(*)',
       )
       .eq('id', id)
       .single();

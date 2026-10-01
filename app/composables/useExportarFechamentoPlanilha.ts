@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import { useSupabase } from './useSupabase';
+import { obterTokenValido, useSupabase } from './useSupabase';
 import { mensagemDeErro } from '~/utils/erros';
 
 /**
@@ -17,9 +17,7 @@ export function useExportarFechamentoPlanilha() {
     erro.value = '';
     try {
       const supabase = useSupabase();
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-      if (!token) throw new Error('Sessão expirada — faça login de novo.');
+      const token = await obterTokenValido(supabase);
 
       await $fetch(`/fechamentos/${fechamentoId}/exportar-planilha`, {
         method: 'POST',

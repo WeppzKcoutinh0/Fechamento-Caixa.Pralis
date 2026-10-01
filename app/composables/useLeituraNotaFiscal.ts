@@ -1,4 +1,4 @@
-import { useSupabase } from './useSupabase';
+import { obterTokenValido, useSupabase } from './useSupabase';
 import { blobParaBase64 } from '~/utils/blobParaBase64';
 
 interface ItemLeitura {
@@ -23,9 +23,7 @@ export function useLeituraNotaFiscal() {
   const supabase = useSupabase();
 
   async function enviarParaLeitura(arquivo: Blob): Promise<ResultadoLeitura> {
-    const { data: sessao } = await supabase.auth.getSession();
-    const token = sessao.session?.access_token;
-    if (!token) throw new Error('Sessão expirada — faça login novamente.');
+    const token = await obterTokenValido(supabase);
 
     return await $fetch<ResultadoLeitura>('/ia/ler-discriminacao-nota', {
       method: 'POST',

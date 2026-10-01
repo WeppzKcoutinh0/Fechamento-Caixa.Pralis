@@ -1,4 +1,4 @@
-import { useSupabase } from './useSupabase';
+import { obterTokenValido, useSupabase } from './useSupabase';
 import type { FechamentoDraft } from '~/types/fechamento';
 import { blobParaBase64 } from '~/utils/blobParaBase64';
 
@@ -47,9 +47,7 @@ export function useLeituraMaquininha() {
 
   async function enviarParaLeitura(arquivo: Blob, turno: Turno): Promise<ResultadoLeitura> {
     const imagem = await otimizarImagemParaIa(arquivo);
-    const { data: sessao } = await supabase.auth.getSession();
-    const token = sessao.session?.access_token;
-    if (!token) throw new Error('Sessão expirada — faça login novamente.');
+    const token = await obterTokenValido(supabase);
 
     return await $fetch<ResultadoLeitura>('/ia/ler-relatorio-maquininha', {
       method: 'POST',

@@ -1,4 +1,4 @@
-import { useSupabase } from './useSupabase';
+import { obterTokenValido, useSupabase } from './useSupabase';
 import { caixaParaNumero, turnoParaLetra } from '~/utils/vendasFechamento';
 import type { Caixa, EventoMaquinaDesligada, Turno } from '~/types/fechamento';
 
@@ -35,9 +35,7 @@ export function useDeteccaoMaquinaDesligada() {
     if (!numeroCaixa || !letraTurno) return { eventos: [], temDadosSuficientes: false };
 
     try {
-      const { data: sessao } = await supabase.auth.getSession();
-      const token = sessao.session?.access_token;
-      if (!token) return { eventos: [], temDadosSuficientes: false };
+      const token = await obterTokenValido(supabase);
 
       const resposta = await $fetch<{
         eventos: { descricao: string; confirmadoPelosDados: true }[];

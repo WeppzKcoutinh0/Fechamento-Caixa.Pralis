@@ -10,7 +10,7 @@ import CampoFoto from '~/components/comum/CampoFoto.vue';
 import CartaoValor from '~/components/comum/CartaoValor.vue';
 import DetalhesPagamentoMaquininha from './DetalhesPagamentoMaquininha.vue';
 import { useLeituraMaquininha } from '~/composables/useLeituraMaquininha';
-import { calculatePdvEntradas, formatCents, toCents } from '~/utils/financeiro';
+import { calculatePdvEntradas, formatCents } from '~/utils/financeiro';
 import { mensagemDeErro } from '~/utils/erros';
 
 const props = defineProps<{ draft: FechamentoDraft }>();

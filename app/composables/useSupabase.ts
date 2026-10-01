@@ -48,7 +48,11 @@ export async function fetchAutenticado<T>(
 ): Promise<T> {
   const token = await obterTokenValido(supabase);
   try {
-    return await $fetch<T>(url, { ...opcoes, headers: { authorization: `Bearer ${token}` } });
+    return (await $fetch(url, {
+      ...opcoes,
+      headers: { authorization: `Bearer ${token}` },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any)) as T;
   } catch (erro) {
     const status =
       (erro as { statusCode?: number; status?: number; response?: { status?: number } })
@@ -59,10 +63,11 @@ export async function fetchAutenticado<T>(
 
     const { data: atualizado, error } = await supabase.auth.refreshSession();
     if (error || !atualizado.session) throw erro;
-    return await $fetch<T>(url, {
+    return (await $fetch(url, {
       ...opcoes,
       headers: { authorization: `Bearer ${atualizado.session.access_token}` },
-    });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any)) as T;
   }
 }
 

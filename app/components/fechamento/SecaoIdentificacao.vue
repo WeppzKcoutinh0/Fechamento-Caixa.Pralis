@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { CAIXAS, TURNOS, type Caixa, type FechamentoDraft, type Turno } from '~/types/fechamento';
 import { useVendasCanceladas } from '~/composables/useVendasCanceladas';
 import { useVendasFechamento } from '~/composables/useVendasFechamento';
@@ -101,6 +101,7 @@ async function buscarVendas() {
 let atualizacaoAutomatica: ReturnType<typeof setInterval> | undefined;
 let atualizandoAutomaticamente = false;
 async function atualizarVendasAutomaticamente(): Promise<void> {
+  if (!filtrarPorHorario.value) return;
   if (atualizandoAutomaticamente || ocupadoBuscarVendas.value || ocupadoCanceladas.value) return;
   atualizandoAutomaticamente = true;
   try {
@@ -117,6 +118,13 @@ onMounted(() => {
   atualizacaoAutomatica = setInterval(() => {
     void atualizarVendasAutomaticamente();
   }, 60_000);
+});
+
+// Obrigatório marcar o filtro por horário (pedido do usuário, 01/10/2026): sem isso nem o botão
+// nem a atualização automática buscam nada — assim que o interruptor liga, busca na hora, sem
+// esperar o próximo ciclo de 60s.
+watch(filtrarPorHorario, (ligado) => {
+  if (ligado) void atualizarVendasAutomaticamente();
 });
 
 onBeforeUnmount(() => {
@@ -221,6 +229,10 @@ const ajustesPresentes = computed(() => {
         hide-details
         class="flex-grow-0"
       />
+      <p class="text-caption text-medium-emphasis mt-n2">
+        Obrigatório marcar — evita contar a mesma venda duas vezes (o robô grava o total do turno
+        junto com o detalhe por hora).
+      </p>
       <template v-if="filtrarPorHorario">
         <div class="d-flex flex-column flex-sm-row ga-3">
           <v-text-field v-model="horaInicio" label="Horário de" type="time" />
@@ -236,7 +248,7 @@ const ajustesPresentes = computed(() => {
           color="primary"
           variant="tonal"
           :loading="ocupadoBuscarVendas"
-          :disabled="ocupadoBuscarVendas || !dataVendas"
+          :disabled="ocupadoBuscarVendas || !dataVendas || !filtrarPorHorario"
           @click="buscarVendas"
         >
           {{

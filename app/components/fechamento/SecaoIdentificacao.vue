@@ -94,21 +94,17 @@ async function buscarVendas() {
   }
 }
 
-// O robô local envia CREARE -> API -> Supabase a cada minuto. Depois que o operador faz a
-// primeira busca, esta tela só relê o Supabase a cada 60s: não relê a planilha nem disputa com o
-// robô. Assim os números reais novos aparecem no próprio fechamento sem apertar o botão de novo.
+// O robô local envia CREARE -> API -> Supabase a cada minuto. A tela relê o Supabase a cada 60s
+// sozinha, sem precisar de nenhum clique antes (pedido do usuário, 01/10/2026: "deixe a venda
+// pingar real" — antes só começava a atualizar depois de um primeiro "Buscar vendas" manual; agora
+// já busca sozinha assim que a tela abre, com caixa/turno já travados da conta).
 let atualizacaoAutomatica: ReturnType<typeof setInterval> | undefined;
 let atualizandoAutomaticamente = false;
 async function atualizarVendasAutomaticamente(): Promise<void> {
-  if (
-    !jaBuscou.value ||
-    atualizandoAutomaticamente ||
-    ocupadoBuscarVendas.value ||
-    ocupadoCanceladas.value
-  )
-    return;
+  if (atualizandoAutomaticamente || ocupadoBuscarVendas.value || ocupadoCanceladas.value) return;
   atualizandoAutomaticamente = true;
   try {
+    jaBuscou.value = true;
     await buscarPorData(dataVendas.value, filtroBusca.value);
     if (jaBuscouCanceladas.value) await buscarVendasCanceladasBase(dataVendas.value);
   } finally {
@@ -117,6 +113,7 @@ async function atualizarVendasAutomaticamente(): Promise<void> {
 }
 
 onMounted(() => {
+  void atualizarVendasAutomaticamente();
   atualizacaoAutomatica = setInterval(() => {
     void atualizarVendasAutomaticamente();
   }, 60_000);
@@ -314,6 +311,18 @@ const ajustesPresentes = computed(() => {
       <template v-if="jaBuscou && !ocupadoBuscarVendas">
         <v-alert v-if="erro" type="error" variant="tonal" density="comfortable">
           {{ erro }}
+        </v-alert>
+
+        <v-alert
+          v-else-if="resumo && resumo.registros === 0 && filtrarPorHorario"
+          type="info"
+          variant="tonal"
+          density="comfortable"
+        >
+          Nenhuma venda por hora encontrada pra {{ rotuloFiltro }} em
+          {{ formatarDataBr(resumo.data) }}. O robô só grava o horário de cada venda a partir de
+          29/09/2026 — dias antes disso (ou um caixa/turno que ainda não vendeu nesse intervalo
+          hoje) não têm esse detalhe. Desligue o filtro por horário pra ver o total do dia inteiro.
         </v-alert>
 
         <v-alert

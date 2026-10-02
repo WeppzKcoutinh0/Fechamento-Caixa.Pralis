@@ -8,6 +8,7 @@
  */
 import { criarFechamentoVazio, type FechamentoDraft } from '~/types/fechamento';
 import { toCents } from './financeiro';
+import { gerarId } from './id';
 
 const CHAVE_LOCALSTORAGE = 'fechamentos_caixa';
 
@@ -107,7 +108,7 @@ export function draftDoRegistroAntigo(reg: RegistroAntigo): FechamentoDraft {
   draft.lancamentos = (reg.lancamentos ?? []).map((l) => ({
     // Gerado agora — o formato antigo (localStorage) não tinha id de lançamento porque só existia
     // no máximo 1 por tipo (a mesma limitação que este importador está com pressa de corrigir).
-    id: crypto.randomUUID(),
+    id: gerarId(),
     tipo: tipoLancamentoValido(l.tipo),
     status: statusValido(l.status),
     dataRef: textoDe(l.dataRef),
@@ -153,7 +154,7 @@ export function draftDoRegistroAntigo(reg: RegistroAntigo): FechamentoDraft {
   // pra corrigir) — migra pro único item da lista nova.
   draft.pdvEntradas = [
     {
-      id: crypto.randomUUID(),
+      id: gerarId(),
       nrClientes:
         typeof reg.nrClientes === 'number'
           ? reg.nrClientes

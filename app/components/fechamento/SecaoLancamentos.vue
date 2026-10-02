@@ -24,6 +24,7 @@ import {
   formatCents,
 } from '~/utils/financeiro';
 import { mensagemDeErro } from '~/utils/erros';
+import { gerarId } from '~/utils/id';
 
 const props = defineProps<{ draft: FechamentoDraft }>();
 const { perfil } = usePerfil();
@@ -127,7 +128,7 @@ const ROTULOS_GRUPO: Record<string, string> = {
 // decisão deliberada dele, "é fechamento de caixa daquele dia específico".
 function novoLancamento(tipo: TipoLancamento): LancamentoDraft {
   return {
-    id: crypto.randomUUID(),
+    id: gerarId(),
     tipo,
     status: 'naopago',
     dataRef: props.draft.data,

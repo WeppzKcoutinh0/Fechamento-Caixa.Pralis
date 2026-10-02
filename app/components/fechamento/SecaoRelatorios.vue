@@ -12,6 +12,7 @@ import DetalhesPagamentoMaquininha from './DetalhesPagamentoMaquininha.vue';
 import { useLeituraMaquininha } from '~/composables/useLeituraMaquininha';
 import { calculatePdvEntradas, formatCents } from '~/utils/financeiro';
 import { mensagemDeErro } from '~/utils/erros';
+import { gerarId } from '~/utils/id';
 
 const props = defineProps<{ draft: FechamentoDraft }>();
 
@@ -86,7 +87,7 @@ function aoDigitarNumeros(valorBruto: string | number | null): string {
 // aplicarResumoAoPrimeiroPdv); PDVs extras são sempre manuais.
 function novaPdvEntrada(): PdvEntradaDraft {
   return {
-    id: crypto.randomUUID(),
+    id: gerarId(),
     nrClientes: 0,
     dinheiroCents: 0,
     creditoCents: 0,

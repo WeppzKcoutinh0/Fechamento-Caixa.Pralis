@@ -12,6 +12,7 @@ import type {
 } from '~/types/fechamento';
 import type { ResumoVendasDia } from '~/types/vendasFechamento';
 import { formatCents, toCents } from '~/utils/financeiro';
+import { gerarId } from '~/utils/id';
 
 /**
  * "Caixa 1" -> "1" — o bot grava só o número na coluna `caixa` (extraído do texto do operador,
@@ -47,7 +48,7 @@ export function aplicarResumoAoPrimeiroPdv(draft: FechamentoDraft, resumo: Resum
     crediarioCents: toCents(resumo.porForma.crediario),
   };
   if (draft.pdvEntradas.length === 0) {
-    draft.pdvEntradas.push({ id: crypto.randomUUID(), ...valores });
+    draft.pdvEntradas.push({ id: gerarId(), ...valores });
   } else {
     Object.assign(draft.pdvEntradas[0]!, valores);
   }
@@ -124,7 +125,7 @@ export function aplicarAjustesComoLancamentos(
       existente.obsTexto = obsTexto;
     } else {
       const novo: LancamentoDraft = {
-        id: crypto.randomUUID(),
+        id: gerarId(),
         tipo,
         status: 'naopago',
         dataRef: resumo.data,

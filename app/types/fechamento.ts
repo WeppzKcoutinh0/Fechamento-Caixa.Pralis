@@ -4,6 +4,7 @@
  * monetários ficam em centavos inteiros (ver `utils/financeiro.ts`), convertidos para decimal
  * só na hora de chamar `salvar_fechamento`.
  */
+import { gerarId } from '~/utils/id';
 
 // Caixa 5 (pedido do usuário, 24/09/2026) — operado pelo gerente no turno da manhã, e como um
 // caixa normal no turno da tarde. Mesmo tratamento dos outros 4 em todo o resto do app.
@@ -166,7 +167,7 @@ export interface TransferenciaCaixaDraft {
 }
 
 export interface LancamentoDraft {
-  // Gerado no client (crypto.randomUUID()) na criação e mantido como PK real na tabela
+  // Gerado no client (utils/id.ts::gerarId()) na criação e mantido como PK real na tabela
   // `lancamentos` — é o que permite ter N despesas/mercadorias/retiradas por fechamento
   // (a UI, antes desta extensão, só mostrava 1 lançamento por tipo) e ainda ligar cada item
   // discriminado (`DiscriminacaoDraft.lancamentoId`) ao lançamento certo, não só ao tipo.
@@ -423,7 +424,7 @@ export function criarFechamentoVazio(contexto?: ContextoSessaoCaixa): Fechamento
   return {
     // Gerado no client desde já (não só ao salvar) para os anexos (Storage) terem um caminho
     // estável mesmo antes do primeiro "Salvar" — o RPC aceita esse id como o da linha final.
-    id: crypto.randomUUID(),
+    id: gerarId(),
     codigo: gerarCodigo(),
     data: contexto?.businessDate ?? hojeISO(),
     caixa: contexto?.caixa ?? '',

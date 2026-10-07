@@ -24,3 +24,6 @@ Thumbs.db
 # Cache local do Supabase CLI (regenerado sozinho a cada comando, não é segredo mas também não é
 # código do projeto).
 supabase/.temp/
+
+# Backups de migração: contêm dados reais e nunca devem entrar no Git.
+backups/

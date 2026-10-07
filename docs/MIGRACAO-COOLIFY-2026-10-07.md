@@ -2,42 +2,36 @@
 
 ## Estado atual
 
-- Aplicação: Nuxt 4 + Vue + Vuetify + Nitro, com Dockerfile já existente.
-- Origem: GitHub, Supabase Cloud e Vercel.
+- Aplicação Nuxt 4 + Vue + Vuetify + Nitro publicada a partir do GitHub.
 - Destino: Coolify no servidor `187.77.54.180`.
-- O projeto `Cicluz` já possui uma aplicação Docker Compose.
-- Foi criado no projeto `Cicluz` um serviço Supabase self-hosted paralelo para validação.
-- O primeiro deploy desse serviço falhou ao baixar `minio/mc`; nenhum dado foi importado.
+- Foi criado um Supabase self-hosted paralelo no projeto `Cicluz`.
+- O armazenamento usa backend local em arquivo (`/var/lib/storage`).
+- As migrations do repositório foram aplicadas em ordem no banco novo (`MIGRATIONS_OK`).
+- Conforme autorizado, os dados e logins antigos não foram restaurados.
+- O app foi publicado no Coolify no commit `9f9561d` e está em execução.
 
 ## Backup gerado
 
-Foi gerado localmente, sem alteração no banco de origem:
+Foram gerados localmente, sem alteração no banco de origem:
 
 - `backups/supabase-2026-10-07/public-data.sql`
 - `backups/supabase-2026-10-07/auth-data.sql`
 - `backups/supabase-2026-10-07/storage-data.sql`
 
-Esses arquivos contêm dados reais e estão bloqueados pelo `.gitignore`. Não devem ser enviados ao GitHub, Vercel, chat ou compartilhados por mensagem.
+Esses arquivos contêm dados reais e estão bloqueados pelo `.gitignore`.
 
-## Dependências que precisam ser preservadas
+## Validações concluídas
 
-O sistema não depende apenas de PostgreSQL. Ele usa Supabase Auth, PostgREST, RLS, RPCs, Storage, Realtime e `auth.uid()`. A migração correta precisa manter a instalação Supabase completa ou substituir toda essa arquitetura.
+- Schema, tabelas, funções RPC e bucket `anexos` foram validados no banco novo.
+- O app responde HTTP 200 na URL gerada pelo Coolify.
+- O cron `Sincronizar vendas Creare` foi criado com `0 8 * * *`, substituindo o cron da Vercel.
+- O `.mcp.json` do Playwright MCP foi adicionado ao projeto.
 
-Há 71 migrations em `supabase/migrations`, tabelas com referências a `auth.users`, o bucket privado `anexos` e funções financeiras com `SECURITY DEFINER`.
+## Pendências manuais antes do uso real
 
-## Próximas etapas seguras
-
-1. Corrigir o template self-hosted no Coolify e fazer todos os containers ficarem saudáveis.
-2. Configurar domínio HTTPS para Kong/API, Studio e o app.
-3. Aplicar as migrations na ordem, sem executar `db reset` no ambiente real.
-4. Restaurar dados `auth`, `public` e metadados `storage` preservando UUIDs.
-5. Copiar os arquivos binários do bucket `anexos` separadamente.
-6. Validar login, RLS, RPCs, anexos, importação de vendas e exportação de planilhas.
-7. Publicar o app no Coolify apontando para a nova URL Supabase.
-8. Configurar o cron de importação que hoje existe apenas na Vercel.
-9. Atualizar o agente CREARE para a nova URL somente após o teste paralelo.
-10. Manter Supabase/Vercel antigos como rollback até a validação final.
-
-## Playwright MCP
-
-Foi adicionado `.mcp.json` com o servidor oficial `@playwright/mcp@latest` em modo extensão. O cliente MCP precisa reiniciar/recarregar o projeto para reconhecer a configuração. A extensão/conexão do navegador ainda precisa estar habilitada no cliente usado.
+1. Criar as novas contas admin/caixa no Supabase novo e testar cada perfil.
+2. Informar no Coolify as credenciais do Google Sheets: `NUXT_GOOGLE_SERVICE_ACCOUNT_JSON`,
+   `NUXT_GOOGLE_SPREADSHEET_ID` e, se aplicável, `NUXT_GOOGLE_SPREADSHEET_ID_SECUNDARIO`.
+3. Configurar um domínio HTTPS definitivo; a URL `sslip.io` é adequada para teste, não para
+   operação definitiva.
+4. Validar uma sincronização real e um fechamento de teste antes de desligar Vercel/Supabase.

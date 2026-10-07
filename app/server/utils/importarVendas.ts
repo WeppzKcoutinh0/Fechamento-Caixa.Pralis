@@ -208,12 +208,7 @@ export async function processarImportacao(
 
   if (resposta.error) {
     registrarErroSupabase(`upsert ${tipo}`, resposta.error);
-    throw new ErroImportacaoVendas('INTEGRATION_DATABASE_ERROR', 503, {
-      codigo: resposta.error.code ?? null,
-      mensagem: resposta.error.message ?? null,
-      detalhes: resposta.error.details ?? null,
-      dica: resposta.error.hint ?? null,
-    });
+    throw new ErroImportacaoVendas('INTEGRATION_DATABASE_ERROR', 503);
   }
 
   return { recebidas: resposta.recebidas, gravadas: resposta.count ?? resposta.recebidas };

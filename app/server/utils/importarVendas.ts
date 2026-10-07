@@ -22,6 +22,16 @@ class ErroImportacaoVendas extends Error {
   }
 }
 
+function registrarErroSupabase(contexto: string, error: unknown): void {
+  const erro = error as { code?: string; message?: string; details?: string; hint?: string } | null;
+  console.error(`[importarVendas] ${contexto}`, {
+    code: erro?.code ?? null,
+    message: erro?.message ?? null,
+    details: erro?.details ?? null,
+    hint: erro?.hint ?? null,
+  });
+}
+
 // data_venda null = "DATA_VENDA" não bateu com nenhum formato conhecido (DD/MM/YYYY ou
 // YYYY-MM-DD) — payload malformado, não erro transitório: não adianta re-tentar sem corrigir a
 // origem.
@@ -197,6 +207,7 @@ export async function processarImportacao(
         })();
 
   if (resposta.error) {
+    registrarErroSupabase(`upsert ${tipo}`, resposta.error);
     throw new ErroImportacaoVendas('INTEGRATION_DATABASE_ERROR', 503, {
       codigo: resposta.error.code ?? null,
     });

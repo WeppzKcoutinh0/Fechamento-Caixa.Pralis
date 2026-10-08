@@ -54,7 +54,7 @@ async function entrar() {
 
     <v-card class="login-card cartao-entrada" elevation="0">
       <div class="login-brand" aria-label="Cicluz Gestão Profissional">
-        <AppLogoAnimada size="clamp(78px, 12vh, 104px)" :glow-intensity="0.26" />
+        <AppLogoAnimada size="clamp(96px, 15vh, 128px)" :glow-intensity="0.26" />
         <span class="login-brand__word">
           <img src="/marca/cicluz-palavra.svg" alt="Cicluz" />
           <span>Gestão Profissional</span>
@@ -133,10 +133,10 @@ async function entrar() {
 
 .login-brand {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--cx-sp-3);
+  gap: 2px;
   margin-bottom: var(--cx-sp-5);
   animation: login-in var(--cx-dur-3) var(--cx-ease-out) 60ms both;
 }
@@ -146,7 +146,7 @@ async function entrar() {
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  width: min(176px, 52vw);
+  width: min(190px, 62vw);
 }
 
 .login-brand__word img { display: block; width: 100%; height: auto; }

@@ -67,21 +67,25 @@ export function useVendasFechamento() {
           valor_total: number | string;
         }>;
         const idsVendas = vendasBase.map((venda) => venda.id).filter(Boolean);
-        const { data: pagamentos, error: erroPagamentos } = idsVendas.length
-          ? await supabase
-              .from('vendas_pagamentos')
-              .select('venda_id, forma_pagamento, valor')
-              .in('venda_id', idsVendas)
-          : { data: [], error: null };
-
-        if (erroPagamentos) throw erroPagamentos;
-
-        const pagamentosPorVenda = new Map<string, Array<{ forma_pagamento: string; valor: number | string }>>();
-        for (const pagamento of (pagamentos ?? []) as Array<{
+        const pagamentos: Array<{
           venda_id: string;
           forma_pagamento: string;
           valor: number | string;
-        }>) {
+        }> = [];
+        // Mantém a URL da consulta pequena. Um único `in(...)` com todas as vendas do turno
+        // pode ultrapassar o limite do proxy/PostgREST e virar apenas "Failed to fetch".
+        for (let inicio = 0; inicio < idsVendas.length; inicio += 75) {
+          const loteIds = idsVendas.slice(inicio, inicio + 75);
+          const { data: pagamentosLote, error: erroPagamentos } = await supabase
+            .from('vendas_pagamentos')
+            .select('venda_id, forma_pagamento, valor')
+            .in('venda_id', loteIds);
+          if (erroPagamentos) throw erroPagamentos;
+          pagamentos.push(...((pagamentosLote ?? []) as typeof pagamentos));
+        }
+
+        const pagamentosPorVenda = new Map<string, Array<{ forma_pagamento: string; valor: number | string }>>();
+        for (const pagamento of pagamentos) {
           const lista = pagamentosPorVenda.get(pagamento.venda_id) ?? [];
           lista.push({ forma_pagamento: pagamento.forma_pagamento, valor: pagamento.valor });
           pagamentosPorVenda.set(pagamento.venda_id, lista);

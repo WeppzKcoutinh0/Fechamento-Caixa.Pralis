@@ -59,7 +59,7 @@ export function useVendasFechamento() {
           operador: string | null;
           valor_total: number | string;
           vendas_pagamentos: Array<{ venda_id: string; forma_pagamento: string; valor: number | string }>;
-        }>>(supabase, `/api/vendas/horario?data=${encodeURIComponent(data)}`, { method: 'GET' });
+        }>>(supabase, `/vendas/horario?data=${encodeURIComponent(data)}`, { method: 'GET' });
 
         resumo.value = calcularResumoVendasPorHorario(
           data,

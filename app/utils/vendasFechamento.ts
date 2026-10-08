@@ -168,6 +168,7 @@ export interface FechamentoCaixaDiaRow {
 }
 
 export interface VendaComPagamentoHorarioRow {
+  id?: string;
   hora_venda: string | null;
   operador: string | null;
   valor_total: number | string;

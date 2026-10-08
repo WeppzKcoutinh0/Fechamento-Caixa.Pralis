@@ -54,15 +54,47 @@ export function useVendasFechamento() {
       if (temFiltroPorHorario) {
         const { data: vendas, error } = await supabase
           .from('vendas')
-          .select('hora_venda, operador, valor_total, vendas_pagamentos(forma_pagamento, valor)')
+          .select('id, hora_venda, operador, valor_total')
           .eq('data_venda', data)
           .eq('status', 'FINALIZADA');
 
         if (error) throw error;
 
+        const vendasBase = (vendas ?? []) as Array<{
+          id: string;
+          hora_venda: string | null;
+          operador: string | null;
+          valor_total: number | string;
+        }>;
+        const idsVendas = vendasBase.map((venda) => venda.id).filter(Boolean);
+        const { data: pagamentos, error: erroPagamentos } = idsVendas.length
+          ? await supabase
+              .from('vendas_pagamentos')
+              .select('venda_id, forma_pagamento, valor')
+              .in('venda_id', idsVendas)
+          : { data: [], error: null };
+
+        if (erroPagamentos) throw erroPagamentos;
+
+        const pagamentosPorVenda = new Map<string, Array<{ forma_pagamento: string; valor: number | string }>>();
+        for (const pagamento of (pagamentos ?? []) as Array<{
+          venda_id: string;
+          forma_pagamento: string;
+          valor: number | string;
+        }>) {
+          const lista = pagamentosPorVenda.get(pagamento.venda_id) ?? [];
+          lista.push({ forma_pagamento: pagamento.forma_pagamento, valor: pagamento.valor });
+          pagamentosPorVenda.set(pagamento.venda_id, lista);
+        }
+
+        const vendasComPagamentos = vendasBase.map((venda) => ({
+          ...venda,
+          vendas_pagamentos: pagamentosPorVenda.get(venda.id) ?? [],
+        }));
+
         resumo.value = calcularResumoVendasPorHorario(
           data,
-          (vendas ?? []) as VendaComPagamentoHorarioRow[],
+          vendasComPagamentos as VendaComPagamentoHorarioRow[],
           {
             caixa: filtros?.caixa ?? null,
             turno: filtros?.turno ?? null,

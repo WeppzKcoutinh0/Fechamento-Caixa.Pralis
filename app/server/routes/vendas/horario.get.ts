@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
   const supabase = useSupabaseAdmin();
   const { data, error } = await supabase
     .from('vendas')
-    .select('id, hora_venda, operador, valor_total, vendas_pagamentos(venda_id, forma_pagamento, valor)')
+    .select('id, hora_venda, operador, pdv, valor_total, vendas_pagamentos(venda_id, forma_pagamento, valor)')
     .eq('data_venda', resultado.data.data)
     .eq('status', 'FINALIZADA');
 

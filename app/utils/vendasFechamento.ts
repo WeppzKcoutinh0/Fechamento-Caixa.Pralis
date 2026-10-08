@@ -171,6 +171,7 @@ export interface VendaComPagamentoHorarioRow {
   id?: string;
   hora_venda: string | null;
   operador: string | null;
+  pdv?: string | null;
   valor_total: number | string;
   vendas_pagamentos?: Array<{ forma_pagamento: string; valor: number | string }>;
 }
@@ -201,16 +202,26 @@ function categoriaPagamento(forma: string): keyof ResumoVendasDia['porForma'] {
   return 'outros';
 }
 
-function operadorPertenceAoFiltro(operador: string | null, caixa?: string | null, turno?: string | null): boolean {
+function operadorPertenceAoFiltro(
+  operador: string | null,
+  pdv: string | null,
+  caixa?: string | null,
+  turno?: string | null,
+): boolean {
   if (!caixa && !turno) return true;
-  const nome = String(operador ?? '')
+  const nome = `${operador ?? ''} ${pdv ?? ''}`
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toUpperCase();
-  const encontrado = nome.match(/(?:CAIXA\s*)?(\d+)\s*(?:[- ]\s*)?(M|T|MANHA|TARDE)\b/);
-  if (!encontrado) return false;
-  const turnoEncontrado = encontrado[2] === 'MANHA' ? 'M' : encontrado[2] === 'TARDE' ? 'T' : encontrado[2];
-  return (!caixa || encontrado[1] === caixa) && (!turno || turnoEncontrado === turno);
+  const caixaEncontrado =
+    nome.match(/\bCAIXA\s*(\d+)\b/)?.[1] ??
+    nome.match(/\b(\d+)\s*[MT]\b/)?.[1] ??
+    nome.match(/\b(\d+)\s*(?:MANHA|TARDE)\b/)?.[1];
+  const turnoToken =
+    nome.match(/\b(MANHA|TARDE)\b/)?.[1] ??
+    nome.match(/\b\d+\s*(?:[- ]\s*)?(M|T)\b/)?.[1];
+  const turnoEncontrado = turnoToken === 'MANHA' ? 'M' : turnoToken === 'TARDE' ? 'T' : turnoToken;
+  return (!caixa || caixaEncontrado === caixa) && (!turno || turnoEncontrado === turno);
 }
 
 /** Soma vendas individuais pelo horário completo, sem incluir a hora inteira do limite final. */
@@ -220,7 +231,7 @@ export function calcularResumoVendasPorHorario(
   filtros: { caixa?: string | null; turno?: string | null; inicioSegundos?: number | null; fimSegundos?: number | null },
 ): ResumoVendasDia {
   const registros = vendas.filter((venda) => {
-    if (!operadorPertenceAoFiltro(venda.operador, filtros.caixa, filtros.turno)) return false;
+    if (!operadorPertenceAoFiltro(venda.operador, venda.pdv ?? null, filtros.caixa, filtros.turno)) return false;
     const segundos = segundosDaHora(venda.hora_venda);
     if (segundos === null) return false;
     if (filtros.inicioSegundos !== null && filtros.inicioSegundos !== undefined && segundos < filtros.inicioSegundos) return false;

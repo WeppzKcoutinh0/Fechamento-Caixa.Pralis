@@ -57,6 +57,7 @@ export function useVendasFechamento() {
           id: string;
           hora_venda: string | null;
           operador: string | null;
+          pdv: string | null;
           valor_total: number | string;
           vendas_pagamentos: Array<{ venda_id: string; forma_pagamento: string; valor: number | string }>;
         }>>(supabase, `/vendas/horario?data=${encodeURIComponent(data)}`, { method: 'GET' });

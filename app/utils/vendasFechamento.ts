@@ -167,6 +167,87 @@ export interface FechamentoCaixaDiaRow {
   sobra_perda?: number | string | null;
 }
 
+export interface VendaComPagamentoHorarioRow {
+  hora_venda: string | null;
+  operador: string | null;
+  valor_total: number | string;
+  vendas_pagamentos?: Array<{ forma_pagamento: string; valor: number | string }>;
+}
+
+function segundosDaHora(hora: string | null): number | null {
+  if (!hora) return null;
+  const partes = hora.split(':').map(Number);
+  if (partes.length < 3 || !Number.isFinite(partes[0]) || !Number.isFinite(partes[1]) || !Number.isFinite(partes[2])) return null;
+  return partes[0]! * 3600 + partes[1]! * 60 + partes[2]!;
+}
+
+function formaPagamentoNormalizada(forma: string): string {
+  return forma
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .trim();
+}
+
+function categoriaPagamento(forma: string): keyof ResumoVendasDia['porForma'] {
+  const normalizada = formaPagamentoNormalizada(forma);
+  if (normalizada.includes('DINHEIRO')) return 'dinheiro';
+  if (normalizada.includes('CREDITO')) return 'credito';
+  if (normalizada.includes('DEBITO')) return 'debito';
+  if (normalizada.includes('PIX')) return 'pix';
+  if (normalizada.includes('VOUCHER')) return 'voucher';
+  if (normalizada.includes('CLIENTE') || normalizada.includes('CREDIARIO')) return 'crediario';
+  return 'outros';
+}
+
+function operadorPertenceAoFiltro(operador: string | null, caixa?: string | null, turno?: string | null): boolean {
+  if (!caixa && !turno) return true;
+  const encontrado = String(operador ?? '').match(/\b(\d+)\s*([MT])\b/i);
+  if (!encontrado) return false;
+  return (!caixa || encontrado[1] === caixa) && (!turno || encontrado[2]!.toUpperCase() === turno);
+}
+
+/** Soma vendas individuais pelo horário completo, sem incluir a hora inteira do limite final. */
+export function calcularResumoVendasPorHorario(
+  data: string,
+  vendas: VendaComPagamentoHorarioRow[],
+  filtros: { caixa?: string | null; turno?: string | null; inicioSegundos?: number | null; fimSegundos?: number | null },
+): ResumoVendasDia {
+  const registros = vendas.filter((venda) => {
+    if (!operadorPertenceAoFiltro(venda.operador, filtros.caixa, filtros.turno)) return false;
+    const segundos = segundosDaHora(venda.hora_venda);
+    if (segundos === null) return false;
+    if (filtros.inicioSegundos !== null && filtros.inicioSegundos !== undefined && segundos < filtros.inicioSegundos) return false;
+    if (filtros.fimSegundos !== null && filtros.fimSegundos !== undefined && segundos > filtros.fimSegundos) return false;
+    return true;
+  });
+
+  const porForma = { dinheiro: 0, credito: 0, debito: 0, pix: 0, voucher: 0, crediario: 0, outros: 0 };
+  let totalPagamento = 0;
+  for (const venda of registros) {
+    const pagamentos = venda.vendas_pagamentos ?? [];
+    if (pagamentos.length === 0) {
+      porForma.outros += Number(venda.valor_total ?? 0);
+      totalPagamento += Number(venda.valor_total ?? 0);
+      continue;
+    }
+    for (const pagamento of pagamentos) {
+      const valor = Number(pagamento.valor ?? 0);
+      porForma[categoriaPagamento(pagamento.forma_pagamento)] += valor;
+      totalPagamento += valor;
+    }
+  }
+
+  return {
+    data,
+    registros: registros.length,
+    numeroVendas: registros.length,
+    totalPagamento,
+    porForma,
+    ajustes: { colaboradores: 0, alimentacao: 0, rouboFurto: 0, socios: 0, sobraPerda: 0 },
+  };
+}
+
 /** "2026-08-21" -> "21/08/2026", para as mensagens de feedback do botão "Buscar vendas". */
 export function formatarDataBr(dataIso: string): string {
   const [ano, mes, dia] = dataIso.split('-');

@@ -43,10 +43,8 @@ const dataVendas = ref(props.draft.data);
 const { erro, resumo, buscarPorData } = useVendasFechamento();
 const jaBuscou = ref(false);
 
-// Filtro por horário (pedido do usuário): o bot passou a sincronizar por hora cheia da venda,
-// não só por turno inteiro (ver FECHAMENTO_CAIXA.sql v6) — então dá pra restringir ainda mais a
-// busca a um intervalo, ex. "Caixa 1 das 8h às 12h". Granularidade de hora cheia só: os campos
-// são <input type="time"> por familiaridade, mas só a HORA é usada (minutos são ignorados).
+// Filtro por horário: as vendas individuais sincronizadas pelo robô carregam hora, minuto e
+// segundo. Os campos aceitam HH:MM:SS e o limite é comparado exatamente com o horário da venda.
 //
 // `filtrarPorHorario` (interruptor, começa desligado) é o que DECIDE se o filtro vale — não
 // "os campos estão vazios ou não". Bug real: um clique sem querer num <input type="time"> já
@@ -56,31 +54,44 @@ const jaBuscou = ref(false);
 // nenhum aviso do porquê. Com o interruptor, os campos só contam quando o usuário liga de
 // propósito.
 const filtrarPorHorario = ref(false);
-const horaInicio = ref('00:00');
-const horaFim = ref('23:00');
+const horaInicio = ref('00:00:00');
+const horaFim = ref('23:59:59');
 
-function horaDoCampo(valor: string): number | null {
-  const hora = parseInt(valor.split(':')[0] ?? '', 10);
-  return Number.isFinite(hora) ? hora : null;
+function segundosDoCampo(valor: string): number | null {
+  const partes = valor.split(':').map(Number);
+  if (partes.length < 3) return null;
+  const hora = partes[0]!;
+  const minuto = partes[1]!;
+  const segundo = partes[2]!;
+  if (!Number.isInteger(hora) || !Number.isInteger(minuto) || !Number.isInteger(segundo)) return null;
+  if (hora < 0 || hora > 23 || minuto < 0 || minuto > 59 || segundo < 0 || segundo > 59) return null;
+  return hora * 3600 + minuto * 60 + segundo;
 }
 
 const rotuloFiltro = computed(() => {
   const partes = [props.draft.caixa, props.draft.turno].filter(Boolean);
   const base = partes.length ? partes.join(' - ') : 'todos os caixas';
   if (!filtrarPorHorario.value) return base;
-  const hi = horaDoCampo(horaInicio.value);
-  const hf = horaDoCampo(horaFim.value);
+  const hi = segundosDoCampo(horaInicio.value);
+  const hf = segundosDoCampo(horaFim.value);
   const rotuloHora = `${hi !== null ? String(hi).padStart(2, '0') + 'h' : 'início'} às ${hf !== null ? String(hf).padStart(2, '0') + 'h' : 'fim'}`;
   return `${base}, ${rotuloHora}`;
 });
 
 // Fluxo oficial (29/09/2026): o robô CREARE grava direto em vendas_fechamento_caixa_dia a cada
 // minuto — não depende mais de planilha/cron/sincronização manual (ver SecaoRelatorios.vue).
+const rotuloFiltroExato = computed(() => {
+  const partes = [props.draft.caixa, props.draft.turno].filter(Boolean);
+  const base = partes.length ? partes.join(' - ') : 'todos os caixas';
+  if (!filtrarPorHorario.value) return base;
+  return `${base}, ${horaInicio.value} às ${horaFim.value}`;
+});
+
 const filtroBusca = computed(() => ({
   caixa: caixaParaNumero(props.draft.caixa),
   turno: turnoParaLetra(props.draft.turno),
-  horaInicio: filtrarPorHorario.value ? horaDoCampo(horaInicio.value) : null,
-  horaFim: filtrarPorHorario.value ? horaDoCampo(horaFim.value) : null,
+  horaInicio: filtrarPorHorario.value ? segundosDoCampo(horaInicio.value) : null,
+  horaFim: filtrarPorHorario.value ? segundosDoCampo(horaFim.value) : null,
 }));
 
 const ocupadoBuscarVendas = ref(false);
@@ -235,11 +246,11 @@ const ajustesPresentes = computed(() => {
       </p>
       <template v-if="filtrarPorHorario">
         <div class="d-flex flex-column flex-sm-row ga-3">
-          <v-text-field v-model="horaInicio" label="Horário de" type="time" />
-          <v-text-field v-model="horaFim" label="Horário até" type="time" />
+          <v-text-field v-model="horaInicio" label="Horário de" type="time" step="1" />
+          <v-text-field v-model="horaFim" label="Horário até" type="time" step="1" />
         </div>
         <p class="text-caption text-medium-emphasis mt-n2">
-          Filtra por hora cheia — os minutos são ignorados.
+          Filtra pelo horário completo da venda — horas, minutos e segundos são considerados.
         </p>
       </template>
 
@@ -331,7 +342,7 @@ const ajustesPresentes = computed(() => {
           variant="tonal"
           density="comfortable"
         >
-          Nenhuma venda por hora encontrada pra {{ rotuloFiltro }} em
+          Nenhuma venda encontrada no intervalo {{ rotuloFiltroExato }} em
           {{ formatarDataBr(resumo.data) }}. O robô só grava o horário de cada venda a partir de
           29/09/2026 — dias antes disso (ou um caixa/turno que ainda não vendeu nesse intervalo
           hoje) não têm esse detalhe. Desligue o filtro por horário pra ver o total do dia inteiro.
@@ -343,7 +354,7 @@ const ajustesPresentes = computed(() => {
           variant="tonal"
           density="comfortable"
         >
-          Nenhuma venda sincronizada para {{ rotuloFiltro }} em {{ formatarDataBr(resumo.data) }}.
+          Nenhuma venda sincronizada para {{ rotuloFiltroExato }} em {{ formatarDataBr(resumo.data) }}.
           Se a loja esteve aberta nesse dia, verifique se o bot está rodando (ver
           integracoes-scripts/README.md).
         </v-alert>
@@ -351,7 +362,7 @@ const ajustesPresentes = computed(() => {
         <v-alert v-else-if="resumo" type="success" variant="tonal" density="comfortable">
           <div>
             {{ resumo.numeroVendas }} venda{{ resumo.numeroVendas === 1 ? '' : 's' }} —
-            {{ rotuloFiltro }} — em {{ formatarDataBr(resumo.data) }} — total R$
+            {{ rotuloFiltroExato }} — em {{ formatarDataBr(resumo.data) }} — total R$
             {{ formatCents(toCents(resumo.totalPagamento)) }}.
           </div>
           <ul v-if="formasPagamento.length" class="text-caption mt-2 pl-4">

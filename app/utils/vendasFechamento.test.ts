@@ -5,6 +5,7 @@ import {
   aplicarAjustesComoLancamentos,
   caixaParaNumero,
   calcularResumoVendasDia,
+  calcularResumoVendasPorHorario,
   formatarDataBr,
   turnoParaLetra,
   type FechamentoCaixaDiaRow,
@@ -133,6 +134,39 @@ describe('calcularResumoVendasDia', () => {
       socios: 0,
       sobraPerda: 0,
     });
+  });
+});
+
+describe('calcularResumoVendasPorHorario', () => {
+  it('respeita os minutos do limite e filtra caixa/turno pelo operador', () => {
+    const resumo = calcularResumoVendasPorHorario(
+      '2026-10-08',
+      [
+        {
+          hora_venda: '09:37:24',
+          operador: 'VND CAIXA PDV - 1M',
+          valor_total: '100.00',
+          vendas_pagamentos: [{ forma_pagamento: 'PIX', valor: '100.00' }],
+        },
+        {
+          hora_venda: '09:37:25',
+          operador: 'VND CAIXA PDV - 1M',
+          valor_total: '200.00',
+          vendas_pagamentos: [{ forma_pagamento: 'PIX', valor: '200.00' }],
+        },
+        {
+          hora_venda: '09:37:00',
+          operador: 'VND CAIXA PDV - 1T',
+          valor_total: '300.00',
+          vendas_pagamentos: [{ forma_pagamento: 'PIX', valor: '300.00' }],
+        },
+      ],
+      { caixa: '1', turno: 'M', inicioSegundos: 6 * 3600, fimSegundos: 9 * 3600 + 37 * 60 + 24 },
+    );
+
+    expect(resumo.numeroVendas).toBe(1);
+    expect(resumo.totalPagamento).toBe(100);
+    expect(resumo.porForma.pix).toBe(100);
   });
 });
 

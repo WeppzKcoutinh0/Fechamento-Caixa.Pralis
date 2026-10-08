@@ -1,7 +1,13 @@
 import { ref } from 'vue';
 import { useSupabase } from './useSupabase';
-import { calcularResumoVendasDia, type FechamentoCaixaDiaRow } from '~/utils/vendasFechamento';
+import {
+  calcularResumoVendasDia,
+  calcularResumoVendasPorHorario,
+  type FechamentoCaixaDiaRow,
+  type VendaComPagamentoHorarioRow,
+} from '~/utils/vendasFechamento';
 import type { ResumoVendasDia } from '~/types/vendasFechamento';
+import { demoResumoVendas, modoDemoLocal } from '~/utils/demoLocal';
 
 /**
  * Leitura das vendas já sincronizadas em `vendas_fechamento_caixa_dia` pelo bot local (ver
@@ -40,6 +46,33 @@ export function useVendasFechamento() {
     resumo.value = null;
 
     try {
+      if (modoDemoLocal()) {
+        resumo.value = demoResumoVendas();
+        return resumo.value;
+      }
+      const temFiltroPorHorario = filtros?.horaInicio != null || filtros?.horaFim != null;
+      if (temFiltroPorHorario) {
+        const { data: vendas, error } = await supabase
+          .from('vendas')
+          .select('hora_venda, operador, valor_total, vendas_pagamentos(forma_pagamento, valor)')
+          .eq('data_venda', data)
+          .eq('status', 'FINALIZADA');
+
+        if (error) throw error;
+
+        resumo.value = calcularResumoVendasPorHorario(
+          data,
+          (vendas ?? []) as VendaComPagamentoHorarioRow[],
+          {
+            caixa: filtros?.caixa ?? null,
+            turno: filtros?.turno ?? null,
+            inicioSegundos: filtros?.horaInicio ?? null,
+            fimSegundos: filtros?.horaFim ?? null,
+          },
+        );
+        return resumo.value;
+      }
+
       let consulta = supabase
         .from('vendas_fechamento_caixa_dia')
         .select(
@@ -48,8 +81,6 @@ export function useVendasFechamento() {
         .eq('data_venda', data);
       if (filtros?.caixa) consulta = consulta.eq('caixa', filtros.caixa);
       if (filtros?.turno) consulta = consulta.eq('turno', filtros.turno);
-      if (filtros?.horaInicio != null) consulta = consulta.gte('hora', filtros.horaInicio);
-      if (filtros?.horaFim != null) consulta = consulta.lte('hora', filtros.horaFim);
 
       const { data: linhas, error } = await consulta;
 

@@ -203,9 +203,14 @@ function categoriaPagamento(forma: string): keyof ResumoVendasDia['porForma'] {
 
 function operadorPertenceAoFiltro(operador: string | null, caixa?: string | null, turno?: string | null): boolean {
   if (!caixa && !turno) return true;
-  const encontrado = String(operador ?? '').match(/\b(\d+)\s*([MT])\b/i);
+  const nome = String(operador ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase();
+  const encontrado = nome.match(/(?:CAIXA\s*)?(\d+)\s*(?:[- ]\s*)?(M|T|MANHA|TARDE)\b/);
   if (!encontrado) return false;
-  return (!caixa || encontrado[1] === caixa) && (!turno || encontrado[2]!.toUpperCase() === turno);
+  const turnoEncontrado = encontrado[2] === 'MANHA' ? 'M' : encontrado[2] === 'TARDE' ? 'T' : encontrado[2];
+  return (!caixa || encontrado[1] === caixa) && (!turno || turnoEncontrado === turno);
 }
 
 /** Soma vendas individuais pelo horário completo, sem incluir a hora inteira do limite final. */

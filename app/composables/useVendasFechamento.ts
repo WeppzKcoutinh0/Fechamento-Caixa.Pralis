@@ -8,6 +8,7 @@ import {
 } from '~/utils/vendasFechamento';
 import type { ResumoVendasDia } from '~/types/vendasFechamento';
 import { demoResumoVendas, modoDemoLocal } from '~/utils/demoLocal';
+import { fetchAutenticado } from './useSupabase';
 
 /**
  * Leitura das vendas já sincronizadas em `vendas_fechamento_caixa_dia` pelo bot local (ver
@@ -52,53 +53,17 @@ export function useVendasFechamento() {
       }
       const temFiltroPorHorario = filtros?.horaInicio != null || filtros?.horaFim != null;
       if (temFiltroPorHorario) {
-        const { data: vendas, error } = await supabase
-          .from('vendas')
-          .select('id, hora_venda, operador, valor_total')
-          .eq('data_venda', data)
-          .eq('status', 'FINALIZADA');
-
-        if (error) throw error;
-
-        const vendasBase = (vendas ?? []) as Array<{
+        const vendas = await fetchAutenticado<Array<{
           id: string;
           hora_venda: string | null;
           operador: string | null;
           valor_total: number | string;
-        }>;
-        const idsVendas = vendasBase.map((venda) => venda.id).filter(Boolean);
-        const pagamentos: Array<{
-          venda_id: string;
-          forma_pagamento: string;
-          valor: number | string;
-        }> = [];
-        // Mantém a URL da consulta pequena. Um único `in(...)` com todas as vendas do turno
-        // pode ultrapassar o limite do proxy/PostgREST e virar apenas "Failed to fetch".
-        for (let inicio = 0; inicio < idsVendas.length; inicio += 75) {
-          const loteIds = idsVendas.slice(inicio, inicio + 75);
-          const { data: pagamentosLote, error: erroPagamentos } = await supabase
-            .from('vendas_pagamentos')
-            .select('venda_id, forma_pagamento, valor')
-            .in('venda_id', loteIds);
-          if (erroPagamentos) throw erroPagamentos;
-          pagamentos.push(...((pagamentosLote ?? []) as typeof pagamentos));
-        }
-
-        const pagamentosPorVenda = new Map<string, Array<{ forma_pagamento: string; valor: number | string }>>();
-        for (const pagamento of pagamentos) {
-          const lista = pagamentosPorVenda.get(pagamento.venda_id) ?? [];
-          lista.push({ forma_pagamento: pagamento.forma_pagamento, valor: pagamento.valor });
-          pagamentosPorVenda.set(pagamento.venda_id, lista);
-        }
-
-        const vendasComPagamentos = vendasBase.map((venda) => ({
-          ...venda,
-          vendas_pagamentos: pagamentosPorVenda.get(venda.id) ?? [],
-        }));
+          vendas_pagamentos: Array<{ venda_id: string; forma_pagamento: string; valor: number | string }>;
+        }>>(supabase, `/api/vendas/horario?data=${encodeURIComponent(data)}`, { method: 'GET' });
 
         resumo.value = calcularResumoVendasPorHorario(
           data,
-          vendasComPagamentos as VendaComPagamentoHorarioRow[],
+          vendas as VendaComPagamentoHorarioRow[],
           {
             caixa: filtros?.caixa ?? null,
             turno: filtros?.turno ?? null,

@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import { getCurrentInstance, onMounted, onUnmounted } from 'vue';
+import { useTheme } from 'vuetify';
 import { useAuth } from '~/composables/useAuth';
 import { mensagemDeErro } from '~/utils/erros';
 
-// Única tela pública (ver middleware/auth.global.ts) — sem sidebar/topbar do app.
 definePageMeta({ layout: false });
 
 const email = ref('');
@@ -10,9 +11,28 @@ const password = ref('');
 const carregando = ref(false);
 const erro = ref<string | null>(null);
 const mostrarSenha = ref(false);
-
 const { signIn } = useAuth();
 const router = useRouter();
+
+// A entrada tem identidade escura própria. A preferência do usuário para o restante do sistema
+// é restaurada ao sair desta página, portanto autenticar não altera a escolha de tema dele.
+const tema = getCurrentInstance() ? useTheme() : null;
+let temaAnterior: string | null = null;
+let atributoAnterior: string | null = null;
+useHead({ htmlAttrs: { 'data-theme': 'dark' } });
+
+onMounted(() => {
+  atributoAnterior = document.documentElement.getAttribute('data-theme');
+  temaAnterior = tema?.global.name.value ?? null;
+  document.documentElement.setAttribute('data-theme', 'dark');
+  tema?.change('fechamentoDark');
+});
+
+onUnmounted(() => {
+  if (atributoAnterior === null) document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme', atributoAnterior);
+  if (temaAnterior) tema?.change(temaAnterior);
+});
 
 async function entrar() {
   erro.value = null;
@@ -29,114 +49,126 @@ async function entrar() {
 </script>
 
 <template>
-  <v-container class="login-page fill-height" fluid>
-    <div class="login-page__luz login-page__luz--superior" aria-hidden="true" />
-    <div class="login-page__luz login-page__luz--inferior" aria-hidden="true" />
-    <v-row align="center" justify="center">
-      <v-col cols="12" sm="8" md="5" lg="4">
-        <v-card class="pa-6 login-card" elevation="0">
-          <img class="logo-login" src="/marca/logo-cicluz-dark.png" alt="Cicluz Gestão Profissional" />
-          <v-card-title class="login-title">Sistema Inteligente</v-card-title>
-          <v-card-subtitle class="login-subtitle">Fechamento de Caixa</v-card-subtitle>
+  <v-main class="login-page tela-entrada d-flex align-center justify-center pa-4">
+    <AppFundoEntrada />
 
-          <v-form @submit.prevent="entrar">
-            <v-text-field
-              v-model="email"
-              label="E-mail"
-              type="email"
-              autocomplete="username"
-              prepend-inner-icon="mdi-email-outline"
-              required
-              class="mb-2"
-            />
-            <v-text-field
-              v-model="password"
-              label="Senha"
-              :type="mostrarSenha ? 'text' : 'password'"
-              autocomplete="current-password"
-              prepend-inner-icon="mdi-lock-outline"
-              :append-inner-icon="mostrarSenha ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
-              @click:append-inner="mostrarSenha = !mostrarSenha"
-              required
-              class="mb-2"
-            />
+    <v-card class="login-card cartao-entrada" elevation="0">
+      <div class="login-brand" aria-label="Cicluz Gestão Profissional">
+        <AppLogoAnimada size="clamp(68px, 10vh, 88px)" :glow-intensity="0.26" />
+        <span class="login-brand__word">
+          <img src="/marca/cicluz-palavra.svg" alt="Cicluz" />
+          <span>Gestão Profissional</span>
+        </span>
+      </div>
 
-            <v-alert v-if="erro" type="error" variant="tonal" density="compact" class="mb-4">
-              {{ erro }}
-            </v-alert>
+      <div class="login-head">
+        <h1>Sistema Inteligente</h1>
+        <p>Fechamento de Caixa</p>
+      </div>
 
-            <v-btn type="submit" class="login-submit" block size="large" :loading="carregando" append-icon="mdi-arrow-right">
-              Entrar no sistema
-            </v-btn>
-          </v-form>
-          <p class="login-slogan">Clareza em cada ciclo do seu negócio</p>
-        </v-card>
-      </v-col>
-    </v-row>
-  </v-container>
+      <v-form class="login-form" @submit.prevent="entrar">
+        <v-text-field
+          v-model="email"
+          label="E-mail"
+          placeholder="voce@cicluz.com.br"
+          autocomplete="email"
+          name="email"
+          type="email"
+          prepend-inner-icon="mdi-email-outline"
+          hide-details="auto"
+          required
+        />
+        <v-text-field
+          v-model="password"
+          label="Senha"
+          autocomplete="current-password"
+          name="password"
+          :type="mostrarSenha ? 'text' : 'password'"
+          prepend-inner-icon="mdi-lock-outline"
+          :append-inner-icon="mostrarSenha ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
+          hide-details="auto"
+          required
+          @click:append-inner="mostrarSenha = !mostrarSenha"
+        />
+
+        <v-alert v-if="erro" type="error" variant="tonal" density="compact" class="login-alert">
+          {{ erro }}
+        </v-alert>
+
+        <v-btn type="submit" class="login-submit" block size="large" :loading="carregando" append-icon="mdi-arrow-right">
+          Entrar no sistema
+        </v-btn>
+      </v-form>
+
+      <p class="login-slogan">Clareza em cada ciclo do seu negócio</p>
+    </v-card>
+  </v-main>
 </template>
 
 <style scoped>
-/* Cartão de login: superfície grande, per hierarquia de raio/elevação --cx-* (67 §5/§6) —
-   "cartão de login" é literalmente um dos exemplos de --cx-r-xl/--cx-e-3 da referência. */
 .login-page {
   position: relative;
+  isolation: isolate;
   min-height: 100dvh;
   overflow: hidden;
-  isolation: isolate;
-  background: #10151d;
+  background: var(--cx-canvas);
 }
-
-.login-page__luz {
-  position: fixed;
-  z-index: -1;
-  width: min(78vw, 720px);
-  aspect-ratio: 1;
-  border-radius: 999px;
-  filter: blur(20px);
-  opacity: 0.28;
-  pointer-events: none;
-  animation: flutuar 12s ease-in-out infinite alternate;
-}
-
-.login-page__luz--superior { top: -35%; left: -18%; background: #6515dd; }
-.login-page__luz--inferior { right: -20%; bottom: -42%; background: #0ea5e9; animation-delay: -6s; }
 
 .login-card {
-  width: min(100%, 420px);
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  border-radius: 24px !important;
-  color: #f8fafc;
-  background: rgba(25, 31, 38, 0.96) !important;
-  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.36) !important;
-  animation: entrar 360ms ease-out both;
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: min(420px, calc(100vw - 32px));
+  min-width: 0;
+  padding: var(--cx-sp-8) var(--cx-sp-7) var(--cx-sp-6);
+  border: 1px solid var(--cx-line-soft) !important;
+  border-radius: var(--cx-r-xl) !important;
+  background: color-mix(in srgb, var(--cx-surface) 42%, transparent) !important;
+  box-shadow: var(--cx-e-3) !important;
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  animation: login-in var(--cx-dur-3) var(--cx-ease-out) both;
 }
 
-.logo-login {
-  display: block;
-  width: min(100%, 220px);
-  height: auto;
-  margin: 0 auto 28px;
+.login-brand {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--cx-sp-3);
+  margin-bottom: var(--cx-sp-5);
+  animation: login-in var(--cx-dur-3) var(--cx-ease-out) 60ms both;
 }
 
-.login-title { padding: 0; color: #fff; font-size: clamp(1.5rem, 5vw, 1.9rem); font-weight: 700; text-align: center; }
-.login-subtitle { padding: 0; margin: 7px 0 26px; color: #b5beca; text-align: center; }
-.login-card :deep(.v-field) { color: #f8fafc; background: rgba(255, 255, 255, 0.035); }
-.login-card :deep(.v-field__outline) { color: rgba(220, 227, 237, 0.48); }
-.login-card :deep(.v-label), .login-card :deep(input) { color: #dce3ed; }
-.login-card :deep(.v-field--focused .v-field__outline), .login-card :deep(.v-field--focused .v-label) { color: #b889ff; }
-.login-submit { min-height: 48px; color: #fff !important; font-weight: 700; text-transform: none; background: #6515dd !important; box-shadow: 0 12px 26px rgba(101, 21, 221, 0.32) !important; }
-.login-slogan { margin: 28px 0 0; color: #b5beca; font-size: 0.82rem; font-style: italic; text-align: center; }
+.login-brand__word {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: min(176px, 52vw);
+}
 
-@keyframes entrar { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes flutuar { to { transform: translate(8%, 5%) scale(1.08); } }
+.login-brand__word img { display: block; width: 100%; height: auto; }
+.login-brand__word span { color: var(--cx-ink-soft); font-size: var(--cx-fs-micro); font-weight: 500; letter-spacing: 0.06em; line-height: 1.1; white-space: nowrap; }
 
+.login-head { margin-bottom: var(--cx-sp-6); text-align: center; animation: login-in var(--cx-dur-3) var(--cx-ease-out) 110ms both; }
+.login-head h1 { margin: 0; color: var(--cx-ink); font-size: var(--cx-fs-h2); font-weight: 700; letter-spacing: var(--cx-tracking-tight); }
+.login-head p { margin: var(--cx-sp-1) 0 0; color: var(--cx-ink-soft); font-size: var(--cx-fs-body); font-weight: 500; }
+
+.login-form { display: grid; gap: var(--cx-sp-4); animation: login-in var(--cx-dur-3) var(--cx-ease-out) 160ms both; }
+.login-alert { margin: -2px 0; }
+.login-card :deep(.v-field--focused .v-field__outline) { color: var(--cx-focus); }
+.login-card :deep(.v-field--focused .v-label) { color: var(--cx-brand-text); }
+.login-card :deep(.v-field--focused) { box-shadow: 0 0 0 3px color-mix(in srgb, var(--cx-brand) 25%, transparent); }
+
+.login-submit { margin-top: var(--cx-sp-1); min-height: 48px; background: var(--cx-brand) !important; color: var(--cx-brand-on) !important; font-weight: 700; letter-spacing: 0.01em; text-transform: none; box-shadow: 0 10px 22px color-mix(in srgb, var(--cx-brand) 30%, transparent) !important; }
+.login-slogan { margin: var(--cx-sp-6) 0 var(--cx-sp-1); color: var(--cx-ink-soft); font-size: var(--cx-fs-caption); font-style: italic; text-align: center; animation: login-in var(--cx-dur-3) var(--cx-ease-out) 220ms both; }
+
+@keyframes login-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 @media (max-width: 390px) {
-  .login-card { border-radius: 20px !important; }
-  .logo-login { width: min(100%, 190px); }
+  .login-card { padding: var(--cx-sp-6) var(--cx-sp-5) var(--cx-sp-5); border-radius: var(--cx-r-lg) !important; }
+  .login-brand { gap: var(--cx-sp-2); }
+  .login-brand__word { width: min(150px, 48vw); }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .login-card, .login-page__luz { animation: none; }
-}
+@media (prefers-reduced-motion: reduce) { .login-card, .login-brand, .login-head, .login-form, .login-slogan { animation: none; } }
 </style>

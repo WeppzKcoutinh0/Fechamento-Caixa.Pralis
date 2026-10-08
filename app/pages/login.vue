@@ -54,7 +54,7 @@ async function entrar() {
 
     <v-card class="login-card cartao-entrada" elevation="0">
       <div class="login-brand" aria-label="Cicluz Gestão Profissional">
-        <AppLogoAnimada size="clamp(68px, 10vh, 88px)" :glow-intensity="0.26" />
+        <AppLogoAnimada size="clamp(78px, 12vh, 104px)" :glow-intensity="0.26" />
         <span class="login-brand__word">
           <img src="/marca/cicluz-palavra.svg" alt="Cicluz" />
           <span>Gestão Profissional</span>
@@ -135,6 +135,7 @@ async function entrar() {
   display: flex;
   flex-direction: row;
   align-items: center;
+  justify-content: center;
   gap: var(--cx-sp-3);
   margin-bottom: var(--cx-sp-5);
   animation: login-in var(--cx-dur-3) var(--cx-ease-out) 60ms both;
@@ -157,6 +158,16 @@ async function entrar() {
 
 .login-form { display: grid; gap: var(--cx-sp-4); animation: login-in var(--cx-dur-3) var(--cx-ease-out) 160ms both; }
 .login-alert { margin: -2px 0; }
+.login-card :deep(.v-field) {
+  background: #fff !important;
+  color: #1f2937;
+}
+.login-card :deep(.v-field__overlay) { background: #fff !important; opacity: 1; }
+.login-card :deep(.v-field__input),
+.login-card :deep(.v-label),
+.login-card :deep(.v-field__prepend-inner),
+.login-card :deep(.v-field__append-inner) { color: #1f2937; }
+.login-card :deep(.v-field__input::placeholder) { color: #6b7280; opacity: 1; }
 .login-card :deep(.v-field--focused .v-field__outline) { color: var(--cx-focus); }
 .login-card :deep(.v-field--focused .v-label) { color: var(--cx-brand-text); }
 .login-card :deep(.v-field--focused) { box-shadow: 0 0 0 3px color-mix(in srgb, var(--cx-brand) 25%, transparent); }

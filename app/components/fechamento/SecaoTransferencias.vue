@@ -69,8 +69,10 @@ const indiceEditando = ref<number | null>(null);
 // só digita o valor à mão, como sempre fez.
 // 28/09/2026 (pedido do usuário): o lacre só vale na data exata em que o tesoureiro criou, e é de
 // uso único — `consumir: true` aqui é o ponto real de "usar o lacre" (marca pra nunca mais casar).
-const { buscarPorLacre } = useTransferenciasTesouraria();
+const { buscarPorLacre, validarLacre } = useTransferenciasTesouraria();
 const lacreEncontradoMsg = ref<string | null>(null);
+const lacreSangriaMsg = ref<string | null>(null);
+const lacreSangriaValido = ref(false);
 async function aoSairDoLacreEntrada(): Promise<void> {
   if (tipoModal.value !== 'entrada' || indiceEditando.value === null) return;
   const entrada = props.draft.entradas[indiceEditando.value];
@@ -109,12 +111,40 @@ function abrirNovaSangria(): void {
   props.draft.sangrias.push(novaSangria());
   indiceEditando.value = props.draft.sangrias.length - 1;
   tipoModal.value = 'sangria';
+  lacreSangriaMsg.value = null;
+  lacreSangriaValido.value = false;
   modalAberto.value = true;
 }
 function abrirSangria(indice: number): void {
   indiceEditando.value = indice;
   tipoModal.value = 'sangria';
+  lacreSangriaMsg.value = null;
+  lacreSangriaValido.value = false;
   modalAberto.value = true;
+}
+
+async function validarLacreSangria(): Promise<void> {
+  if (tipoModal.value !== 'sangria' || indiceEditando.value === null) return;
+  const sangria = props.draft.sangrias[indiceEditando.value];
+  const alvo = sangria?.lacre.trim();
+  lacreSangriaValido.value = false;
+  lacreSangriaMsg.value = null;
+  if (!sangria || !alvo || !props.draft.caixa || !props.draft.turno) return;
+  try {
+    const valido = await validarLacre(
+      alvo,
+      'sangrias',
+      props.draft.data,
+      props.draft.caixa,
+      props.draft.turno,
+    );
+    lacreSangriaValido.value = valido;
+    lacreSangriaMsg.value = valido
+      ? 'Lacre de sangria conferido pela Tesouraria.'
+      : 'Este lacre de sangria não está cadastrado para este caixa, turno e data.';
+  } catch {
+    lacreSangriaMsg.value = 'Não foi possível conferir o lacre de sangria agora.';
+  }
 }
 function abrirNovaTransferencia(): void {
   props.draft.transferenciasCaixa.push(novaTransferencia());
@@ -170,6 +200,9 @@ const transferenciaSemOrigem = computed(
 );
 const transferenciaInvalida = computed(
   () => transferenciaSemOrigem.value || transferenciaSemDestino.value,
+);
+const sangriaInvalida = computed(
+  () => tipoModal.value === 'sangria' && (!itemAtual.value || !('lacre' in itemAtual.value) || !lacreSangriaValido.value),
 );
 
 function remover(): void {
@@ -531,9 +564,19 @@ const totalTransferenciasAutomaticasCents = computed(() =>
                 class="lc-input"
                 placeholder="000000"
                 inputmode="numeric"
-                @blur="tipoModal === 'entrada' ? aoSairDoLacreEntrada() : undefined"
+                @blur="
+                  tipoModal === 'entrada'
+                    ? aoSairDoLacreEntrada()
+                    : tipoModal === 'sangria'
+                      ? validarLacreSangria()
+                      : undefined
+                "
                 @keydown.enter.prevent="
-                  tipoModal === 'entrada' ? aoSairDoLacreEntrada() : undefined
+                  tipoModal === 'entrada'
+                    ? aoSairDoLacreEntrada()
+                    : tipoModal === 'sangria'
+                      ? validarLacreSangria()
+                      : undefined
                 "
               />
             </label>
@@ -543,6 +586,13 @@ const totalTransferenciasAutomaticasCents = computed(() =>
               style="color: var(--cx-positive)"
             >
               {{ lacreEncontradoMsg }}
+            </p>
+            <p
+              v-if="tipoModal === 'sangria' && lacreSangriaMsg"
+              class="lc-erro-campo"
+              :style="{ color: lacreSangriaValido ? 'var(--cx-positive)' : undefined }"
+            >
+              {{ lacreSangriaMsg }}
             </p>
 
             <!-- Sangria sempre sai DESTE caixa e vai pro Fluxo — não é uma escolha, é informativo
@@ -610,7 +660,7 @@ const totalTransferenciasAutomaticasCents = computed(() =>
           <button
             type="button"
             class="lc-salvar"
-            :disabled="transferenciaInvalida"
+            :disabled="transferenciaInvalida || sangriaInvalida"
             @click="modalAberto = false"
           >
             Salvar

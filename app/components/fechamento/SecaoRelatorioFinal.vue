@@ -19,8 +19,10 @@ import { baixarPdfFechamento } from '~/utils/gerarPdfFechamento';
 import { baixarPdfVendasCanceladas } from '~/utils/gerarPdfVendasCanceladas';
 import { abrirWhatsappVendasCanceladas } from '~/utils/whatsappVendasCanceladas';
 import { caixaParaNumero, turnoParaLetra } from '~/utils/vendasFechamento';
+import { useTransferenciasTesouraria } from '~/composables/useTransferenciasTesouraria';
 
 const props = defineProps<{ draft: FechamentoDraft }>();
+const { validarLacre } = useTransferenciasTesouraria();
 
 const CHAVE_FOTO_FOLHA = 'img-folha-fechamento';
 
@@ -99,8 +101,31 @@ function confirmarValoresContados(marcado: boolean): void {
 }
 
 const lacreFinalVazio = computed(() => !props.draft.lacreFechamento.trim());
-function confirmarDinheiroFinal(): void {
+const lacreFinalMsg = ref<string | null>(null);
+const validandoLacreFinal = ref(false);
+async function confirmarDinheiroFinal(): Promise<void> {
   if (lacreFinalVazio.value || !props.draft.dinheiroContadoValoresConfirmados) return;
+  if (!props.draft.caixa || !props.draft.turno) return;
+  validandoLacreFinal.value = true;
+  lacreFinalMsg.value = null;
+  try {
+    const valido = await validarLacre(
+      props.draft.lacreFechamento,
+      'final',
+      props.draft.data,
+      props.draft.caixa,
+      props.draft.turno,
+    );
+    if (!valido) {
+      lacreFinalMsg.value = 'Este lacre final não está cadastrado pela Tesouraria para este caixa, turno e data.';
+      return;
+    }
+  } catch {
+    lacreFinalMsg.value = 'Não foi possível conferir o lacre final agora.';
+    return;
+  } finally {
+    validandoLacreFinal.value = false;
+  }
   props.draft.dinheiroContadoConfirmado = true;
 }
 // Cores pedidas pelo usuário (30/09/2026): igualado = verde, falta = vermelho, sobra = laranja
@@ -127,10 +152,6 @@ const valorDiferencaComSinal = computed(() => {
 });
 // Linha pequena abaixo do valor (pedido do usuário, 30/09/2026): "=0" quando igualado, ou o
 // mesmo valor com sinal repetido quando há sobra/falta — reforço visual do resultado.
-const subvalorDiferenca = computed(() =>
-  statusFisico.value === 'zero' ? '=0' : valorDiferencaComSinal.value,
-);
-
 // Confirmação do RESULTADO (pedido do usuário, 30/09/2026), separada da confirmação dos valores
 // contados acima: só depois que a diferença é revelada (dinheiroContadoConfirmado) é que dá pra
 // saber se é quebra (falta) ou não (zero/sobra) — o rótulo do botão muda sozinho conforme o
@@ -1325,7 +1346,6 @@ const CAT_VARS = {
       class="mt-3"
       :rotulo="rotuloDiferenca"
       :valor="valorDiferencaComSinal"
-      :subvalor="subvalorDiferenca"
       :tom="tomDiferenca"
     />
 
@@ -1417,7 +1437,8 @@ const CAT_VARS = {
           <p v-if="lacreFinalVazio" class="lc-erro-campo">
             Informe o N° do lacre do malote pra poder confirmar.
           </p>
-          <p v-else class="text-caption text-medium-emphasis" style="margin: -6px 0 10px">
+           <p v-else-if="lacreFinalMsg" class="lc-erro-campo">{{ lacreFinalMsg }}</p>
+           <p v-else class="text-caption text-medium-emphasis" style="margin: -6px 0 10px">
             Identifica o malote que leva esse dinheiro de volta ao cofre — sobe junto pro
             administrador conferir.
           </p>
@@ -1461,7 +1482,6 @@ const CAT_VARS = {
             <CartaoValor
               :rotulo="rotuloDiferenca"
               :valor="valorDiferencaComSinal"
-              :subvalor="subvalorDiferenca"
               :tom="tomDiferenca"
             />
 
@@ -1480,7 +1500,8 @@ const CAT_VARS = {
             v-if="!draft.dinheiroContadoConfirmado"
             type="button"
             class="lc-salvar"
-            :disabled="lacreFinalVazio || !draft.dinheiroContadoValoresConfirmados"
+             :disabled="lacreFinalVazio || !draft.dinheiroContadoValoresConfirmados || validandoLacreFinal"
+             :aria-busy="validandoLacreFinal"
             @click="confirmarDinheiroFinal"
           >
             Confirmar

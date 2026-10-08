@@ -1,5 +1,6 @@
 import { useSupabase } from './useSupabase';
 import { hojeISO, type Caixa, type Turno } from '~/types/fechamento';
+import { demoTransferenciaAbertura, modoDemoLocal } from '~/utils/demoLocal';
 
 // Caixa Principal / Caixa de Troco / Fluxo (pedido do usuário, 23/09/2026): três cofres centrais
 // NOVOS, independentes do "Cofre" genérico que já existia — decisão explícita do usuário de não
@@ -36,6 +37,9 @@ export interface TransferenciaTesouraria {
   valorNotasCents: number;
   valorMoedasCents: number;
   lacre: string;
+  lacreInicial: string;
+  lacreSangrias: string;
+  lacreFinal: string;
   dataLanc: string;
   agendamento: boolean;
   dataRecebimento: string | null;
@@ -64,6 +68,9 @@ interface LinhaRow {
   valor_notas: string;
   valor_moedas: string;
   lacre: string;
+  lacre_inicial: string;
+  lacre_sangrias: string;
+  lacre_final: string;
   data_lanc: string;
   agendamento: boolean;
   data_recebimento: string | null;
@@ -88,6 +95,9 @@ function linhaParaTransferencia(l: LinhaRow): TransferenciaTesouraria {
     valorNotasCents: Math.round(Number(l.valor_notas) * 100),
     valorMoedasCents: Math.round(Number(l.valor_moedas) * 100),
     lacre: l.lacre,
+    lacreInicial: l.lacre_inicial || l.lacre,
+    lacreSangrias: l.lacre_sangrias || '',
+    lacreFinal: l.lacre_final || '',
     dataLanc: l.data_lanc,
     agendamento: l.agendamento,
     dataRecebimento: l.data_recebimento,
@@ -110,7 +120,7 @@ function linhaParaTransferencia(l: LinhaRow): TransferenciaTesouraria {
 }
 
 const SELECT_COLUNAS =
-  'id, valor, valor_notas, valor_moedas, lacre, data_lanc, agendamento, data_recebimento, confirmado_em, caixa_origem, caixa_destino, ' +
+  'id, valor, valor_notas, valor_moedas, lacre, lacre_inicial, lacre_sangrias, lacre_final, data_lanc, agendamento, data_recebimento, confirmado_em, caixa_origem, caixa_destino, ' +
   'turno_origem, turno_destino, multiplo_destino, destinos_extra, tempo_confirmacao, transferencia_retorno, observacao, criado_em, lacre_usado_em';
 
 /**
@@ -121,6 +131,7 @@ const SELECT_COLUNAS =
  * aqui.
  */
 export function useTransferenciasTesouraria() {
+  const modoDemo = modoDemoLocal();
   const supabase = useSupabase();
 
   async function listar(): Promise<TransferenciaTesouraria[]> {
@@ -147,6 +158,10 @@ export function useTransferenciasTesouraria() {
   ): Promise<TransferenciaTesouraria | null> {
     const alvo = lacre.trim();
     if (!alvo) return null;
+    if (modoDemo) {
+      const transferencia = demoTransferenciaAbertura();
+      return alvo === transferencia.lacre && data === transferencia.dataLanc ? transferencia : null;
+    }
     const { data: linhas, error } = await supabase.rpc('buscar_transferencia_tesouraria_por_lacre', {
       p_lacre: alvo,
       p_data: data,
@@ -162,6 +177,9 @@ export function useTransferenciasTesouraria() {
     valorNotasCents: number;
     valorMoedasCents: number;
     lacre: string;
+    lacreInicial?: string;
+    lacreSangrias?: string;
+    lacreFinal?: string;
     agendamento: boolean;
     caixaOrigem: CaixaOuCofre;
     caixaDestino: CaixaOuCofre;
@@ -191,6 +209,9 @@ export function useTransferenciasTesouraria() {
         valor_notas: (dados.valorNotasCents / 100).toFixed(2),
         valor_moedas: (dados.valorMoedasCents / 100).toFixed(2),
         lacre: dados.lacre.trim(),
+        lacre_inicial: (dados.lacreInicial ?? dados.lacre).trim(),
+        lacre_sangrias: dados.lacreSangrias?.trim() ?? '',
+        lacre_final: dados.lacreFinal?.trim() ?? '',
         data_lanc: dados.dataLanc || hojeISO(),
         agendamento: dados.agendamento,
         caixa_origem: caixaOrigem,
@@ -214,6 +235,26 @@ export function useTransferenciasTesouraria() {
     return linhaParaTransferencia(data as unknown as LinhaRow);
   }
 
+  async function validarLacre(
+    lacre: string,
+    tipo: 'inicial' | 'sangrias' | 'final',
+    data: string,
+    caixa: CaixaOuCofre,
+    turno: Turno | '' | null,
+  ): Promise<boolean> {
+    if (!lacre.trim() || !data || !caixa) return false;
+    if (modoDemo) return true;
+    const { data: valido, error } = await supabase.rpc('validar_lacre_fechamento', {
+      p_lacre: lacre.trim(),
+      p_tipo: tipo,
+      p_data: data,
+      p_caixa: normalizarCaixa(caixa),
+      p_turno: turno || null,
+    });
+    if (error) throw error;
+    return Boolean(valido);
+  }
+
   async function confirmarRecebimento(id: string): Promise<void> {
     const { error } = await supabase
       .from('transferencias_tesouraria')
@@ -234,6 +275,9 @@ export function useTransferenciasTesouraria() {
     dados: {
       valorCents: number;
       lacre: string;
+      lacreInicial?: string;
+      lacreSangrias?: string;
+      lacreFinal?: string;
       dataLanc: string;
       caixaOrigem: CaixaOuCofre;
       caixaDestino: CaixaOuCofre;
@@ -245,6 +289,9 @@ export function useTransferenciasTesouraria() {
       .update({
         valor: (dados.valorCents / 100).toFixed(2),
         lacre: dados.lacre.trim(),
+        lacre_inicial: (dados.lacreInicial ?? dados.lacre).trim(),
+        lacre_sangrias: dados.lacreSangrias?.trim() ?? '',
+        lacre_final: dados.lacreFinal?.trim() ?? '',
         data_lanc: dados.dataLanc,
         caixa_origem: normalizarCaixa(dados.caixaOrigem),
         caixa_destino: normalizarCaixa(dados.caixaDestino),
@@ -309,6 +356,7 @@ export function useTransferenciasTesouraria() {
   return {
     listar,
     buscarPorLacre,
+    validarLacre,
     criar,
     confirmarRecebimento,
     excluir,

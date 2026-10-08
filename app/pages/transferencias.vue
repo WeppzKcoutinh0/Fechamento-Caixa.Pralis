@@ -219,7 +219,8 @@ async function confirmarRecebimentoDe(id: string): Promise<void> {
                   <span
                     class="text-caption text-medium-emphasis"
                     :class="{ 'lacre-riscado': grupo.id === 'lacres' && t.lacreUsadoEm }"
-                    >Lacre {{ t.lacre }}</span
+                    >Inicial {{ t.lacreInicial }} · Sangrias {{ t.lacreSangrias || '—' }} · Final
+                    {{ t.lacreFinal || '—' }}</span
                   >
                   <span class="text-caption text-medium-emphasis">{{
                     formatarDataBr(t.dataLanc)

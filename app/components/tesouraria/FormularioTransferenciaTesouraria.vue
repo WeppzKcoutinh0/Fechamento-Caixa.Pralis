@@ -44,7 +44,9 @@ function aoAlterarMoedas(cents: number): void {
   valorMoedasCents.value = cents;
   valorCents.value = valorNotasCents.value + cents;
 }
-const lacre = ref('');
+const lacreInicial = ref('');
+const lacreSangrias = ref('');
+const lacreFinal = ref('');
 const dataLanc = ref(hojeISO());
 const agendamento = ref(false);
 const caixaOrigem = ref<CaixaOuCofre | null>(null);
@@ -101,7 +103,9 @@ function resetar(): void {
   valorCents.value = 0;
   valorNotasCents.value = 0;
   valorMoedasCents.value = 0;
-  lacre.value = '';
+  lacreInicial.value = '';
+  lacreSangrias.value = '';
+  lacreFinal.value = '';
   dataLanc.value = hojeISO();
   agendamento.value = false;
   caixaOrigem.value = null;
@@ -121,7 +125,9 @@ function resetar(): void {
 const valido = computed(
   () =>
     valorCents.value > 0 &&
-    !!lacre.value.trim() &&
+    !!lacreInicial.value.trim() &&
+    !!lacreSangrias.value.trim() &&
+    !!lacreFinal.value.trim() &&
     /^\d{4}-\d{2}-\d{2}$/.test(dataLanc.value) &&
     !!caixaOrigem.value &&
     !!caixaDestino.value &&
@@ -134,7 +140,9 @@ const valido = computed(
 // falta preencher em vez de silenciosamente não salvar.
 function mensagemFaltando(): string | null {
   if (valorCents.value <= 0) return 'Informe o valor da transferência (Notas + Moedas).';
-  if (!lacre.value.trim()) return 'Informe o N° Lacre / Doc.';
+  if (!lacreInicial.value.trim()) return 'Informe o lacre inicial.';
+  if (!lacreSangrias.value.trim()) return 'Informe o lacre das sangrias.';
+  if (!lacreFinal.value.trim()) return 'Informe o lacre final.';
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dataLanc.value)) return 'Informe a data do lançamento.';
   if (!caixaOrigem.value) return 'Selecione a Origem / Saída.';
   if (!caixaDestino.value) return 'Selecione o Destino / Entrada.';
@@ -155,7 +163,10 @@ async function salvar(criarNova: boolean): Promise<void> {
       valorCents: valorCents.value,
       valorNotasCents: valorNotasCents.value,
       valorMoedasCents: valorMoedasCents.value,
-      lacre: lacre.value,
+      lacre: lacreInicial.value,
+      lacreInicial: lacreInicial.value,
+      lacreSangrias: lacreSangrias.value,
+      lacreFinal: lacreFinal.value,
       dataLanc: dataLanc.value,
       agendamento: agendamento.value,
       caixaOrigem: caixaOrigem.value,
@@ -177,7 +188,7 @@ async function salvar(criarNova: boolean): Promise<void> {
   } catch (e) {
     const mensagem = mensagemDeErro(e, 'Não foi possível salvar a transferência.');
     erro.value = mensagem.includes('duplicate')
-      ? `Já existe uma transferência com o lacre "${lacre.value}".`
+      ? `Já existe uma transferência com o lacre inicial "${lacreInicial.value}".`
       : mensagem;
   } finally {
     salvando.value = false;
@@ -217,10 +228,24 @@ watch(modelValue, (aberto) => {
 
         <div class="d-flex flex-column flex-sm-row ga-3">
           <v-text-field
-            v-model="lacre"
+            v-model="lacreInicial"
             class="lacre-field"
-            label="N° Lacre / Doc"
+            label="Lacre inicial"
             placeholder="Ex.: 000123"
+            required
+          />
+          <v-text-field
+            v-model="lacreSangrias"
+            class="lacre-field"
+            label="Lacre das sangrias"
+            placeholder="Ex.: 000124"
+            required
+          />
+          <v-text-field
+            v-model="lacreFinal"
+            class="lacre-field"
+            label="Lacre final"
+            placeholder="Ex.: 000125"
             required
           />
           <v-text-field

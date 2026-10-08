@@ -110,6 +110,13 @@ const grupos = computed<GrupoNav[]>(() => {
       icone: 'mdi-alert-circle-outline',
       cor: 'var(--cx-brand)',
     },
+    {
+      id: 'usuarios',
+      label: 'Usuários',
+      to: '/usuarios',
+      icone: 'mdi-account-cog-outline',
+      cor: 'var(--cx-brand)',
+    },
   ];
 });
 </script>

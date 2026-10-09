@@ -7,11 +7,24 @@
 // CAIXA e TURNO saem de graça do próprio texto, sem cadastro nenhum.
 import { text } from './hashService.js';
 
-const RE_POSTO = /^VND\s+CAIXA\s+PDV\s*-\s*(\d+)\s*([MT])$/i;
+const RE_POSTOS = [
+  /^(?:VND\s+)?CAIXA\s+PDV\s*-?\s*([1-4])\s*[-/]?\s*(M|T|MANHA|TARDE)$/i,
+  /\bCAIXA\s*(?:PDV\s*)?-?\s*([1-4])\s*[-/]?\s*(M|T|MANHA|TARDE)\b/i,
+  /\bPDV\s*-?\s*([1-4])\s*[-/]?\s*(M|T|MANHA|TARDE)\b/i,
+];
+
+function normalizarTurno(valor) {
+  const turno = String(valor).toUpperCase();
+  return turno === 'MANHA' ? 'M' : turno === 'TARDE' ? 'T' : turno;
+}
 
 export function interpretarOperador(operador) {
-  const nome = text(operador).trim();
-  const m = nome.match(RE_POSTO);
-  if (m) return { natureza: 'posto', caixa: String(Number(m[1])), turno: m[2].toUpperCase() };
+  const nome = text(operador)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const m = RE_POSTOS.map((regex) => nome.match(regex)).find(Boolean);
+  if (m) return { natureza: 'posto', caixa: String(Number(m[1])), turno: normalizarTurno(m[2]) };
   return { natureza: 'nominal', caixa: '', turno: '' };
 }

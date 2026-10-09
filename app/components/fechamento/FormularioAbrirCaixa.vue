@@ -16,7 +16,7 @@ const modelValue = defineModel<boolean>({ default: false });
 
 const { perfil } = usePerfil();
 const { abrirSessao, erro, carregando } = useSessaoCaixa();
-const { buscarPorLacre } = useTransferenciasTesouraria();
+const { buscarPorLacre, validarLacre } = useTransferenciasTesouraria();
 
 // Caixa/Turno travados no valor cadastrado da conta (pedido do usuário, 18/09/2026) — cada uma
 // das 8 contas operacionais só abre o caixa/turno que já é dela (`profiles.caixa_padrao`/
@@ -59,6 +59,7 @@ const lacreValido = computed(() => !!transferenciaEncontrada.value);
 const transferenciaEncontrada = ref<TransferenciaTesouraria | null>(null);
 const buscandoLacre = ref(false);
 const jaBuscouLacre = ref(false);
+const lacreForaDoCaixa = ref(false);
 const fundoConfirmado = ref<boolean | null>(null);
 const notasContadasCents = ref(0);
 const moedasContadasCents = ref(0);
@@ -81,6 +82,7 @@ async function buscarLacre(): Promise<void> {
   notasContadasCents.value = 0;
   moedasContadasCents.value = 0;
   erroConsumoLacre.value = null;
+  lacreForaDoCaixa.value = false;
   if (!lacre) {
     transferenciaEncontrada.value = null;
     jaBuscouLacre.value = false;
@@ -89,7 +91,20 @@ async function buscarLacre(): Promise<void> {
   buscandoLacre.value = true;
   try {
     // consumir: false — só ajuda visual, não "usa" o lacre ainda (ver comentário acima).
-    transferenciaEncontrada.value = await buscarPorLacre(lacre, hojeISO());
+    const transferencia = await buscarPorLacre(lacre, hojeISO());
+    if (transferencia && caixaSelecionado.value && turnoSelecionado.value) {
+      const pertenceAoCaixa = await validarLacre(
+        lacre,
+        'inicial',
+        hojeISO(),
+        caixaSelecionado.value,
+        turnoSelecionado.value,
+      );
+      lacreForaDoCaixa.value = !pertenceAoCaixa;
+      transferenciaEncontrada.value = pertenceAoCaixa ? transferencia : null;
+    } else {
+      transferenciaEncontrada.value = transferencia;
+    }
   } catch {
     transferenciaEncontrada.value = null;
   } finally {
@@ -140,6 +155,27 @@ async function confirmar(): Promise<void> {
     return;
   erroConsumoLacre.value = null;
   consumindoLacre.value = true;
+  try {
+    const pertenceAoCaixa = await validarLacre(
+      lacreAbertura.value,
+      'inicial',
+      hojeISO(),
+      caixaSelecionado.value,
+      turnoSelecionado.value,
+    );
+    if (!pertenceAoCaixa) {
+      transferenciaEncontrada.value = null;
+      lacreForaDoCaixa.value = true;
+      erroConsumoLacre.value =
+        'Este lacre inicial não está cadastrado para este caixa, turno e data.';
+      consumindoLacre.value = false;
+      return;
+    }
+  } catch {
+    erroConsumoLacre.value = 'Não foi possível conferir o lacre inicial agora. Tente novamente.';
+    consumindoLacre.value = false;
+    return;
+  }
   let consumido: TransferenciaTesouraria | null;
   try {
     consumido = await buscarPorLacre(lacreAbertura.value, hojeISO(), { consumir: true });
@@ -211,6 +247,10 @@ async function confirmar(): Promise<void> {
         <v-alert v-if="lacreNaoEncontrado" type="warning" variant="tonal" density="comfortable">
           Nenhum lacre cadastrado com esse número para hoje. Confira o número ou peça pra
           administração cadastrar na Tesouraria.
+        </v-alert>
+
+        <v-alert v-if="lacreForaDoCaixa" type="warning" variant="tonal" density="comfortable">
+          Este lacre inicial nao esta cadastrado para este caixa, turno e data.
         </v-alert>
 
         <v-alert v-if="erroConsumoLacre" type="error" variant="tonal" density="comfortable">
